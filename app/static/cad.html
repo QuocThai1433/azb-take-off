@@ -1959,7 +1959,7 @@ function ve_TM_bang() {
       <tr><td></td><td colspan="5" class="nho">${esc(r.ly_do)} · ${r.so_hinh} hình, ${r.so_net} nét, ${r.so_chu} chữ${daCo(r) ? ' · <b style="color:#4cc38a">đã có mục cho vùng này</b>' : ""}
         ${r.canh_bao.map(c => `<div class="cb">⚠ ${esc(c)}</div>`).join("")}</td></tr>`).join("")}</table></div>`;
 }
-function zoomVung(k) {
+function zoomTheoKhung(k) {
   S.v.cx = (k[0] + k[2]) / 2; S.v.cy = (k[1] + k[3]) / 2;
   S.v.s = 0.9 * Math.min(W / Math.max(k[2] - k[0], 1e-6), H / Math.max(k[3] - k[1], 1e-6)); veLai();
 }
@@ -1985,7 +1985,7 @@ $("p-tm").addEventListener("click", e => {
     ve_ds(); ve_TM_bang(); return veLai();
   }
   const dong = d.closest("[data-tx]");
-  if (dong && !d.closest("input,select")) { t.xem = +dong.dataset.tx; zoomVung(t.ds.find(r => r.id === t.xem).khung); ve_TM_bang(); }
+  if (dong && !d.closest("input,select")) { t.xem = +dong.dataset.tx; zoomTheoKhung(t.ds.find(r => r.id === t.xem).khung); ve_TM_bang(); }
 });
 // đổi bản vẽ đang mở thì bỏ lớp phủ cũ
 const _moFileGoc = moFile;
