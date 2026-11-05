@@ -470,6 +470,7 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
     da_co = sum(1 for c in _tat_ca_chu(trong) for dong in _nfc(c.noi_dung).splitlines() if RE_DAM_CHU.match(dong))
 
     can_dam = tc.get("nhan_dam", True) or tc.get("nhan_truc", True) or tc.get("nhan_san", True)  # sàn cũng dựa vào dầm
+    layer_cot_bo_sung = []  # layer tự dò thêm là cột: giao diện tự gán loại "Cột" cho các layer này
     n_cb0 = len(canh_bao)
     dam = _phan_loai_dam(_tim_dam(trong, loai_layer, canh_bao), canh_bao) if can_dam else []
     cb_dam = canh_bao[n_cb0:]  # cảnh báo của riêng khâu tìm dầm
@@ -485,6 +486,7 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
         moi = [g for g in them_hinh if not any(g.intersection(u).area > 0.5 * g.area for u in cot_hinh)]
         if moi:
             cot_hinh = list(cot_hinh) + moi
+            layer_cot_bo_sung = list(tu_do)
             canh_bao.append(f"Ngoài layer đã gán Cột, bổ sung {len(moi)} hình cột đúng kích thước ghi trong bản vẽ (40x60...) ở layer "
                             f"{', '.join(repr(t) for t in tu_do)}. Sếp kiểm tra, hoặc gán các layer đó là Cột ở tab Layer.")
     if tc.get("nhan_cot", False) and not cot_hinh:  # chưa gán layer Cột: tự dò theo bảng kích thước cột ghi sẵn (40x60...)
@@ -617,7 +619,8 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
         canh_bao.append(f"Vùng này đã có {da_co} nhãn dầm trong bản vẽ; nhãn mới sẽ nằm cạnh/chồng lên, Sếp xem lại trước khi xuất.")
     nhan = ap_dung_sua(nhan, tc.get("sua"), cao_chu)
     return {"ty_le": ty_le, "nguon_ty_le": nguon_ty_le, "cao_chu": cao_chu, "tang": tang, "tien_to": tien_to,
-            "nhan": nhan, "bong": bong, "loai_dam": loai_dam, "loai_mong": loai_mong, "loai_cot": loai_cot, "loai_coc": loai_coc, "loai_san": loai_san, "canh_bao": canh_bao, "da_co": da_co}
+            "nhan": nhan, "bong": bong, "loai_dam": loai_dam, "loai_mong": loai_mong, "loai_cot": loai_cot, "loai_coc": loai_coc, "loai_san": loai_san, "canh_bao": canh_bao, "da_co": da_co,
+            "layer_cot_bo_sung": layer_cot_bo_sung}
 
 
 def khoa_nhan(x, y):

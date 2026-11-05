@@ -2134,6 +2134,13 @@ async function goiGanNhan(f, phong, giuKhung) {
     veNhanLenHinh(f); veGN(); chonTab("gn"); if (phong) zoomKhung(p.khung); else if (kq.nhan.length && !giuKhung) zoomNhan(0);
     lenh(`Vùng ${S.gn.sel + 1} (${LOAI_GN[p.tc.loai]}): ${kq.nhan.length} nhãn (tỷ lệ 1/${kq.ty_le}, chữ cao ${so(kq.cao_chu * 1000, 0)} mm).`, "ok");
     kq.canh_bao.forEach(w => lenh(w));
+    // Layer app tự dò thêm là cột (40x60...): gán luôn loại "Cột" rồi dán lại một lần cho khỏi còn cảnh báo bổ sung
+    const moi = (kq.layer_cot_bo_sung || []).map(t => f.layers.find(l => l.ten === t)).filter(l => l && (!l.loai || l.loai === "bo_qua") && !l.khoa);
+    if (moi.length && !phong) {
+      moi.forEach(l => { l.loai = "cot"; }); lamMoiKT(); ve_layer();
+      lenh(`Đã gán loại "Cột" cho layer ${moi.map(l => `"${l.ten}"`).join(", ")} (hình cột đúng kích thước ghi trong bản vẽ). Sếp bỏ gán ở tab Layer nếu sai.`, "ok");
+      return goiGanNhan(f, false, true);
+    }
   } catch (e) { lenh(e.message, "loi"); }
 }
 function zoomNhan(i) {  // đưa khung nhìn tới nhãn thứ i (zoom đủ gần để đọc được chữ)
