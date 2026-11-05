@@ -15,7 +15,8 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Res
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import config, ho_so_layer, kiem_tra_layer, luu_tru, nhat_ky
+from . import config, cot_thep, ho_so_layer, kiem_tra_layer, luu_tru, nhat_ky
+from .excel_thep import xuat_excel_thep
 from .tach_mat_bang import do_mat_bang
 from .dxf_reader import _doc_file, cat_vung, doc_ban_ve, doc_ban_ve_cache, hinh_xem, nap_doc, tom_tat_layer, tong_quan
 from . import cong_cu
@@ -212,6 +213,66 @@ def _de_xuat(p, moi=False):
     if moi or "de_xuat" not in p:
         p["de_xuat"] = de_xuat_layer(thong_tin_tu_ban_ve(p["ban_ve"]))
     return p["de_xuat"]
+
+
+class TinhThep(BaseModel):
+    dong: list[dict]
+    loai_bo: list[int] = []
+    id: str | None = None          # bản vẽ đã bóc bê tông, để đối chiếu hàm lượng kg/m³
+    du_an: str = ""
+    nguon: str = ""
+    canh_bao_doc: list[str] = []
+
+
+def _bt_da_boc(pid):
+    """Tổng bê tông kết cấu đã bóc (m³) của bản vẽ, không tính lót; None nếu chưa bấm Tính khối lượng."""
+    p = PHIEN.get(pid) if pid else None
+    if not p or not p.get("kq"):
+        return None
+    v = sum(t["khoi_luong"] for t in p["kq"].get("tong_hop", []) if t["ma"].startswith("be_tong_") and "lot" not in t["ma"])
+    return v or None
+
+
+@app.post("/api/cot-thep/doc-file")
+async def thep_doc_file(file: UploadFile = File(...), sheet: str = Form("")):
+    """Đọc bảng thống kê thép từ Excel / CSV. Chỉ đọc, chưa tính."""
+    try:
+        kq = cot_thep.doc_excel_csv(await file.read(), file.filename or "", sheet or None)
+    except ValueError as ex:
+        raise HTTPException(400, str(ex))
+    log.info("Đọc bảng thép từ %s: %d dòng, %d cảnh báo", file.filename, len(kq["dong"]), len(kq["canh_bao"]))
+    return kq
+
+
+class DocThepCad(BaseModel):
+    id: str
+    khung: list[float]
+
+
+@app.post("/api/cot-thep/doc-cad")
+def thep_doc_cad(yc: DocThepCad):
+    """Đọc bảng thép dựng bằng chữ trong bản vẽ, trong khung người dùng kéo."""
+    if len(yc.khung) != 4:
+        raise HTTPException(400, "Khung phải có 4 số: x0, y0, x1, y1 (mét).")
+    kq = cot_thep.doc_bang_cad(_phien(yc.id)["ban_ve"], yc.khung)
+    log.info("Đọc bảng thép từ CAD %s: %d dòng", yc.id, len(kq["dong"]))
+    return kq
+
+
+@app.post("/api/cot-thep/tinh")
+def thep_tinh(yc: TinhThep):
+    return cot_thep.tinh(yc.dong, yc.loai_bo, _bt_da_boc(yc.id))
+
+
+@app.post("/api/cot-thep/xuat-excel")
+def thep_xuat_excel(yc: TinhThep):
+    kq = cot_thep.tinh(yc.dong, yc.loai_bo, _bt_da_boc(yc.id))
+    kq["canh_bao_doc"] = yc.canh_bao_doc
+    if not kq["dong"]:
+        raise HTTPException(400, "Chưa có dòng thép nào để xuất.")
+    return Response(xuat_excel_thep(kq, yc.du_an, yc.nguon),
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": 'attachment; filename="cot_thep_theo_bang_thong_ke.xlsx"'})
 
 
 class TachMatBang(BaseModel):
