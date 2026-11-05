@@ -1018,12 +1018,16 @@ function timDoiTuong(m, boQuaKhoa) {
   const x = wx(m.x), y = wy(m.y), tol = 6 / S.v.s;
   let net = null, hinh = null;
   for (const l of f.layers) {
-    if (!l.hien || (l.khoa && !boQuaKhoa)) continue; const g = f.hinh.layers[l.ten]; if (!g) continue;
+    if (!l.hien) continue; const g = f.hinh.layers[l.ten]; if (!g) continue;
+    // Layer khoá vẫn rê chuột xem được các đối tượng đã chọn (để xem S, P của thứ đang bóc)
+    const khoaL = l.khoa && !boQuaKhoa, daChon = (k, i) => S.chon.some(c => c.ten === l.ten && c.k === k && c.i === i);
     g.net.forEach((p, i) => {
+      if (khoaL && !daChon("net", i)) return;
       const bb = bbCua(p); if (x < bb[0] - tol || x > bb[1] + tol || y < bb[2] - tol || y > bb[3] + tol) return;
       const d = kcDoan(p, x, y); if (d <= tol && (!net || d < net.d)) net = {ten:l.ten, k:"net", i, d};
     });
     g.hinh.forEach((p, i) => {
+      if (khoaL && !daChon("hinh", i)) return;
       const bb = bbCua(p); if (x < bb[0] || x > bb[1] || y < bb[2] || y > bb[3]) return;
       if (!pip(p, x, y)) return;
       const a = g.hi[i].a; if (!hinh || a < hinh.a) hinh = {ten:l.ten, k:"hinh", i, a};
