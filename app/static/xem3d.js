@@ -102,6 +102,27 @@
     for (let i = 1; i < vong.length; i++) sh.holes.push(new THREE.Path(vong[i]));
     return sh;
   }
+  // Cụm khối chính: các khối nối nhau khi hộp mặt bằng cách nhau <= D (m). Trả về chỉ số khối trong cụm lớn nhất.
+  // Dùng để khung nhìn đầu tiên ôm đúng chỗ có cấu kiện, không ôm cả bản vẽ khi cấu kiện rải rác.
+  function cumChinh(boxes, D) {
+    const n = boxes.length;
+    if (n === 0) return [];
+    if (n > 3000) return boxes.map((_, i) => i);   // quá nhiều: bỏ qua, coi như một cụm
+    const cha = Array.from({length: n}, (_, i) => i);
+    const goc = i => { while (cha[i] !== i) { cha[i] = cha[cha[i]]; i = cha[i]; } return i; };
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      const a = boxes[i], b = boxes[j];
+      const dx = Math.max(0, b[0] - a[2], a[0] - b[2]), dz = Math.max(0, b[1] - a[3], a[1] - b[3]);
+      if (Math.hypot(dx, dz) <= D) cha[goc(i)] = goc(j);
+    }
+    const dem = new Map();
+    for (let i = 0; i < n; i++) { const r = goc(i); dem.set(r, (dem.get(r) || 0) + 1); }
+    let best = null, sl = -1;
+    dem.forEach((c, r) => { if (c > sl) { sl = c; best = r; } });
+    const kq = [];
+    for (let i = 0; i < n; i++) if (goc(i) === best) kq.push(i);
+    return kq;
+  }
 
   window.xem3D = function (d) {
     if (typeof THREE === "undefined" || !THREE.OrbitControls) {
@@ -728,12 +749,33 @@
 
     // ---------- khởi động ----------
     dung(); datMoiTruong(); ap();
-    { const [p, t] = goc("iso"); cam.position.copy(p); dk.target.copy(t); dk.update(); }
+    // Khung nhìn đầu tiên: ôm cụm khối chính. Khi cấu kiện rải rác trên cả bản vẽ, ôm toàn bản vẽ sẽ làm khối nhỏ chỉ còn vài pixel.
+    let khungNote = "";
+    {
+      const ds = [...objs.values()].filter(o => o.meshes.length).map(o => { const b = new THREE.Box3(); o.meshes.forEach(m => b.expandByObject(m)); return {o, b}; });
+      const kichXZ = ds.map(x => Math.max(x.b.max.x - x.b.min.x, x.b.max.z - x.b.min.z)).sort((p, q) => p - q);
+      const trungVi = kichXZ.length ? Math.max(kichXZ[kichXZ.length >> 1], 0.2) : 1;
+      const D = Math.max(50, 25 * trungVi);
+      const cum = cumChinh(ds.map(x => [x.b.min.x, x.b.min.z, x.b.max.x, x.b.max.z]), D);
+      const fb = new THREE.Box3();
+      cum.forEach(i => fb.union(ds[i].b));
+      if (!fb.isEmpty() && cum.length < ds.length) {
+        const fc = fb.getCenter(new THREE.Vector3()), fs = fb.getSize(new THREE.Vector3());
+        const fk = Math.max(fs.x, fs.y, fs.z, 0.5), dist = fk * 2.4 + 1.2;
+        const hu = new THREE.Vector3(0.5625, 0.5, 0.6875).normalize();   // hướng góc nhìn 3D
+        cam.position.copy(fc).add(hu.multiplyScalar(dist)); dk.target.copy(fc);
+        dk.minDistance = Math.max(0.3, Math.min(bk * 0.02, fk * 0.2));
+        khungNote = `Khung đầu tiên ôm ${cum.length} khối gần nhau nhất (${f2(fs.x, 1)} × ${f2(fs.z, 1)} m), vì ${ds.length - cum.length} khối còn lại nằm xa hơn trên ${f2(bk, 0)} m. Bấm Vừa để xem cả bản vẽ.`;
+      } else {
+        const [p, t] = goc("iso"); cam.position.copy(p); dk.target.copy(t);
+      }
+      dk.update();
+    }
     datLai(); addEventListener("resize", datLai);
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(datLai) : null; ro && ro.observe(kg);
     capNhatPn();
     $("#x3-tt").textContent = `Cao tầng ${H} m · ${(d.cau_kien || []).filter(c => c.loai_bo).length} cấu kiện bị loại (xám mờ)` + (coOng ? ` · ${holes.length} lỗ khoét · ${vaCham.length + vaMep.length} va chạm` : "");
-    $("#x3-ft").textContent = "Chuột trái: xoay · Phải: dịch · Lăn: zoom · Bấm: chọn · Nhấp đúp: bay tới · Bấm ❔ Hướng dẫn hoặc phím ? để xem chi tiết. Khối dựng từ hình 2D và chiều cao đã tính, chưa phải mô hình BIM.";
+    $("#x3-ft").textContent = (khungNote ? khungNote + " · " : "") + "Chuột trái: xoay · Phải: dịch · Lăn: zoom · Bấm: chọn · Nhấp đúp: bay tới · Bấm ❔ Hướng dẫn hoặc phím ? để xem chi tiết. Khối dựng từ hình 2D và chiều cao đã tính, chưa phải mô hình BIM.";
     let chay = true;
     const bnd = new THREE.Vector3();
     (function vong() {
