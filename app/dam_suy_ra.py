@@ -69,7 +69,7 @@ def suy_dam(ban_ve, loai_layer):
         if not any(k.intersection(u).area > 0.95 * k.area for u in khung_duy_nhat):
             khung_duy_nhat.append(k)
 
-    dai_dam = []
+    dai_dam, manh_le = [], []
     for k in khung_duy_nhat:
         o_trong = [o.intersection(k) for o in ods if k.contains(o.centroid)]
         o_trong = [o for o in o_trong if O_NHO_NHAT * k.area <= o.area < O_LON_NHAT * k.area]
@@ -83,10 +83,12 @@ def suy_dam(ban_ve, loai_layer):
         for g in _manh(du):
             if g.area > 1e-4:
                 dai_k.append(g)
-                canh_bao.append(
-                    f"Khung dầm có phần dầm {g.area:.3f} m² không theo lưới chữ nhật, gom thành một dầm riêng, Sếp kiểm tra.")
+                manh_le.append(g.area)
         dai_dam.extend(dai_k)
 
+    if manh_le:  # gộp một dòng, không lặp mỗi mảnh một cảnh báo
+        canh_bao.append(f"Khung dầm có {len(manh_le)} phần dầm nhỏ ({min(manh_le):.3f}-{max(manh_le):.3f} m²) không theo lưới chữ nhật, "
+                        "gom thành dầm riêng, Sếp kiểm tra.")
     if not dai_dam:
         canh_bao.append("Không suy ra được dầm: không khung dầm nào chứa ô trống.")
         return replace(ban_ve, canh_bao=canh_bao), loai_layer
