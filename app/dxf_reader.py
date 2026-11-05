@@ -99,6 +99,21 @@ def _cac_entity(layout_or_insert, layer_cha=None, do_sau=0):
                     yield attr
                 yield from _cac_entity(e, layer, do_sau + 1)
             continue
+        if e.dxftype() == "DIMENSION":
+            # Đường kích thước (dim) là entity DIMENSION trỏ tới block *D ẩn: bung ra đường gióng, đường dim, mũi tên, chữ
+            if do_sau < 8:
+                try:
+                    con = list(e.virtual_entities())
+                except Exception:
+                    con = []  # dim hỏng / thiếu block: bỏ qua
+                for c in con:
+                    if c.dxf.get("layer", "0") == "0":
+                        c.dxf.layer = layer
+                    if c.dxftype() == "INSERT":  # mũi tên (block)
+                        yield from _cac_entity(c, c.dxf.layer, do_sau + 1)
+                    else:
+                        yield c
+            continue
         yield e
 
 
@@ -290,7 +305,7 @@ def doc_ban_ve(duong_dan, oda_path=None, don_vi="auto"):
     return BanVe(ten_file=ten, he_so=he_so, don_vi=ten_don_vi, layers=layers, canh_bao=canh_bao, doc=doc)
 
 
-VERSION_CACHE = 1  # tăng số này khi đổi logic doc_ban_ve để bỏ cache cũ
+VERSION_CACHE = 2 # tăng số này khi đổi logic doc_ban_ve để bỏ cache cũ
 
 
 def doc_ban_ve_cache(duong_dan, oda_path, don_vi, file_cache):
