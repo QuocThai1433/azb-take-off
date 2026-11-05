@@ -1,0 +1,26 @@
+# CẤU HÌNH CHUNG
+
+# Đường dẫn ODA File Converter (miễn phí, dùng để đổi DWG -> DXF).
+# Tải tại trang Open Design Alliance, cài xong sửa đường dẫn cho đúng phiên bản.
+oda_path: "C:/Program Files/ODA/ODAFileConverter 27.10.0/ODAFileConverter.exe"
+
+# Thông số mặc định hiện trên giao diện (đơn vị m). Người dùng sửa lại cho từng bản vẽ.
+mac_dinh:
+  chieu_cao_tang: 3.6        # từ mặt sàn tầng này đến mặt sàn tầng trên
+  day_san: 0.12              # dùng khi ô sàn không có nhãn t=...
+  chieu_cao_dam: 0.5         # dùng khi dầm không có nhãn bxh
+  day_mong: 0.8              # dùng khi móng không có nhãn
+  lot_mong_day: 0.1          # bê tông lót móng
+  lot_mong_mo_rong: 0.1      # lót rộng hơn móng mỗi phía
+  so_tang_giong_nhau: 1
+  don_vi_ban_ve: auto        # auto | mm | cm | m
+
+# Ngưỡng kiểm tra
+kiem_tra:
+  khoang_cach_nhan_toi_da: 1.5   # m - chữ cách cấu kiện xa hơn mức này thì không gán
+  lech_kich_thuoc_nhan: 0.05     # 5% - kích thước trên nhãn lệch hình vẽ quá mức này thì cảnh báo
+  dien_tich_toi_thieu: 0.0004    # m2 - hình nhỏ hơn coi là rác nét vẽ
+  nguong_trung_lap: 0.98         # hai hình chồng nhau trên 98% coi là vẽ trùng
+  h_dam_hop_ly: [0.15, 2.0]      # m - h dầm ngoài khoảng này thì cảnh báo
+  day_san_hop_ly: [0.05, 0.6]    # m - t sàn ngoài khoảng này thì cảnh báo
+  sai_lech_cho_phep: 0.02        # 2% - tiêu chí nghiệm thu khi đối chiếu

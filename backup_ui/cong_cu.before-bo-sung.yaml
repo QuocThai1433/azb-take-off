@@ -1,0 +1,95 @@
+# BỘ CÔNG CỤ TÍNH VÀ CÔNG THỨC CHUNG CỦA TỪNG CẤU KIỆN
+# Mỗi công cụ có một bộ công thức mặc định. Trên giao diện, Sếp sửa được công thức rồi bấm "Lưu làm mặc định":
+# bản sửa được ghi vào data/cong_cu_tuy_chinh.yaml (không đụng file này), bấm "Khôi phục" để quay về bản gốc.
+#
+# Biến dùng trong biểu thức (mỗi ký hiệu cấu kiện là một dòng, số liệu của MỘT cái, n là số lượng):
+#   n  số lượng            a  dài (cạnh lớn, m)      b  rộng (cạnh nhỏ, m)     h  cao / dày (m)
+#   S  diện tích (m²)      P  chu vi (m)             L  chiều dài (m, đường hoặc cạnh dài)
+#   cộng với các "tham_so" khai báo riêng của từng công cụ (ví dụ c, H, d).
+# Toán tử: + - * / ** và ngoặc; hàm: min, max, abs, sqrt, round.
+#
+# nguon: loại đối tượng lấy khi quét chọn mặt bằng
+#   mong | cot | da_kieng | dam | san | khac (lấy mọi đối tượng đã chọn)
+
+dao_dat:
+  ten: "Tính KL đào đất"
+  nguon: mong
+  mo_ta: "Đào hố móng theo từng ký hiệu móng: (dài + 2c) × (rộng + 2c) × sâu H."
+  buoc1: "Quét chọn mặt bằng móng"
+  buoc2: "Quét chọn chi tiết móng (lấy cao độ, kích thước)"
+  tham_so:
+    c: {ten: "Mở rộng đáy hố mỗi phía (m)", gia_tri: 0.3}
+    H: {ten: "Chiều sâu đào (m)", gia_tri: 1.5}
+  cong_thuc:
+    - {ten: "Đào đất hố móng", dv: "m3", bt: "n*(a+2*c)*(b+2*c)*H"}
+
+mong:
+  ten: "Tính KL móng"
+  nguon: mong
+  mo_ta: "Bóc bê tông lót, bê tông và ván khuôn móng theo từng ký hiệu móng."
+  buoc1: "Quét chọn mặt bằng móng"
+  buoc2: "Quét chọn chi tiết móng (lấy chiều cao móng)"
+  tham_so:
+    d: {ten: "Lót rộng hơn móng mỗi phía (m)", gia_tri: 0.1}
+    tl: {ten: "Dày bê tông lót (m)", gia_tri: 0.1}
+  cong_thuc:
+    - {ten: "Bê tông lót móng", dv: "m3", bt: "n*(a+2*d)*(b+2*d)*tl"}
+    - {ten: "Bê tông móng", dv: "m3", bt: "n*S*h"}
+    - {ten: "Ván khuôn móng", dv: "m2", bt: "n*P*h"}
+
+da_kieng:
+  ten: "Tính KL đà kiềng"
+  nguon: da_kieng
+  mo_ta: "Đà kiềng (giằng móng) nằm trên đất nên ván khuôn chỉ tính hai thành bên."
+  buoc1: "Quét chọn mặt bằng đà kiềng"
+  buoc2: "Quét chọn chi tiết đà kiềng (lấy b × h)"
+  tham_so: {}
+  cong_thuc:
+    - {ten: "Bê tông đà kiềng", dv: "m3", bt: "n*L*b*h"}
+    - {ten: "Ván khuôn đà kiềng", dv: "m2", bt: "n*L*2*h"}
+
+cot:
+  ten: "Tính KL cột"
+  nguon: cot
+  mo_ta: "Cột theo ký hiệu: bê tông = diện tích × cao, ván khuôn = chu vi × cao."
+  buoc1: "Quét chọn mặt bằng cột"
+  buoc2: "Quét chọn chi tiết cột (lấy chiều cao)"
+  tham_so: {}
+  cong_thuc:
+    - {ten: "Bê tông cột", dv: "m3", bt: "n*S*h"}
+    - {ten: "Ván khuôn cột", dv: "m2", bt: "n*P*h"}
+
+dam:
+  ten: "Tính KL dầm"
+  nguon: dam
+  mo_ta: "Dầm theo ký hiệu: dài × rộng × cao; ván khuôn tính đáy và hai thành."
+  buoc1: "Quét chọn mặt bằng dầm"
+  buoc2: "Quét chọn chi tiết dầm (lấy b × h)"
+  tham_so: {}
+  cong_thuc:
+    - {ten: "Bê tông dầm", dv: "m3", bt: "n*L*b*h"}
+    - {ten: "Ván khuôn dầm", dv: "m2", bt: "n*L*(b+2*h)"}
+
+san:
+  ten: "Tính KL sàn"
+  nguon: san
+  mo_ta: "Sàn theo ký hiệu: diện tích × dày."
+  buoc1: "Quét chọn mặt bằng sàn"
+  buoc2: "Quét chọn ghi chú / chi tiết sàn (lấy chiều dày)"
+  tham_so: {}
+  cong_thuc:
+    - {ten: "Bê tông sàn", dv: "m3", bt: "n*S*h"}
+    - {ten: "Ván khuôn sàn", dv: "m2", bt: "n*S"}
+
+khac:
+  ten: "Cấu kiện khác"
+  nguon: khac
+  mo_ta: "Cấu kiện bất kỳ: lấy mọi đối tượng đã quét chọn, tự chọn công thức."
+  buoc1: "Quét chọn đối tượng trên mặt bằng"
+  buoc2: "Quét chọn chi tiết (nếu có)"
+  tham_so: {}
+  cong_thuc:
+    - {ten: "Diện tích", dv: "m2", bt: "n*S"}
+    - {ten: "Thể tích = S × dày", dv: "m3", bt: "n*S*h"}
+    - {ten: "Chiều dài", dv: "m", bt: "n*L"}
+    - {ten: "Ván khuôn thành = chu vi × cao", dv: "m2", bt: "n*P*h"}

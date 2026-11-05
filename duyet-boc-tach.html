@@ -1,0 +1,403 @@
+<title>Duyệt Bóc Tách</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Bố cục: khung model-space đen như CAD bên trái (nhãn đầy đủ), hàng đợi cảnh báo / khối lượng / nhật ký bên phải, thanh xuất ở trên. */
+:root{
+  --bg:#edf2f4; --panel:#ffffff; --panel2:#f5f9fa; --line:#d3dfe3; --line2:#c2d1d7; --fg:#13232a; --mute:#566c76;
+  --cad:#0b8f6d; --on-cad:#ffffff; --ok:#17995f; --warn:#b4720f; --bad:#d23a2c; --accent:#1b7aa6;
+  --accent-bg:rgba(27,122,166,.10); --hover:rgba(0,0,0,.04);
+  --sans:"IBM Plex Sans",system-ui,"Segoe UI",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0a1115; --panel:#101a20; --panel2:#0d171c; --line:#1d2c34; --line2:#2a3e49; --fg:#d9e5e9; --mute:#84999f;
+  --cad:#2fd4a7; --on-cad:#04201a; --ok:#3ecf8e; --warn:#f2b84b; --bad:#ff6b5e; --accent:#5bc0eb;
+  --accent-bg:rgba(91,192,235,.10); --hover:rgba(255,255,255,.04); color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0a1115; --panel:#101a20; --panel2:#0d171c; --line:#1d2c34; --line2:#2a3e49; --fg:#d9e5e9; --mute:#84999f;
+  --cad:#2fd4a7; --on-cad:#04201a; --ok:#3ecf8e; --warn:#f2b84b; --bad:#ff6b5e; --accent:#5bc0eb;
+  --accent-bg:rgba(91,192,235,.10); --hover:rgba(255,255,255,.04); color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--sans);padding-block:20px 40px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
+h1{margin:0;font-size:22px;font-weight:600;letter-spacing:-.01em;text-wrap:balance}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.chip{font:12px var(--mono);color:var(--mute);border:1px solid var(--line);border-radius:4px;padding:2px 8px;background:var(--panel2)}
+.chip b{color:var(--fg);font-weight:500}
+.chip.bad{color:var(--bad);border-color:var(--bad)}
+.chip.ok{color:var(--ok);border-color:var(--ok)}
+.bar{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;display:flex;flex-wrap:wrap;gap:14px 24px;align-items:center}
+.seg{flex:1 1 260px;min-width:0}
+.segtrack{display:flex;height:8px;border-radius:2px;overflow:hidden;background:var(--line);gap:2px}
+.segtrack i{display:block;height:100%;transition:width .25s}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:8px;font-size:12px;color:var(--mute)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+.d-ok{background:var(--ok)}.d-warn{background:var(--warn)}.d-bad{background:var(--bad)}
+.primary{background:var(--cad);color:var(--on-cad);border:0;border-radius:4px;padding:9px 16px;font-weight:600}
+.primary:disabled{background:var(--line);color:var(--mute);cursor:not-allowed}
+.ghost{background:transparent;border:1px solid var(--line);border-radius:4px;padding:6px 10px}
+.ghost:hover{border-color:var(--mute)}
+main{display:grid;grid-template-columns:minmax(0,2fr) minmax(300px,1fr);gap:16px;align-items:start}
+@media(max-width:900px){main{grid-template-columns:minmax(0,1fr)}}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.hbtns{display:flex;gap:8px}
+/* model space: luôn nền đen như CAD, không đổi theo giao diện */
+.canvas{position:relative;background:#050709;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+svg{display:block;width:100%;height:auto;touch-action:manipulation}
+.cl{font:10.5px var(--mono);fill:#e05cf0;pointer-events:none}
+.cl.mid{text-anchor:middle}
+.tools{position:absolute;right:10px;top:10px;display:flex;gap:4px}
+.tools button{width:32px;height:32px;border-radius:4px;border:1px solid #2b3a42;background:#0d1419;color:#d9e5e9;font:500 16px var(--mono);line-height:1;padding:0}
+.tools button:hover{border-color:#6f858f}
+.read{position:absolute;left:10px;bottom:8px;font:11px var(--mono);color:#8a9aa3}
+.keys{display:flex;flex-wrap:wrap;gap:4px 12px;font:11px var(--mono);color:#8a9aa3;padding:10px 120px 4px 10px}
+.keys i{display:inline-block;width:10px;height:10px;border:1.5px solid;margin-right:5px;vertical-align:-1px}
+.hit{cursor:pointer}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px}
+.tabs{display:flex;border-bottom:1px solid var(--line)}
+.tab{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:11px 8px;color:var(--mute);font-weight:500}
+.tab[aria-selected=true]{color:var(--fg);border-bottom-color:var(--cad)}
+.pane{padding:12px;display:flex;flex-direction:column;gap:10px;max-height:640px;overflow-y:auto}
+.issue{border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:4px;padding:10px 12px;background:var(--panel2);cursor:pointer;display:flex;flex-direction:column;gap:6px}
+.issue.bad{border-left-color:var(--bad)}
+.issue.on{border-color:var(--accent);border-left-color:var(--accent)}
+.issue h3{margin:0;font-size:13.5px;font-weight:600}
+.issue p{margin:0;color:var(--mute);font-size:13px;display:none}
+.issue.open p{display:block}
+.fixes{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.fixes button{background:var(--line);border:0;border-radius:4px;padding:5px 10px;font-size:12.5px}
+.fixes button:hover{background:var(--line2)}
+.tag{font:11px var(--mono);padding:1px 6px;border-radius:3px;border:1px solid var(--line);color:var(--mute);white-space:nowrap}
+.tag.edited{color:var(--accent);border-color:var(--accent)}.tag.confirmed{color:var(--ok);border-color:var(--ok)}
+.ttl{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.sev{font:11px var(--mono);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.sev.bad{color:var(--bad)}.sev.warn{color:var(--warn)}
+table{border-collapse:collapse;width:100%}
+.tw{overflow-x:auto}
+th{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--mute);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono)}
+tr.row{cursor:pointer}tr.row:hover td{background:var(--hover)}tr.row.on td{background:var(--accent-bg)}
+tfoot td{font-weight:600;border-bottom:0}
+.detail{padding:14px;display:flex;flex-direction:column;gap:10px}
+.detail h2{margin:0;font-size:15px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 16px}
+.kv small{display:block;font:11px var(--mono);color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.kv span{font-family:var(--mono)}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mute)}
+select,input[type=number]{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:6px 8px;min-width:0}
+.acts{display:flex;flex-wrap:wrap;gap:8px}
+.log{font:12px var(--mono);color:var(--mute);display:flex;gap:10px}
+.log time{color:var(--fg);flex:none}
+.empty{color:var(--mute);padding:14px;text-align:center}
+pre{margin:0;background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:10px;font:12px var(--mono);overflow-x:auto;color:var(--fg)}
+.toast{font-size:13px;color:var(--ok)}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Duyệt bóc tách bản vẽ</h1>
+      <div class="meta">
+        <span class="chip"><b>MatBangMong_T1.dxf</b></span>
+        <span class="chip">Mặt bằng móng, nhãn đọc từ bản vẽ</span>
+        <span class="chip" id="scaleChip"></span>
+        <span class="chip">Mẫu minh họa</span>
+      </div>
+    </div>
+    <div class="hbtns"><button class="ghost" id="themeBtn" aria-label="Đổi giao diện sáng hoặc tối"></button></div>
+  </header>
+
+  <section class="bar" aria-label="Tiến độ duyệt">
+    <div class="seg">
+      <div class="segtrack" id="track"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+      <button class="primary" id="exportBtn" data-act="export"></button>
+      <span class="toast" id="toast" role="status"></span>
+    </div>
+  </section>
+
+  <main>
+    <div class="col">
+      <div class="canvas">
+        <div class="keys">
+          <span><i style="border-color:#19c3d6"></i>Móng M</span><span><i style="border-color:#f08a1c"></i>Cột C</span>
+          <span><i style="border-color:#e8d23a"></i>Dầm D</span><span><i style="border-color:#3d7fe0"></i>Sàn S</span><span><i style="border-color:#2ecf6e"></i>Chưa nhận dạng</span>
+        </div>
+        <svg id="svg" viewBox="0 0 940 420" role="img" aria-label="Mặt bằng móng với nhãn đầy đủ, đối tượng nghi sai có vòng cảnh báo"></svg>
+        <div class="tools"><button data-act="zin" aria-label="Phóng to">+</button><button data-act="zout" aria-label="Thu nhỏ">−</button><button data-act="zfit" aria-label="Vừa khung">⤢</button></div>
+        <div class="read" id="read">x 0,00 m · y 0,00 m</div>
+      </div>
+      <div class="card detail" id="detail"></div>
+    </div>
+
+    <div class="card">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="t-issues" data-tab="issues" aria-selected="true"></button>
+        <button class="tab" role="tab" id="t-qty" data-tab="qty" aria-selected="false">Khối lượng</button>
+        <button class="tab" role="tab" id="t-log" data-tab="log" aria-selected="false"></button>
+      </div>
+      <div class="pane" id="pane"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+const S = 56, OX = 90, OY = 70;
+const CL = {foot:'#19c3d6', col:'#f08a1c', beam:'#e8d23a', slab:'#3d7fe0', unk:'#2ecf6e'};
+const vn = (n, d = 2) => n.toLocaleString('vi-VN', {minimumFractionDigits: d, maximumFractionDigits: d});
+const mm = v => Math.round(v * 1000);
+const $ = q => document.getElementById(q) || document.querySelector(q);
+const px = v => OX + v * S, py = v => OY + v * S;
+
+/* Hình học tính theo mét. x, y là góc trên trái của hộp bao. */
+const foot = (id, cx, cy, src) => ({id, type:'foot', name:'M1', x:cx-0.6, y:cy-0.6, w:1.2, h:1.2, depth:0.7, src: src || 'Layer MONG, chữ trong vùng', status:'auto'});
+const col  = (id, cx, cy) => ({id, type:'col', name:'C1', x:cx-0.15, y:cy-0.15, w:0.3, h:0.3, depth:null, src:'Layer COT, chữ trong vùng', status:'auto'});
+const beamH = (id, name, x, y, len, depth) => ({id, type:'beam', name, x, y:y-0.11, w:len, h:0.22, bLabel:0.22, depth, src:'Layer DAM, chữ gần nhất', status:'auto'});
+const beamV = (id, name, x, y, len, depth, b = 0.22) => ({id, type:'beam', name, x:x-b/2, y, w:b, h:len, bLabel:0.22, depth, src:'Layer DAM, chữ gần nhất', status:'auto'});
+
+const state = {
+  scaleOk:false, sel:'u1', tab:'issues', logs:[], exported:null, exp:'i-unk', vb:{x:0, y:0, w:940, h:420},
+  items:[
+    {id:'s1', type:'slab', name:'S1', x:-0.2, y:-0.2, w:12.4, h:5.2, depth:0.12, src:'Layer SAN, chữ "S1 t=120"', status:'auto'},
+    beamH('d1a','D1',0,0,6,0.5), beamH('d1b','D1',6,0,6,0.5), beamH('d1c','D1',0,4.8,6,0.5), beamH('d1d','D1',6,4.8,6,0.5),
+    beamV('d2a','D2',0,0,4.8,0.4), beamV('d2b','D2',6,0,4.8,0.4), beamV('d2c','D2',12,0,4.8,0.4,0.30),
+    foot('m1',0,0), foot('m2',6,0), foot('m3',12,0), foot('m4',0,4.8), foot('m5',6,4.8), foot('m6',12,4.8,'Chữ gần nhất cách 0,9 m, không có layer'),
+    col('c1',0,0), col('c2',6,0), col('c3',12,0), col('c4',0,4.8), col('c5',6,4.8), col('c6',12,4.8),
+    {id:'u1', type:'unk', name:null, x:2.0, y:1.9, w:1.0, h:1.0, depth:null, src:'Hình vuông 1,0 m, layer 0, không có chữ', status:'auto'}
+  ]
+};
+const colIds = ['c1','c2','c3','c4','c5','c6'];
+const get = id => state.items.find(i => i.id === id);
+const log = t => state.logs.unshift({t: new Date().toLocaleTimeString('vi-VN'), text: t});
+const confirmItem = id => { const i = get(id); i.status = 'confirmed'; log('Xác nhận ' + labelText(i)); };
+
+function labelText(i){
+  if (i.type === 'foot') return `${i.name} ${mm(i.w)}x${mm(i.h)}x${mm(i.depth)}`;
+  if (i.type === 'col')  return `${i.name} ${mm(i.w)}x${mm(i.h)}`;
+  if (i.type === 'beam') return `${i.name} ${mm(i.bLabel)}x${mm(i.depth)}`;
+  if (i.type === 'slab') return `${i.name} t=${mm(i.depth)}`;
+  return i.name || 'Chưa nhận dạng';
+}
+const beamLen = i => Math.max(i.w, i.h), beamB = i => Math.min(i.w, i.h);
+function volume(i){
+  if (i.type === 'foot' || i.type === 'slab') return i.w * i.h * i.depth;
+  if (i.type === 'beam') return beamLen(i) * beamB(i) * i.depth;
+  if (i.type === 'col') return i.depth ? i.w * i.h * i.depth : null;
+  return null;
+}
+
+const issues = [
+  {id:'i-scale', sev:'bad', targets:[], title:'Chưa xác nhận đơn vị và tỉ lệ',
+   text:'File không ghi đơn vị. Nhãn M1 1200x1200x700 khớp với hình vẽ nếu 1 đơn vị = 1 mm.',
+   fixes:[{label:'Dùng 1 đơn vị = 1 mm', fn:()=>{state.scaleOk=true; log('Xác nhận đơn vị mm');}}]},
+  {id:'i-unk', sev:'bad', targets:['u1'], title:'Hình vuông xanh lá 1,0 × 1,0 m chưa có nhãn',
+   text:'Không có chữ ghi chú, layer chung. Chọn loại để tính hoặc loại khỏi bảng.',
+   fixes:['Hố thang máy','Hố ga','Lỗ chờ'].map(l=>({label:l, fn:()=>{const u=get('u1'); u.name=l; u.status='edited'; log('Gán nhãn: '+l);}}))},
+  {id:'i-d2c', sev:'warn', targets:['d2c'], title:'D2 bên phải: nhãn 220, hình đo 300',
+   text:'Nhãn ghi bề rộng 220 mm nhưng nét vẽ rộng 300 mm. Chọn số dùng để tính.',
+   fixes:[{label:'Theo nhãn (220)', fn:()=>{const d=get('d2c'); d.x=12-0.11; d.w=0.22; d.status='edited'; log('D2 bên phải: dùng 220 theo nhãn');}},
+          {label:'Theo hình vẽ (300)', fn:()=>{const d=get('d2c'); d.bLabel=0.30; d.status='edited'; log('D2 bên phải: dùng 300 theo hình vẽ');}}]},
+  {id:'i-col', sev:'warn', targets:colIds, title:'Cột C1 chưa có chiều cao',
+   text:'Nhãn chỉ có tiết diện 300x300 nên chưa tính được thể tích. Nhập chiều cao ở ô bên dưới bản vẽ, hoặc chọn nhanh.',
+   fixes:[{label:'Dùng cao 3,0 m', fn:()=>{colIds.forEach(id=>{const c=get(id); if(c){c.depth=3.0; c.status='edited';}}); log('Đặt cột C1 cao 3,0 m');}},
+          {label:'Bỏ thể tích cột', fn:()=>{colIds.forEach(id=>{if(get(id)) get(id).status='confirmed';}); log('Bỏ qua thể tích cột C1');}}]},
+  {id:'i-m6', sev:'warn', targets:['m6'], title:'Nhãn móng góc dưới phải gán từ chữ ở xa',
+   text:'Chữ "M1 1200x1200x700" cách móng 0,9 m và không có layer. Độ tin cậy 78%.',
+   fixes:[{label:'Đúng, xác nhận', fn:()=>confirmItem('m6')}]}
+].map(i => ({...i, resolved:false}));
+
+const itemIssues = it => issues.filter(i => !i.resolved && i.targets.includes(it.id));
+function level(it){ const m = itemIssues(it); return m.some(i => i.sev === 'bad') ? 'bad' : m.length ? 'warn' : 'ok'; }
+const openIssues = () => issues.filter(i => !i.resolved);
+function applyFix(issueId, k){ const is = issues.find(i => i.id === issueId); is.fixes[k].fn(); is.resolved = true; state.exported = null; render(); }
+const LV = {ok:'var(--ok)', warn:'var(--warn)', bad:'var(--bad)'};
+const RING = {warn:'#f2b84b', bad:'#ff6b5e'};
+
+/* ---- Bản vẽ ---- */
+function drawCanvas(){
+  const order = ['slab','beam','foot','col','unk'];
+  let shapes = '', labels = '', hits = '', halos = '';
+  const items = [...state.items].sort((a,b) => order.indexOf(a.type) - order.indexOf(b.type));
+  items.forEach(i => {
+    const X = px(i.x), Y = py(i.y), W = i.w * S, H = i.h * S, lab = labelText(i);
+    if (i.type === 'slab') shapes += `<rect x="${X}" y="${Y}" width="${W}" height="${H}" fill="none" stroke="${CL.slab}" stroke-width="1"/>`;
+    if (i.type === 'beam') shapes += `<rect x="${X}" y="${Y}" width="${W}" height="${H}" fill="none" stroke="${CL.beam}" stroke-width="1"/><rect x="${X+1.5}" y="${Y+1.5}" width="${Math.max(0,W-3)}" height="${Math.max(0,H-3)}" fill="none" stroke="#a88a12" stroke-width="1"/>`;
+    if (i.type === 'foot') shapes += `<rect x="${X}" y="${Y}" width="${W}" height="${H}" fill="none" stroke="${CL.foot}" stroke-width="1"/>`;
+    if (i.type === 'col')  shapes += `<rect x="${X}" y="${Y}" width="${W}" height="${H}" fill="none" stroke="${CL.col}" stroke-width="1.4"/><rect x="${X+W/2-3.5}" y="${Y+H/2-3.5}" width="7" height="7" fill="none" stroke="${CL.beam}" stroke-width="1"/>`;
+    if (i.type === 'unk')  shapes += `<rect x="${X}" y="${Y}" width="${W}" height="${H}" fill="none" stroke="${CL.unk}" stroke-width="1.2"/>`;
+    // nhãn đặt theo thói quen CAD: móng ở mép dưới bên phải, cột trong móng, dầm ngang ở trên, dầm dọc bên phải, sàn ở giữa
+    if (i.type === 'foot') labels += `<text class="cl" x="${X+W+4}" y="${Y+H+3}">${lab}</text>`;
+    if (i.type === 'col')  labels += `<text class="cl" x="${X+W/2-0.6*S+4}" y="${Y+H/2-0.6*S+13}">${lab}</text>`;
+    if (i.type === 'beam') labels += i.w > i.h ? `<text class="cl mid" x="${X+W/2}" y="${Y-9}">${lab}</text>` : `<text class="cl" x="${X+W+6}" y="${Y+H/2}">${lab}</text>`;
+    if (i.type === 'slab') labels += `<text class="cl mid" style="font-size:12px" x="${px(9)}" y="${py(2.5)}">${lab}</text>`;
+    if (i.type === 'unk')  labels += `<text class="cl mid" x="${X+W/2}" y="${Y+H/2+4}">${i.name ? lab : '?'}</text>`;
+    const lv = level(i);
+    if (lv !== 'ok') halos += `<rect x="${X-5}" y="${Y-5}" width="${W+10}" height="${H+10}" fill="none" stroke="${RING[lv]}" stroke-width="2" stroke-dasharray="${lv==='bad'?'':'6 3'}" pointer-events="none"/>`;
+    hits += i.type === 'slab'
+      ? `<rect class="hit" data-id="${i.id}" x="${X}" y="${Y}" width="${W}" height="${H}" fill="none" stroke="transparent" stroke-width="10" pointer-events="stroke"/>`
+      : `<rect class="hit" data-id="${i.id}" x="${X-3}" y="${Y-3}" width="${W+6}" height="${H+6}" fill="transparent"/>`;
+  });
+  let sel = '';
+  const s = state.sel && get(state.sel);
+  if (s) sel = `<rect x="${px(s.x)-8}" y="${py(s.y)-8}" width="${s.w*S+16}" height="${s.h*S+16}" fill="none" stroke="#ffffff" stroke-width="1.2" stroke-dasharray="5 3" pointer-events="none"/>`;
+  $('svg').innerHTML = shapes + halos + labels + sel + hits +
+    `<g id="cross" pointer-events="none" visibility="hidden"><line id="chv" stroke="#8a9aa3" stroke-width="1"/><line id="chh" stroke="#8a9aa3" stroke-width="1"/><rect id="chb" width="10" height="10" fill="none" stroke="#8a9aa3"/></g>`;
+}
+
+/* ---- Thanh tiến độ ---- */
+function drawBar(){
+  const cnt = {ok:0, warn:0, bad:0};
+  state.items.forEach(i => cnt[level(i)]++);
+  const total = state.items.length;
+  $('track').innerHTML = ['ok','warn','bad'].map(k => `<i style="width:${cnt[k]/total*100}%;background:${LV[k]}"></i>`).join('');
+  $('legend').innerHTML = `<span><i class="dot d-ok"></i>${cnt.ok} tin cậy cao</span><span><i class="dot d-warn"></i>${cnt.warn} cần xem</span><span><i class="dot d-bad"></i>${cnt.bad} phải xử lý</span><span>${total} đối tượng</span>`;
+  const reds = openIssues().filter(i => i.sev === 'bad').length, b = $('exportBtn');
+  b.disabled = reds > 0;
+  b.textContent = reds ? `Còn ${reds} lỗi đỏ, chưa xuất được` : 'Xuất bảng khối lượng';
+  $('scaleChip').innerHTML = state.scaleOk ? 'Đơn vị <b>mm</b> đã xác nhận' : 'Đơn vị <b>chưa xác nhận</b>';
+  $('scaleChip').className = 'chip ' + (state.scaleOk ? 'ok' : 'bad');
+  $('toast').textContent = '';
+}
+
+/* ---- Khối lượng theo nhóm ---- */
+function groups(){
+  const g = {};
+  state.items.filter(i => i.type !== 'unk').forEach(i => {
+    const key = i.type + '|' + labelText(i);
+    (g[key] = g[key] || {key, type:i.type, text:labelText(i), name:i.name, items:[]}).items.push(i);
+  });
+  return Object.values(g);
+}
+const spec = g => g.text.slice(g.name.length + 1);
+function gVol(g){ const v = g.items.map(volume); return v.some(x => x === null) ? null : v.reduce((a, b) => a + b, 0); }
+const gMeas = g => g.type === 'beam' ? vn(g.items.reduce((a, i) => a + beamLen(i), 0)) + ' m' : g.type === 'slab' ? vn(g.items[0].w * g.items[0].h) + ' m²' : '';
+
+const STAT = {auto:'Tự động', edited:'Đã sửa', confirmed:'Đã xác nhận'};
+function issueCard(i){
+  const on = state.sel && i.targets.includes(state.sel) ? ' on' : '', open = state.exp === i.id ? ' open' : '';
+  return `<div class="issue ${i.sev}${on}${open}" data-iid="${i.id}">
+    <div class="ttl"><h3>${i.title}</h3><span class="sev ${i.sev}">${i.sev==='bad'?'Phải xử lý':'Cần xem'}</span></div>
+    <p>${i.text}</p>
+    <div class="fixes">${i.fixes.map((f,k)=>`<button data-act="fix" data-issue="${i.id}" data-k="${k}">${f.label}</button>`).join('')}</div></div>`;
+}
+function drawPane(){
+  const op = openIssues().sort((a,b) => (a.sev==='bad'?0:1) - (b.sev==='bad'?0:1));
+  $('t-issues').textContent = `Cảnh báo (${op.length})`;
+  $('t-log').textContent = `Nhật ký (${state.logs.length})`;
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === state.tab));
+  let h = '';
+  if (state.tab === 'issues'){
+    h = op.length ? op.map(issueCard).join('') : '<div class="empty">Không còn cảnh báo. Bảng khối lượng sẵn sàng để xuất.</div>';
+  } else if (state.tab === 'qty'){
+    const gs = groups(); let tot = 0;
+    const rows = gs.map(g => {
+      const v = gVol(g); if (v) tot += v;
+      const lv = g.items.some(i => level(i) === 'bad') ? 'bad' : g.items.some(i => level(i) === 'warn') ? 'warn' : 'ok';
+      const st = g.items.every(i => i.status === 'confirmed') ? 'confirmed' : g.items.some(i => i.status === 'edited') ? 'edited' : 'auto';
+      return `<tr class="row${g.items.some(i => i.id === state.sel) ? ' on' : ''}" data-id="${g.items[0].id}"><td><i class="dot d-${lv}"></i> ${g.name}</td><td>${spec(g)}</td><td class="n">${g.items.length}</td><td class="n">${gMeas(g)}</td><td class="n">${v === null ? 'thiếu cao' : vn(v)}</td><td><span class="tag ${st}">${STAT[st]}</span></td></tr>`;
+    }).join('');
+    h = `<div class="tw"><table><thead><tr><th>Tên</th><th>Quy cách</th><th class="n">SL</th><th class="n">Dài / diện tích</th><th class="n">m³</th><th>Nguồn</th></tr></thead><tbody>${rows}</tbody>
+      <tfoot><tr><td colspan="4">Tổng bê tông đã tính (chưa trừ phần chồng nhau)</td><td class="n">${vn(tot)}</td><td></td></tr></tfoot></table></div>`;
+    if (state.exported) h += `<div class="toast">Đã tạo bảng CSV, sao chép bên dưới.</div><pre>${state.exported}</pre><div class="acts"><button class="ghost" data-act="copy">Sao chép CSV</button></div>`;
+  } else {
+    h = state.logs.length ? state.logs.map(l => `<div class="log"><time>${l.t}</time><span>${l.text}</span></div>`).join('') : '<div class="empty">Chưa có thao tác nào.</div>';
+  }
+  $('pane').innerHTML = h;
+}
+
+/* ---- Chi tiết ---- */
+const KIND = {foot:'Móng', col:'Cột', beam:'Dầm', slab:'Sàn', unk:'Chưa nhận dạng'};
+function drawDetail(){
+  const it = state.sel && get(state.sel), el = $('detail');
+  if (!it){ el.innerHTML = '<div class="empty">Chọn một đối tượng trên bản vẽ để xem nguồn nhận dạng và chỉnh sửa.</div>'; return; }
+  const mine = itemIssues(it), v = volume(it);
+  const size = it.type === 'beam' ? `Dài ${vn(beamLen(it))} m · rộng đo ${mm(beamB(it))} mm` : `${mm(it.w)} × ${mm(it.h)} mm`;
+  let edit = '';
+  if (it.type === 'unk') edit = `<label class="f" for="uSel">Loại<select id="uSel" data-act="uname"><option value="">Chưa nhận dạng</option>${['Hố thang máy','Hố ga','Lỗ chờ'].map(l=>`<option${l===it.name?' selected':''}>${l}</option>`).join('')}</select></label>`;
+  else edit = `<label class="f" for="dIn">${it.type==='col'?'Chiều cao (mm), áp dụng cho mọi cột cùng tên':it.type==='slab'?'Chiều dày (mm)':'Chiều sâu (mm)'}<input id="dIn" type="number" min="0" step="10" value="${it.depth ? mm(it.depth) : ''}" placeholder="Chưa có" data-act="depth"></label>`;
+  el.innerHTML = `<div class="ttl"><h2><i class="dot d-${level(it)}"></i> ${KIND[it.type]}: ${labelText(it)}</h2><span class="tag ${it.status}">${STAT[it.status]}</span></div>
+    <div class="grid2"><div class="kv"><small>Kích thước hình vẽ</small><span>${size}</span></div><div class="kv"><small>Thể tích</small><span>${v === null ? 'chưa tính được' : vn(v) + ' m³'}</span></div><div class="kv"><small>Nguồn nhận dạng</small><span>${it.src}</span></div></div>
+    ${mine.length ? `<div class="kv"><small>Cảnh báo</small><span>${mine.map(m=>m.title).join(' · ')}</span></div>` : ''}
+    ${edit}
+    <div class="acts">${it.status!=='confirmed'?'<button class="ghost" data-act="confirm">Xác nhận đúng</button>':''}${it.type==='unk'?'<button class="ghost" data-act="del">Loại khỏi bảng</button>':''}</div>`;
+}
+function render(){ drawCanvas(); drawBar(); drawPane(); drawDetail(); }
+
+/* ---- Phóng to ---- */
+function applyVB(){ const v = state.vb; $('svg').setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`); }
+function zoom(a){
+  const v = state.vb, k = a === 'zin' ? 0.7 : 1 / 0.7;
+  if (a === 'zfit' || (a === 'zout' && v.w * k >= 940)){ state.vb = {x:0, y:0, w:940, h:420}; applyVB(); return; }
+  const it = state.sel && get(state.sel);
+  let cx = v.x + v.w / 2, cy = v.y + v.h / 2;
+  if (a === 'zin' && it){ cx = px(it.x + it.w / 2); cy = py(it.y + it.h / 2); }
+  const w = Math.max(160, v.w * k), h = w * 420 / 940;
+  state.vb = {x: Math.min(Math.max(0, cx - w/2), 940 - w), y: Math.min(Math.max(0, cy - h/2), 420 - h), w, h};
+  applyVB();
+}
+
+/* ---- Sự kiện ---- */
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act],[data-tab],[data-id],[data-iid]');
+  if (!t) return;
+  if (t.dataset.tab){ state.tab = t.dataset.tab; drawPane(); return; }
+  const a = t.dataset.act;
+  if (a === 'fix'){ e.stopPropagation(); applyFix(t.dataset.issue, +t.dataset.k); return; }
+  if (a === 'confirm'){ confirmItem(state.sel); state.exported = null; render(); return; }
+  if (a === 'del'){ const it = get(state.sel); log('Loại khỏi bảng: ' + labelText(it)); state.items = state.items.filter(i => i.id !== state.sel); issues.forEach(i => { if (i.targets.includes(state.sel)) i.resolved = true; }); state.sel = null; render(); return; }
+  if (a === 'export'){
+    const rows = [['Ten','Quy cach','So luong','Dai/Dien tich','m3','Nguon']];
+    groups().forEach(g => { const v = gVol(g), st = g.items.every(i => i.status === 'confirmed') ? 'confirmed' : g.items.some(i => i.status === 'edited') ? 'edited' : 'auto'; rows.push([g.name, spec(g), g.items.length, gMeas(g), v === null ? '' : vn(v), st]); });
+    state.exported = rows.map(r => r.join(';')).join('\n'); state.tab = 'qty'; log('Xuất bảng khối lượng'); render(); return;
+  }
+  if (a === 'copy'){
+    const fail = () => { $('toast').textContent = 'Trình duyệt chặn sao chép, hãy bôi đen và copy tay.'; };
+    try { navigator.clipboard.writeText(state.exported).then(() => { $('toast').textContent = 'Đã sao chép.'; }, fail); } catch(_) { fail(); }
+    return;
+  }
+  if (a === 'zin' || a === 'zout' || a === 'zfit'){ zoom(a); return; }
+  if (t.dataset.id){ state.sel = t.dataset.id; const m = issues.find(i => !i.resolved && i.targets.includes(state.sel)); if (m) state.exp = m.id; render(); return; }
+  if (t.dataset.iid){ const is = issues.find(i => i.id === t.dataset.iid); state.exp = state.exp === is.id ? null : is.id; if (is.targets[0]) state.sel = is.targets[0]; render(); }
+});
+document.addEventListener('change', e => {
+  const t = e.target, it = state.sel && get(state.sel);
+  if (t.dataset.act === 'uname' && it){ it.name = t.value || null; it.status = 'edited'; log('Gán nhãn: ' + (it.name || 'bỏ nhãn')); if (it.name) issues.forEach(i => { if (i.targets.includes(it.id)) i.resolved = true; }); state.exported = null; render(); }
+  if (t.dataset.act === 'depth' && it){
+    const v = parseFloat(t.value) / 1000;
+    if (v > 0){
+      const same = it.type === 'col' ? state.items.filter(i => i.type === 'col') : [it];
+      same.forEach(i => { i.depth = v; i.status = 'edited'; });
+      log(`Sửa ${it.name}: ${mm(v)} mm`);
+      if (it.type === 'col') issues.forEach(i => { if (i.id === 'i-col') i.resolved = true; });
+      state.exported = null; render();
+    }
+  }
+});
+$('svg').addEventListener('mousemove', e => {
+  const r = $('svg').getBoundingClientRect(), v = state.vb, x = v.x + (e.clientX - r.left) / r.width * v.w, y = v.y + (e.clientY - r.top) / r.height * v.h;
+  $('cross').setAttribute('visibility', 'visible');
+  $('chv').setAttribute('x1', x); $('chv').setAttribute('x2', x); $('chv').setAttribute('y1', v.y); $('chv').setAttribute('y2', v.y + v.h);
+  $('chh').setAttribute('y1', y); $('chh').setAttribute('y2', y); $('chh').setAttribute('x1', v.x); $('chh').setAttribute('x2', v.x + v.w);
+  $('chb').setAttribute('x', x - 5); $('chb').setAttribute('y', y - 5);
+  $('read').textContent = `x ${vn((x-OX)/S)} m · y ${vn((y-OY)/S)} m`;
+});
+$('svg').addEventListener('mouseleave', () => { const c = $('cross'); if (c) c.setAttribute('visibility', 'hidden'); });
+function themeLabel(){ const d = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); $('themeBtn').textContent = d === 'dark' ? 'Nền sáng' : 'Nền tối'; return d; }
+$('themeBtn').addEventListener('click', () => { document.documentElement.dataset.theme = themeLabel() === 'dark' ? 'light' : 'dark'; themeLabel(); });
+themeLabel();
+
+log(`Nạp file và nhận dạng ${state.items.length} đối tượng, đọc được nhãn của ${state.items.filter(i => i.name).length}`);
+render();
+</script>

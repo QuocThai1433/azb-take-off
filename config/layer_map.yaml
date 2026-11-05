@@ -1,0 +1,90 @@
+# ÁNH XẠ TÊN LAYER -> LOẠI CẤU KIỆN
+#
+# Cách hoạt động (app/config.py: phan_tich_ten):
+#   1. Tên layer được CHUẨN HÓA trước khi khớp: chữ thường, bỏ dấu tiếng Việt, "_ - ." thành khoảng trắng,
+#      và bỏ tiền tố bản vẽ tham chiếu ngoài (xref) dạng "X - TEN FILE$0$TEN LAYER".
+#   2. Dò các luật từ trên xuống, luật nào khớp trước thì lấy. Thứ tự luật = thứ tự ưu tiên:
+#      hệ thống/kiến trúc -> chữ -> cốt thép/ký hiệu -> kết cấu bê tông.
+#   3. Mỗi luật có "conf" (độ tin cậy 0-1). Từ ngưỡng gán tự động (mặc định 0,7) trở lên mới tự gán;
+#      dưới ngưỡng chỉ hiện làm gợi ý để người dùng xác nhận.
+#   4. Layer nằm trong xref: loại kết cấu bị hạ tin cậy (xref thường là bản kiến trúc).
+#   5. Luật khớp theo TỪ nguyên (lookaround), không khớp chuỗi con: "chu" không còn khớp "hachure".
+#
+# Layer đã được người dùng chọn tay và "ghi nhớ" nằm ở data/ho_so_layer.yaml (xem/sửa/xóa trên giao diện),
+# không còn ghi vào file này.
+#
+# Các loại hợp lệ:
+#   cot, dam, san, lo_san (trừ vào sàn), mong, coc, vach, nhan (chữ ghi tên cấu kiện),
+#   ong_gio, bo_qua (không tính)
+
+rules:
+  # --- 1. Hệ thống / kiến trúc: không bao giờ là bê tông kết cấu ---
+  - pattern: '^defpoints$'
+    type: bo_qua
+    conf: 0.99
+    ly_do: "Layer hệ thống Defpoints của CAD"
+  - pattern: '^a( |$)'
+    type: bo_qua
+    conf: 0.92
+    ly_do: "Tiền tố A- là layer kiến trúc"
+  - pattern: 'ong ?gio|duct|hvac|^me ?m'
+    type: ong_gio
+    conf: 0.9
+    ly_do: "Layer ống gió HVAC"
+
+  # --- 2. Chữ / nhãn (đặt trước cốt thép để TEXTTHEP là chữ, không phải thép) ---
+  - pattern: 'text|ghi ?chu|chu ?thich|ky ?hieu|so ?hieu|tieu ?de|label|annot|ttlb|(?<![a-z])(tag|tags|note|notes)(?![a-z])|^chu(?![a-z])'
+    type: nhan
+    conf: 0.9
+    ly_do: "Tên layer là chữ / ghi chú / ký hiệu"
+
+  # --- 3. Cốt thép, nét phụ, ký hiệu: không phải bê tông ---
+  - pattern: '(?<![a-z])(thep|ferraillage|barre|rebar|steel|stirrup)(?![a-z])'
+    type: bo_qua
+    conf: 0.92
+    ly_do: "Layer cốt thép (không phải bê tông)"
+  - pattern: 'hatch|hachure|(?<![a-z])(dim|dims|dimension|grid|axis|truc|luoi|kich thuoc)(?![a-z])'
+    type: bo_qua
+    conf: 0.9
+    ly_do: "Layer mặt cắt (hatch), kích thước hoặc trục lưới"
+  - pattern: '(?<![a-z])net (dut|cat|thay)(?![a-z])'
+    type: bo_qua
+    conf: 0.8
+    ly_do: "Nét đứt / nét cắt / nét thấy (nét phụ)"
+
+  # --- 4. Kết cấu bê tông ---
+  - pattern: 'lo ?san|opening|(?<![a-z])hole(?![a-z])'
+    type: lo_san
+    conf: 0.9
+    ly_do: "Lỗ mở sàn"
+  - pattern: '(?<![a-z])(cot|column|col)(?![a-z])'
+    type: cot
+    conf: 0.9
+    ly_do: "Tên layer là cột"
+  - pattern: '(?<![a-z])(dam|beam|girder|gb)(?![a-z])'
+    type: dam
+    conf: 0.9
+    ly_do: "Tên layer là dầm"
+  - pattern: 'dai coc|pile ?cap|(?<![a-z])(mong|footing|foundation|fnd|ftg)(?![a-z])'
+    type: mong
+    conf: 0.9
+    ly_do: "Tên layer là móng / đài cọc"
+  - pattern: '(?<![a-z])(coc|pile|piles)(?![a-z])'
+    type: coc
+    conf: 0.9
+    ly_do: "Tên layer là cọc"
+  - pattern: '(?<![a-z])(vach|shear ?wall|core|loi)(?![a-z])|^s (wall|walls)(?![a-z])'
+    type: vach
+    conf: 0.85
+    ly_do: "Tên layer là vách / lõi"
+  - pattern: '(?<![a-z])(wall|walls)(?![a-z])'
+    type: vach
+    conf: 0.5
+    ly_do: "Tên 'wall' có thể là tường kiến trúc hoặc vách kết cấu, cần xác nhận"
+  - pattern: '(?<![a-z])(san|slab)(?![a-z])'
+    type: san
+    conf: 0.8
+    ly_do: "Tên layer là sàn"
+
+# Layer không khớp luật nào: không có căn cứ từ tên, để bước đọc nhãn / hình học đề xuất.
+default: bo_qua

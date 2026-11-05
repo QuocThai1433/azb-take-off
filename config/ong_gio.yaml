@@ -1,0 +1,17 @@
+# ĐỘ DÀY TÔN ỐNG GIÓ THEO CẠNH LỚN NHẤT (mm)
+# Mỗi dòng: [cạnh lớn nhất <= ngưỡng (mm), độ dày tôn (mm)]. Dòng cuối là mức cho mọi cạnh lớn hơn.
+
+# Số chữ số thập phân làm tròn trước khi nhân (khớp công cụ bóc ống gió trong CAD của AZB)
+lam_tron_dai: 2      # tổng dài ống thẳng (m)
+lam_tron_m2_cai: 2   # m² tôn / cái phụ kiện
+
+# m² tôn / cái ghi đè theo tên block, dùng khi công thức khai triển của app chưa khớp bảng của AZB.
+# Block nào có ở đây thì lấy đúng số này thay cho công thức.
+m2_cai_ghi_de:
+  HTS-TV-Can-D341.8-500x300-L300: 0.41   # theo file Excel gốc của công cụ CAD (công thức app ra 0.401)
+
+day_ton:
+  - [400, 0.58]
+  - [1000, 0.75]
+  - [2500, 0.95]
+  - [999999, 1.15]

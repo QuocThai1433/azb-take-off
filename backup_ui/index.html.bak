@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AZB Bóc khối lượng</title>
+<style>
+  :root { --xanh:#1F4E78; --nen:#f4f6f9; --vien:#d0d7de; --vang:#fff2cc; --do:#c00000; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 "Segoe UI", Arial, sans-serif; background:var(--nen); color:#1b1f24; }
+  header { background:var(--xanh); color:#fff; padding:10px 20px; display:flex; align-items:center; gap:16px; }
+  header h1 { font-size:18px; margin:0; }
+  header span { opacity:.8; font-size:13px; }
+  main { padding:16px 20px; display:grid; gap:16px; max-width:1500px; margin:auto; }
+  section { background:#fff; border:1px solid var(--vien); border-radius:6px; padding:14px 16px; }
+  section h2 { font-size:15px; margin:0 0 10px; color:var(--xanh); }
+  .hang { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:end; }
+  label { display:flex; flex-direction:column; font-size:12px; color:#555; gap:3px; }
+  input[type=number], input[type=text], select { padding:5px 7px; border:1px solid var(--vien); border-radius:4px; font:inherit; }
+  input[type=number] { width:100px; }
+  button { background:var(--xanh); color:#fff; border:0; border-radius:4px; padding:7px 14px; font:inherit; cursor:pointer; }
+  button.phu { background:#fff; color:var(--xanh); border:1px solid var(--xanh); }
+  button:disabled { opacity:.5; cursor:default; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th, td { border:1px solid var(--vien); padding:4px 7px; text-align:left; vertical-align:top; }
+  th { background:#eef2f7; position:sticky; top:0; }
+  td.so { text-align:right; font-variant-numeric:tabular-nums; }
+  td input[type=number] { width:80px; }
+  .cuon { max-height:420px; overflow:auto; }
+  .luoi2 { display:grid; grid-template-columns: 1.3fr 1fr; gap:16px; }
+  @media (max-width:1000px) { .luoi2 { grid-template-columns:1fr; } }
+  #mat-bang { width:100%; height:480px; border:1px solid var(--vien); background:#fcfcfd; cursor:grab; }
+  .canh-bao { color:#8a5300; }
+  .loi { color:var(--do); font-weight:600; }
+  .thong-bao { padding:8px 12px; border-radius:4px; background:var(--vang); margin:8px 0; white-space:pre-line; }
+  .thong-bao.loi-nen { background:#fde2e1; color:var(--do); }
+  .an { display:none; }
+  tr.chon td { background:#e3f0ff; }
+  .chu-thich span { display:inline-block; width:12px; height:12px; margin:0 4px 0 12px; vertical-align:middle; border:1px solid #555; }
+  .dat { color:#107c10; font-weight:600; } .khong { color:var(--do); font-weight:600; }
+  small.mo { color:#666; }
+</style>
+</head>
+<body>
+<header><h1>AZB - Bóc khối lượng kết cấu</h1><span>Giai đoạn 1: mặt bằng DWG/DXF · chạy trên máy cá nhân</span></header>
+<main>
+
+<section>
+  <h2>1. Tải bản vẽ</h2>
+  <div class="hang">
+    <label>File DXF / DWG<input type="file" id="file" accept=".dxf,.dwg"></label>
+    <label>Đơn vị bản vẽ
+      <select id="don-vi"><option value="auto">Tự nhận</option><option>mm</option><option>cm</option><option>m</option></select>
+    </label>
+    <button id="nut-tai">Tải lên</button>
+    <small class="mo">Mỗi file nên là 1 mặt bằng của 1 tầng. Bản vẽ có nhiều mặt bằng thì tách ra trước khi tải.</small>
+  </div>
+  <div id="tb-tai"></div>
+</section>
+
+<section id="buoc2" class="an">
+  <h2>2. Gán layer và thông số</h2>
+  <div class="luoi2">
+    <div class="cuon" style="max-height:340px">
+      <table><thead><tr><th>Layer</th><th>Hình kín</th><th>Nét rời</th><th>Chữ</th><th>Loại cấu kiện</th></tr></thead>
+      <tbody id="bang-layer"></tbody></table>
+    </div>
+    <div>
+      <div class="hang" id="thong-so"></div>
+      <p><small class="mo">Thông số mặc định chỉ dùng khi cấu kiện không có nhãn. Nhãn trên bản vẽ (VD "D1 220x500", "S1 t=120", "M1 1200x1200x700") được ưu tiên.</small></p>
+      <div class="hang">
+        <label>Tên dự án (in trên Excel)<input type="text" id="du-an" style="width:260px"></label>
+        <button id="nut-tinh">Tính khối lượng</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="buoc2b" class="an">
+  <h2>Chọn vùng bản vẽ <small class="mo">(tùy chọn, dùng khi một file có nhiều mặt bằng / chi tiết)</small></h2>
+  <div class="hang">
+    <button id="nut-tq" class="phu">Xem tổng quan bản vẽ</button>
+    <label>X từ (m)<input type="number" step="any" id="vung-x0"></label>
+    <label>Y từ (m)<input type="number" step="any" id="vung-y0"></label>
+    <label>X đến (m)<input type="number" step="any" id="vung-x1"></label>
+    <label>Y đến (m)<input type="number" step="any" id="vung-y1"></label>
+    <button id="nut-zoom-vung" class="phu">Phóng to vùng chọn</button>
+    <button id="nut-toan-bo" class="phu">Xem toàn bộ</button>
+    <button id="nut-bo-vung" class="phu">Bỏ chọn vùng</button>
+  </div>
+  <p><small class="mo">Bấm "Xem tổng quan", kéo chuột trên hình để khoanh một mặt bằng (lăn chuột để phóng to, kéo giữ nút giữa hoặc Shift + kéo để di chuyển). Để trống = tính cả bản vẽ. Chỉ phần nằm trong khung được tính.</small></p>
+  <svg id="tong-quan" class="an" style="width:100%;height:520px;border:1px solid var(--vien);background:#fcfcfd;cursor:crosshair"></svg>
+</section>
+
+<section id="buoc3" class="an">
+  <h2>3. Kết quả</h2>
+  <div id="tb-chung"></div>
+  <div class="luoi2">
+    <div>
+      <svg id="mat-bang"></svg>
+      <div class="chu-thich"><small>
+        <span style="background:#c0504d"></span>Cột <span style="background:#4f81bd"></span>Dầm
+        <span style="background:#9bbb59;opacity:.4"></span>Sàn <span style="background:#fff"></span>Lỗ sàn
+        <span style="background:#f79646"></span>Móng <span style="background:#8064a2"></span>Vách
+        <span style="background:#fff;border:2px solid red"></span>Có cảnh báo · lăn chuột để phóng to, kéo để di chuyển
+      </small></div>
+    </div>
+    <div>
+      <table><thead><tr><th>Công tác</th><th>Mã hiệu</th><th>Đơn vị</th><th>Khối lượng</th></tr></thead>
+      <tbody id="bang-tong"></tbody></table>
+      <p class="hang">
+        <button id="nut-excel">Xuất Excel</button>
+        <button id="nut-tinh-lai" class="phu">Tính lại theo điều chỉnh</button>
+      </p>
+    </div>
+  </div>
+  <h2 style="margin-top:14px">Chi tiết cấu kiện <small class="mo">(sửa ô trắng hoặc tick Loại bỏ, rồi bấm Tính lại)</small></h2>
+  <div class="hang" style="margin-bottom:6px">
+    <label>Lọc<select id="loc"><option value="">Tất cả</option><option value="cb">Chỉ cấu kiện có cảnh báo</option>
+      <option value="cot">Cột</option><option value="dam">Dầm</option><option value="san">Sàn</option>
+      <option value="vach">Vách</option><option value="mong">Móng</option></select></label>
+  </div>
+  <div class="cuon"><table>
+    <thead><tr><th>Mã</th><th>Tên</th><th>Nhãn</th><th>Thông số</th><th>Loại bỏ</th><th>Cảnh báo</th></tr></thead>
+    <tbody id="bang-ck"></tbody></table></div>
+</section>
+
+<section id="buoc-og" class="an">
+  <h2>Kết quả bóc ống gió</h2>
+  <div id="tb-og"></div>
+  <h3>Bảng 1 — Ống thẳng <small class="mo">(m² tôn = chu vi × tổng dài)</small></h3>
+  <table><thead><tr><th>STT</th><th>Kích thước (mm)</th><th>Số đoạn</th><th>Tổng dài (m)</th><th>Chu vi (m)</th><th>Dày tôn (mm)</th><th>Diện tích tôn (m²)</th></tr></thead><tbody id="og-ong"></tbody></table>
+  <h3>Bảng 2 — Phụ kiện <small class="mo">(m² tôn / cái theo công thức khai triển gần đúng)</small></h3>
+  <table><thead><tr><th>STT</th><th>Loại phụ kiện</th><th>Quy cách (block)</th><th>Kích thước tính</th><th>Số lượng</th><th>Dày tôn (mm)</th><th>m² / cái</th><th>m² tôn</th></tr></thead><tbody id="og-pk"></tbody></table>
+  <h3>Bảng 3 — Tổng hợp theo độ dày tôn</h3>
+  <table><thead><tr><th>Dày tôn (mm)</th><th>Ống thẳng (m²)</th><th>Phụ kiện (m²)</th><th>Cộng (m²)</th></tr></thead><tbody id="og-th"></tbody></table>
+  <h3>Thiết bị, miệng gió, van <small class="mo">(chỉ đếm số lượng)</small></h3>
+  <table><thead><tr><th>Block</th><th>Số lượng</th></tr></thead><tbody id="og-tb"></tbody></table>
+  <p class="hang"><button id="nut-excel-og">Xuất Excel ống gió</button></p>
+</section>
+
+<section id="buoc4" class="an">
+  <h2>4. Đối chiếu với bảng bóc thủ công</h2>
+  <p><small class="mo">Mở file Excel vừa xuất, nhập khối lượng thủ công vào cột F của sheet "DOI CHIEU", lưu lại rồi tải lên đây.</small></p>
+  <div class="hang">
+    <label>File Excel đã nhập<input type="file" id="file-dc" accept=".xlsx"></label>
+    <button id="nut-dc">Đối chiếu</button>
+  </div>
+  <div id="kq-dc"></div>
+</section>
+
+</main>
+<script>
+const LOAI = {cot:"Cột", dam:"Dầm", san:"Sàn", lo_san:"Lỗ mở sàn", mong:"Móng", vach:"Vách/lõi", khung_dam:"Khung dầm (đường bao ngoài)", o_dam:"Ô trống giữa dầm", nhan:"Nhãn chữ", ong_gio:"Ống gió (MLINE + block)", bo_qua:"Bỏ qua"};
+const MAU = {cot:"#c0504d", dam:"#4f81bd", san:"#9bbb59", lo_san:"#ffffff", mong:"#f79646", vach:"#8064a2"};
+const TS = [
+  ["chieu_cao_tang","Chiều cao tầng (m)"], ["day_san","Dày sàn mặc định (m)"], ["chieu_cao_dam","Cao dầm mặc định (m)"],
+  ["day_mong","Cao móng mặc định (m)"], ["lot_mong_day","Dày lót móng (m)"], ["lot_mong_mo_rong","Lót mở rộng mỗi phía (m)"],
+  ["so_tang_giong_nhau","Số tầng giống nhau"],
+];
+let phien = null, kq = null, dieuChinh = {};
+const $ = id => document.getElementById(id);
+const so = (x, n=3) => x == null ? "" : Number(x).toLocaleString("vi-VN", {minimumFractionDigits:n, maximumFractionDigits:n});
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function thongBao(el, noiDung, loi=false) {
+  el.innerHTML = noiDung ? `<div class="thong-bao ${loi ? "loi-nen" : ""}">${esc(noiDung)}</div>` : "";
+}
+
+async function goi(url, opts) {
+  const r = await fetch(url, opts);
+  if (!r.ok) {
+    let msg = r.statusText;
+    try { msg = (await r.json()).detail || msg; } catch {}
+    throw new Error(msg);
+  }
+  return r;
+}
+
+$("nut-tai").onclick = async () => {
+  const f = $("file").files[0];
+  if (!f) return thongBao($("tb-tai"), "Sếp chọn file trước.", true);
+  const fd = new FormData(); fd.append("file", f); fd.append("don_vi", $("don-vi").value);
+  $("nut-tai").disabled = true; thongBao($("tb-tai"), "Đang đọc bản vẽ...");
+  try {
+    phien = await (await goi("/api/tai-len", {method:"POST", body:fd})).json();
+    dieuChinh = {}; kq = null;
+    thongBao($("tb-tai"), `Đã đọc ${phien.ten_file} · đơn vị ${phien.don_vi} · ${phien.layers.length} layer có dữ liệu.` +
+      (phien.canh_bao.length ? "\n" + phien.canh_bao.join("\n") : ""));
+    veBuoc2();
+  } catch (e) { thongBao($("tb-tai"), e.message, true); }
+  $("nut-tai").disabled = false;
+};
+
+function veBuoc2() {
+  $("bang-layer").innerHTML = phien.layers.map((l, i) => `<tr>
+    <td>${esc(l.ten)}${l.tat ? ' <small class="canh-bao">(đang tắt)</small>' : ""}</td>
+    <td class="so">${l.so_hinh_kin}${l.so_hinh_ghep ? ` +${l.so_hinh_ghep} ghép` : ""}</td>
+    <td class="so">${l.so_net_ho}</td><td class="so">${l.so_chu}</td>
+    <td><select data-layer="${esc(l.ten)}">${phien.loai_hop_le.map(k =>
+      `<option value="${k}" ${k === l.goi_y ? "selected" : ""}>${LOAI[k]}</option>`).join("")}</select></td></tr>`).join("");
+  $("thong-so").innerHTML = TS.map(([k, t]) =>
+    `<label>${t}<input type="number" step="any" id="ts-${k}" value="${phien.mac_dinh[k]}"></label>`).join("");
+  $("buoc2").classList.remove("an");
+  $("buoc2b").classList.remove("an");
+  $("tong-quan").classList.add("an"); tq = null;
+  ["vung-x0", "vung-y0", "vung-x1", "vung-y1"].forEach(id => $(id).value = "");
+  ["buoc3", "buoc4", "buoc-og"].forEach(id => $(id).classList.add("an"));
+}
+
+function yeuCau() {
+  const loai_layer = {};
+  document.querySelectorAll("#bang-layer select").forEach(s => loai_layer[s.dataset.layer] = s.value);
+  const thong_so = {};
+  TS.forEach(([k]) => thong_so[k] = parseFloat($("ts-" + k).value));
+  const v = ["vung-x0", "vung-y0", "vung-x1", "vung-y1"].map(id => $(id).value);
+  const vung = v.every(x => x !== "") ? v.map(parseFloat) : [];
+  return {id: phien.id, loai_layer, thong_so, dieu_chinh: dieuChinh, du_an: $("du-an").value, vung};
+}
+
+// ---------- Chọn vùng trên bản vẽ tổng quan ----------
+let tq = null, tqKhung = null, tqChon = null;
+const VUNG_IDS = ["vung-x0", "vung-y0", "vung-x1", "vung-y1"];
+const vungHienTai = () => { const v = VUNG_IDS.map(id => $(id).value); return v.every(x => x !== "") ? v.map(parseFloat) : null; };
+
+function tqDatKhung(k) { tqKhung = k; $("tong-quan").setAttribute("viewBox", k.join(" ")); }
+
+function veTongQuan() {
+  const svg = $("tong-quan"), [x0, y0, x1, y1] = tq.khung, le = Math.max(x1 - x0, y1 - y0) * 0.03 + 0.5;
+  tqDatKhung([x0 - le, -(y1 + le), (x1 - x0) + 2 * le, (y1 - y0) + 2 * le]);
+  const net = Math.max(tqKhung[2], tqKhung[3]) / 1500, co = Math.max(tqKhung[2], tqKhung[3]) / 200;
+  const d = ps => ps.map(p => "M" + p.map(([x, y]) => `${x},${-y}`).join("L")).join("");
+  svg.innerHTML =
+    `<path d="${d(tq.net)}" fill="none" stroke="#b5b5b5" stroke-width="${net}"/>` +
+    `<path d="${d(tq.hinh)}" fill="none" stroke="#4f81bd" stroke-width="${net * 1.3}"/>` +
+    tq.chu.filter(c => /MẶT BẰNG|MẶT CẮT|CHI TIẾT/i.test(c.t)).map(c =>
+      `<text x="${c.x}" y="${-c.y}" font-size="${co}" fill="#c0504d" font-weight="600">${esc(c.t.split(/\n|\\P/)[0])}</text>`).join("") +
+    `<rect id="tq-chon" fill="#1F4E78" fill-opacity=".15" stroke="#1F4E78" stroke-width="${net * 2}" display="none"/>`;
+  veKhungChon();
+}
+
+function veKhungChon() {
+  const r = $("tq-chon"), v = vungHienTai();
+  if (!r) return;
+  if (!v) { r.setAttribute("display", "none"); return; }
+  const [a, b, c, e] = v;
+  r.setAttribute("x", Math.min(a, c)); r.setAttribute("y", -Math.max(b, e));
+  r.setAttribute("width", Math.abs(c - a)); r.setAttribute("height", Math.abs(e - b));
+  r.removeAttribute("display");
+}
+
+$("nut-tq").onclick = async () => {
+  try {
+    tq = await (await goi("/api/tong-quan?id=" + phien.id)).json();
+    $("tong-quan").classList.remove("an"); veTongQuan();
+  } catch (e) { thongBao($("tb-tai"), e.message, true); }
+};
+$("nut-toan-bo").onclick = () => { if (tq) veTongQuan(); };
+$("nut-bo-vung").onclick = () => { VUNG_IDS.forEach(id => $(id).value = ""); veKhungChon(); };
+$("nut-zoom-vung").onclick = () => {
+  const v = vungHienTai(); if (!v || !tq) return;
+  const [a, b, c, e] = v, le = Math.max(Math.abs(c - a), Math.abs(e - b)) * 0.08 + 0.2;
+  tqDatKhung([Math.min(a, c) - le, -(Math.max(b, e) + le), Math.abs(c - a) + 2 * le, Math.abs(e - b) + 2 * le]);
+};
+VUNG_IDS.forEach(id => $(id).addEventListener("input", veKhungChon));
+
+(() => {
+  const svg = $("tong-quan");
+  const toaDo = ev => { const p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY; const q = p.matrixTransform(svg.getScreenCTM().inverse()); return [q.x, -q.y]; };
+  let thao = null;
+  svg.addEventListener("mousedown", ev => {
+    if (!tq) return;
+    if (ev.shiftKey || ev.button === 1) { thao = {kieu: "di", x: ev.clientX, y: ev.clientY, k: [...tqKhung]}; ev.preventDefault(); return; }
+    thao = {kieu: "chon", a: toaDo(ev)};
+  });
+  window.addEventListener("mousemove", ev => {
+    if (!thao) return;
+    if (thao.kieu === "di") {
+      const r = svg.getBoundingClientRect(), s = Math.max(thao.k[2] / r.width, thao.k[3] / r.height);
+      tqDatKhung([thao.k[0] - (ev.clientX - thao.x) * s, thao.k[1] - (ev.clientY - thao.y) * s, thao.k[2], thao.k[3]]);
+    } else {
+      const b = toaDo(ev), a = thao.a;
+      [a[0], a[1], b[0], b[1]].forEach((v, i) => $(VUNG_IDS[i]).value = +v.toFixed(3));
+      veKhungChon();
+    }
+  });
+  window.addEventListener("mouseup", () => thao = null);
+  svg.addEventListener("wheel", ev => {
+    if (!tq) return; ev.preventDefault();
+    const r = svg.getBoundingClientRect(), k = ev.deltaY > 0 ? 1.2 : 1 / 1.2, kh = tqKhung;
+    const px = kh[0] + (ev.clientX - r.left) / r.width * kh[2], py = kh[1] + (ev.clientY - r.top) / r.height * kh[3];
+    tqDatKhung([px - (px - kh[0]) * k, py - (py - kh[1]) * k, kh[2] * k, kh[3] * k]);
+  }, {passive: false});
+})();
+
+const KET_CAU = ["cot", "dam", "san", "lo_san", "mong", "vach"];
+
+async function tinhOngGio() {
+  try {
+    const d = await (await goi("/api/ong-gio", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(yeuCau())})).json();
+    $("buoc-og").classList.remove("an");
+    thongBao($("tb-og"), d.canh_bao.join("\n"));
+    $("og-ong").innerHTML = d.ong_thang.map((o, i) => `<tr><td>${i + 1}</td><td>${o.kich_thuoc}</td><td class="so">${o.so_doan}</td>
+      <td class="so">${so(o.tong, 2)}</td><td class="so">${so(o.chu_vi, 3)}</td><td class="so">${o.day}</td><td class="so">${so(o.dien_tich, 2)}</td></tr>`).join("") +
+      `<tr><th colspan="3">Tổng cộng</th><th class="so">${so(d.tong.mat_bang, 2)}</th><th></th><th></th><th class="so">${so(d.tong.ong_thang, 2)}</th></tr>`;
+    $("og-pk").innerHTML = d.phu_kien.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.loai)}</td><td>${esc(p.block)}</td><td>${esc(p.kich_thuoc)}</td>
+      <td class="so">${p.so_luong}</td><td class="so">${p.day}</td><td class="so">${so(p.m2_cai, 3)}</td><td class="so">${so(p.m2, 2)}</td></tr>`).join("") +
+      `<tr><th colspan="4">Tổng cộng</th><th class="so">${d.tong.so_phu_kien}</th><th></th><th></th><th class="so">${so(d.tong.phu_kien, 2)}</th></tr>`;
+    $("og-th").innerHTML = d.tong_hop.map(t => `<tr><td class="so">${t.day}</td><td class="so">${so(t.ong_thang, 2)}</td><td class="so">${so(t.phu_kien, 2)}</td><td class="so">${so(t.cong, 2)}</td></tr>`).join("") +
+      `<tr><th>Tổng cộng</th><th class="so">${so(d.tong.ong_thang, 2)}</th><th class="so">${so(d.tong.phu_kien, 2)}</th><th class="so">${so(d.tong.cong, 2)}</th></tr>`;
+    $("og-tb").innerHTML = d.thiet_bi.map(t => `<tr><td>${esc(t.block)}</td><td class="so">${t.so_luong}</td></tr>`).join("") || `<tr><td colspan="2">Không có</td></tr>`;
+  } catch (e) { $("buoc-og").classList.remove("an"); thongBao($("tb-og"), e.message, true); }
+}
+
+$("nut-excel-og").onclick = async () => {
+  try {
+    const r = await goi("/api/xuat-excel-ong-gio", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(yeuCau())});
+    const ten = (r.headers.get("Content-Disposition") || "").match(/filename="(.+)"/)?.[1] || "ong_gio.xlsx";
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(await r.blob()); a.download = ten; a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (e) { thongBao($("tb-og"), e.message, true); }
+};
+
+async function tinh() {
+  const loai = Object.values(yeuCau().loai_layer);
+  const coOng = loai.includes("ong_gio"), coKetCau = loai.some(l => KET_CAU.includes(l));
+  $("buoc-og").classList.add("an");
+  if (coOng) { $("nut-tinh").disabled = true; await tinhOngGio(); $("nut-tinh").disabled = false; }
+  if (coOng && !coKetCau) { ["buoc3", "buoc4"].forEach(id => $(id).classList.add("an")); return; }
+  $("nut-tinh").disabled = true;
+  try {
+    kq = await (await goi("/api/tinh", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(yeuCau())})).json();
+    veKetQua();
+  } catch (e) { thongBao($("tb-chung"), e.message, true); $("buoc3").classList.remove("an"); }
+  $("nut-tinh").disabled = false;
+}
+$("nut-tinh").onclick = tinh;
+$("nut-tinh-lai").onclick = tinh;
+
+function veKetQua() {
+  $("buoc3").classList.remove("an"); $("buoc4").classList.remove("an");
+  const cb = [...kq.canh_bao_chung, ...kq.nhan_khong_gan.map(n => `Nhãn "${n.noi_dung}" không gán được cho cấu kiện nào (x=${n.x.toFixed(2)}, y=${n.y.toFixed(2)}).`)];
+  const soCb = kq.cau_kien.filter(c => c.canh_bao.length).length;
+  thongBao($("tb-chung"), (soCb ? `${soCb} cấu kiện có cảnh báo, Sếp lọc "Chỉ cấu kiện có cảnh báo" để rà.\n` : "") + cb.join("\n"));
+  $("bang-tong").innerHTML = kq.tong_hop.map(t => `<tr><td>${esc(t.ten)}</td>
+    <td ${t.ma_hieu ? "" : 'style="background:var(--vang)" title="Chưa có mã hiệu, điền trong config/cong_tac.yaml"'}>${esc(t.ma_hieu)}</td>
+    <td>${t.don_vi}</td><td class="so">${so(t.khoi_luong)}</td></tr>`).join("") ||
+    `<tr><td colspan="4">Chưa có khối lượng. Sếp kiểm tra lại cách gán layer.</td></tr>`;
+  veBangCk(); veMatBang();
+}
+
+function oNhap(c, khoa, giaTri) {
+  const v = dieuChinh[c.id]?.[khoa] ?? "";
+  return `${khoa}=<input type="number" step="any" data-id="${c.id}" data-k="${khoa}" value="${v}" placeholder="${giaTri ?? ""}">`;
+}
+
+function veBangCk() {
+  const loc = $("loc").value;
+  const ds = kq.cau_kien.filter(c => c.loai !== "lo_san" &&
+    (!loc || (loc === "cb" ? c.canh_bao.length : c.loai === loc)));
+  $("bang-ck").innerHTML = ds.map(c => {
+    const t = c.thong_so;
+    let ts = "";
+    if (c.loai === "dam") ts = oNhap(c, "h", t.h) + ` <small class="mo">(${t.nguon_h})</small>`;
+    if (c.loai === "san") ts = oNhap(c, "t", t.t) + ` <small class="mo">(${t.nguon_t})</small>`;
+    if (c.loai === "mong") ts = oNhap(c, "day", t.day) + ` <small class="mo">(${t.nguon_day})</small>`;
+    if (c.loai === "cot" || c.loai === "vach") ts = oNhap(c, "cao", t.cao != null ? +t.cao.toFixed(3) : "");
+    const cb = c.canh_bao.map(x => `<div class="${x.muc === "loi" ? "loi" : x.muc === "canh_bao" ? "canh-bao" : ""}">${esc(x.noi_dung)}</div>`).join("");
+    return `<tr data-id="${c.id}"><td>${c.id}</td><td>${esc(c.ten)}</td><td>${esc(c.nhan)}</td><td>${ts}</td>
+      <td><input type="checkbox" data-id="${c.id}" data-k="loai_bo" ${c.loai_bo ? "checked" : ""}></td><td>${cb}</td></tr>`;
+  }).join("");
+}
+$("loc").onchange = veBangCk;
+
+$("bang-ck").addEventListener("change", e => {
+  const el = e.target, id = el.dataset.id, k = el.dataset.k;
+  if (!id) return;
+  dieuChinh[id] = dieuChinh[id] || {};
+  if (k === "loai_bo") dieuChinh[id].loai_bo = el.checked;
+  else if (el.value === "") delete dieuChinh[id][k];
+  else dieuChinh[id][k] = parseFloat(el.value);
+});
+$("bang-ck").addEventListener("click", e => {
+  const tr = e.target.closest("tr"); if (tr && e.target.tagName !== "INPUT") chonCk(tr.dataset.id);
+});
+
+// ---------- Mặt bằng SVG ----------
+let khung = null;
+function veMatBang() {
+  const svg = $("mat-bang");
+  const [x0, y0, x1, y1] = kq.khung, le = Math.max(x1 - x0, y1 - y0) * 0.04;
+  khung = [x0 - le, -(y1 + le), (x1 - x0) + 2 * le, (y1 - y0) + 2 * le];
+  svg.setAttribute("viewBox", khung.join(" "));
+  const net = Math.max(khung[2], khung[3]) / 900;
+  const thuTu = ["san", "lo_san", "mong", "vach", "dam", "cot"];
+  const ds = [...kq.cau_kien].sort((a, b) => thuTu.indexOf(a.loai) - thuTu.indexOf(b.loai));
+  svg.innerHTML = ds.map(c => {
+    const d = c.hinh.map(p => p.map(v => "M" + v.map(([x, y]) => `${x},${-y}`).join("L") + "Z").join("")).join("");
+    const coCb = c.canh_bao.some(x => x.muc !== "thong_tin");
+    const op = c.loai === "san" ? 0.35 : c.loai_bo ? 0.15 : 0.85;
+    return `<path data-id="${c.id}" d="${d}" fill="${MAU[c.loai]}" fill-opacity="${op}" fill-rule="evenodd"
+      stroke="${coCb ? "red" : "#333"}" stroke-width="${coCb ? net * 2.5 : net}"><title>${esc(c.id + " " + c.ten + " " + c.nhan)}</title></path>`;
+  }).join("");
+}
+$("mat-bang").addEventListener("click", e => { const id = e.target.dataset?.id; if (id) chonCk(id); });
+function chonCk(id) {
+  document.querySelectorAll("#bang-ck tr").forEach(tr => tr.classList.toggle("chon", tr.dataset.id === id));
+  document.querySelectorAll("#mat-bang path").forEach(p => p.setAttribute("stroke-dasharray", p.dataset.id === id ? "0.15 0.08" : ""));
+  const tr = document.querySelector(`#bang-ck tr[data-id="${id}"]`);
+  if (tr) tr.scrollIntoView({block: "nearest"});
+}
+(() => {
+  const svg = $("mat-bang"); let keo = null;
+  svg.addEventListener("wheel", e => {
+    if (!khung) return; e.preventDefault();
+    const r = svg.getBoundingClientRect(), k = e.deltaY > 0 ? 1.2 : 1 / 1.2;
+    const px = khung[0] + (e.clientX - r.left) / r.width * khung[2], py = khung[1] + (e.clientY - r.top) / r.height * khung[3];
+    khung = [px - (px - khung[0]) * k, py - (py - khung[1]) * k, khung[2] * k, khung[3] * k];
+    svg.setAttribute("viewBox", khung.join(" "));
+  }, {passive: false});
+  svg.addEventListener("mousedown", e => keo = {x: e.clientX, y: e.clientY, k: [...(khung || [])]});
+  window.addEventListener("mouseup", () => keo = null);
+  window.addEventListener("mousemove", e => {
+    if (!keo || !khung) return;
+    const r = svg.getBoundingClientRect(), s = Math.max(keo.k[2] / r.width, keo.k[3] / r.height);
+    khung = [keo.k[0] - (e.clientX - keo.x) * s, keo.k[1] - (e.clientY - keo.y) * s, keo.k[2], keo.k[3]];
+    svg.setAttribute("viewBox", khung.join(" "));
+  });
+})();
+
+// ---------- Excel và đối chiếu ----------
+$("nut-excel").onclick = async () => {
+  try {
+    const r = await goi("/api/xuat-excel", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(yeuCau())});
+    const ten = (r.headers.get("Content-Disposition") || "").match(/filename="(.+)"/)?.[1] || "khoi_luong.xlsx";
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(await r.blob()); a.download = ten; a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (e) { thongBao($("tb-chung"), e.message, true); }
+};
+
+$("nut-dc").onclick = async () => {
+  const f = $("file-dc").files[0];
+  if (!f) return thongBao($("kq-dc"), "Sếp chọn file Excel đã nhập khối lượng thủ công.", true);
+  const fd = new FormData(); fd.append("id", phien.id); fd.append("file", f);
+  try {
+    const d = await (await goi("/api/doi-chieu", {method:"POST", body:fd})).json();
+    if (!d.dong.length) return thongBao($("kq-dc"), "Chưa thấy khối lượng thủ công nào trong cột F.", true);
+    $("kq-dc").innerHTML = `<div class="thong-bao">${d.dat_tat_ca ? "Tất cả công tác đạt" : "Có công tác vượt"} ngưỡng ±${(d.nguong * 100).toFixed(0)}%.</div>
+      <table><thead><tr><th>Công tác</th><th>Công cụ</th><th>Thủ công</th><th>Chênh lệch</th><th>Sai lệch</th><th>Kết quả</th></tr></thead><tbody>` +
+      d.dong.map(x => `<tr><td>${esc(x.ten)}</td><td class="so">${so(x.cong_cu)}</td><td class="so">${so(x.thu_cong)}</td>
+        <td class="so">${so(x.chenh)}</td><td class="so">${x.sai_lech == null ? "" : (x.sai_lech * 100).toFixed(2) + "%"}</td>
+        <td class="${x.dat ? "dat" : "khong"}">${x.dat ? "Đạt" : "Không đạt"}</td></tr>`).join("") + "</tbody></table>";
+  } catch (e) { thongBao($("kq-dc"), e.message, true); }
+};
+</script>
+</body>
+</html>

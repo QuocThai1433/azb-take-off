@@ -1,0 +1,12 @@
+# Môi trường và rác sinh ra khi chạy
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Dữ liệu người dùng: bản vẽ, cache, sao lưu, nhật ký, kết quả (không đưa vào git)
+data/*
+# ...trừ bản vẽ mẫu dùng cho test và hai file thiết lập cá nhân (nhỏ, nên có lịch sử)
+!data/mau/
+!data/cong_cu_tuy_chinh.yaml
+!data/ho_so_layer.yaml

@@ -1,0 +1,17 @@
+# DANH MỤC CÔNG TÁC VÀ MÃ HIỆU ĐỊNH MỨC
+# ma_hieu để trống có chủ đích: Em không tự gắn mã khi chưa được xác nhận.
+# Sếp điền mã theo mẫu AZB (ví dụ theo định mức Bộ Xây dựng đang áp dụng),
+# ô nào còn trống thì file Excel xuất ra sẽ tô vàng để nhắc kiểm tra.
+# Thứ tự trong file này là thứ tự các dòng trong bảng khối lượng.
+
+be_tong_lot_mong: {ten: "Bê tông lót móng", don_vi: m3, ma_hieu: ""}
+be_tong_mong:     {ten: "Bê tông móng",     don_vi: m3, ma_hieu: ""}
+van_khuon_mong:   {ten: "Ván khuôn móng",   don_vi: m2, ma_hieu: ""}
+be_tong_cot:      {ten: "Bê tông cột",      don_vi: m3, ma_hieu: ""}
+van_khuon_cot:    {ten: "Ván khuôn cột",    don_vi: m2, ma_hieu: ""}
+be_tong_vach:     {ten: "Bê tông vách, lõi", don_vi: m3, ma_hieu: ""}
+van_khuon_vach:   {ten: "Ván khuôn vách, lõi", don_vi: m2, ma_hieu: ""}
+be_tong_dam:      {ten: "Bê tông dầm",      don_vi: m3, ma_hieu: ""}
+van_khuon_dam:    {ten: "Ván khuôn dầm",    don_vi: m2, ma_hieu: ""}
+be_tong_san:      {ten: "Bê tông sàn",      don_vi: m3, ma_hieu: ""}
+van_khuon_san:    {ten: "Ván khuôn sàn",    don_vi: m2, ma_hieu: ""}

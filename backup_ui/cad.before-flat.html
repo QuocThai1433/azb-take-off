@@ -1,0 +1,1491 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AZB Take-off</title>
+<script>try { var gd0 = localStorage.getItem("azb-giao-dien"); if (gd0) document.documentElement.dataset.gd = gd0; } catch (e) {}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  /* ===== AZB Take-off: nhận diện thương hiệu (xanh #004C97, cam #F47A20) =====
+     Khung điều khiển: nền sáng. Vùng bản vẽ (giữa): nền tối kiểu CAD. */
+  :root {
+    --xanh:#004C97; --xanh-dam:#003A75; --xanh-nhat:#E8F0F9; --xanh-vien:#B9CCE2;
+    --cam:#F47A20; --cam-dam:#D9650F; --cam-nhat:#FFF1E6;
+    /* khung sáng */
+    --sf:#fff; --sf2:#F4F7FB; --sf3:#EEF3F9; --hv:#F5F8FC; --ln:#E6ECF4; --sang:#FFE3CC; --hd-bg:#FFF6DF; --hd-vien:#F0D58A; --hd-tx:#5E4300; --bd:#0B5CAD; --tx-nhan:#003A75; --xanh-hv:#003A75;
+    --nen:#EEF2F7; --nen2:#E2E9F2; --nen3:#FFFFFF; --vien:#CBD5E2; --chu:#1B2430; --mo:#5B6675;
+    --vang:#A85A00; --do:#C62828; --luc:#1E7B34;
+    /* vùng bản vẽ tối */
+    --dk-nen:#141A22; --dk-nen2:#1E2631; --dk-vien:#37424F; --dk-chu:#E6EAF0; --dk-mo:#8D98A8;
+  }
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body { font:12.5px/1.4 Roboto, "Segoe UI", Arial, sans-serif; background:var(--nen); color:var(--chu); display:flex; flex-direction:column; overflow:hidden; }
+  button, select, input { font:inherit; color:var(--chu); background:var(--sf); border:1px solid var(--vien); border-radius:4px; padding:3px 8px; }
+  button { cursor:pointer; background:var(--sf); color:var(--xanh); font-weight:500; transition:background .12s, border-color .12s; }
+  button:hover { border-color:var(--xanh); background:var(--xanh-nhat); }
+  button.on { background:var(--xanh); border-color:var(--xanh); color:#fff; }
+  button.on:hover { background:var(--xanh-hv); }
+  button:disabled { opacity:.45; cursor:default; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline:2px solid var(--xanh-vien); outline-offset:1px; }
+  input:focus, select:focus { border-color:var(--xanh); }
+  input[type=number] { width:78px; }
+  input[type=checkbox] { padding:0; accent-color:var(--xanh); }
+
+  /* Thanh tiêu đề: [logo + tên] · [nút hiện/ẩn bảng] · [dự án] */
+  #tieu-de { background:linear-gradient(100deg, #003A75, #004C97 65%); color:#fff; padding:7px 16px; display:flex; flex-wrap:wrap; gap:8px 22px; align-items:center; border-bottom:3px solid var(--cam); }
+  .thuong-hieu { display:flex; align-items:center; gap:12px; }
+  /* Logo: file /static/logo-azb-trang.png (chữ trắng). Muốn đổi logo thì chép đè file này. */
+  .logo { height:38px; width:auto; display:block; }
+  img.logo { height:42px; width:auto; min-width:0; padding:0; background:none; border-radius:0; display:block; }
+  .ten-app { display:flex; flex-direction:column; line-height:1.25; padding-left:12px; border-left:1px solid rgba(255,255,255,.3); }
+  .ten-app b { color:#fff; letter-spacing:.8px; font-size:16px; }
+  .ten-app b em { font-style:normal; color:var(--cam); }
+  .ten-app span { color:rgba(255,255,255,.75); font-size:11px; }
+  .hien-an { display:flex; }
+  #tieu-de .hien-an button { height:30px; padding:0 14px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.4); color:#fff; font-weight:500; border-radius:0; margin-left:-1px; }
+  #tieu-de .hien-an button:first-child { border-radius:5px 0 0 5px; margin-left:0; }
+  #tieu-de .hien-an button:last-child { border-radius:0 5px 5px 0; }
+  #tieu-de .hien-an button:hover { background:rgba(255,255,255,.22); border-color:#fff; position:relative; }
+  #tieu-de .hien-an button.on { background:var(--cam); border-color:var(--cam); color:#fff; position:relative; }
+  .du-an-o { display:flex; flex:none; margin-left:auto; flex-direction:row; align-items:center; gap:10px; white-space:nowrap; color:#fff; font-size:13px; font-weight:500; }
+  #tieu-de input { flex:none; width:240px; height:30px; background:#fff; color:#1B2430; border-color:#fff; border-radius:5px; padding:0 10px; }
+
+  /* Ribbon: mỗi nhóm là một thẻ, tên nhóm ở trên, nút thẳng hàng ở dưới */
+  #ribbon { background:var(--sf2); border-bottom:1px solid var(--vien); display:flex; flex-wrap:wrap; align-items:stretch; gap:8px 8px; padding:8px 10px; }
+  #ribbon .nhom { background:var(--sf); border:1px solid var(--vien); border-radius:8px; padding:5px 8px 7px; display:flex; flex-direction:column-reverse; justify-content:flex-end; gap:5px; box-shadow:0 1px 2px rgba(16,40,80,.05); }
+  #ribbon .nhom h6 { margin:0; font-size:10px; font-weight:700; color:var(--xanh); text-align:left; text-transform:uppercase; letter-spacing:.8px; }
+  #ribbon .nhom h6::before { content:""; display:inline-block; width:3px; height:9px; background:var(--cam); margin-right:6px; vertical-align:-1px; }
+  #ribbon .nut { display:flex; gap:6px; align-items:center; min-height:30px; }
+  #ribbon .nut button, #ribbon .nut select, #ribbon .nut input, #ribbon label.nut-file { height:30px; }
+  #ribbon .nut button { padding:0 10px; }
+  #ribbon .nut input[type=number] { width:56px; background:var(--sf2); text-align:center; padding:0 6px; }
+  #ribbon .nut input[type=number]::placeholder { color:var(--mo); font-size:11px; }
+  label.nut-file { display:inline-flex; align-items:center; background:var(--cam); color:#fff; padding:0 14px; border-radius:5px; cursor:pointer; font-weight:700; transition:background .12s; }
+  label.nut-file:hover { background:var(--cam-dam); }
+  /* Nút liền nhau trong nhóm Xem, Thống kê, Vùng */
+  #ribbon .nhom:nth-child(2) .nut, #ribbon .nhom:nth-child(4) .nut { gap:0; }
+  #ribbon .nhom:nth-child(2) .nut button, #ribbon .nhom:nth-child(4) .nut button { border-radius:0; margin-left:-1px; }
+  #ribbon .nhom:nth-child(2) .nut button:first-child, #ribbon .nhom:nth-child(4) .nut button:first-child { border-radius:5px 0 0 5px; margin-left:0; }
+  #ribbon .nhom:nth-child(2) .nut button:last-child, #ribbon .nhom:nth-child(4) .nut button:last-child { border-radius:0 5px 5px 0; }
+  #ribbon .nut button:hover, #ribbon .nut button.on { position:relative; z-index:1; }
+  #t-vung { border-radius:5px 0 0 5px; } #t-bo-vung { border-radius:0 5px 5px 0; margin-left:-7px; margin-right:6px; }
+
+  /* Khung làm việc */
+  #than { flex:1; min-height:0; display:grid; grid-template-columns:var(--cl, 250px) var(--sl, 4px) minmax(0, 1fr) var(--sr, 4px) var(--cr, 480px); grid-template-rows:minmax(0, 1fr) var(--sb, 0px) var(--cb, 0px); position:relative; background:var(--nen); }
+  #dock-l { grid-area:1/1; } #chia-t { grid-area:1/2; } #giua { grid-area:1/3; } #chia-p { grid-area:1/4; } #dock-r { grid-area:1/5; }
+  #chia-b { grid-area:2/1/3/6; cursor:row-resize; } #dock-b { grid-area:3/1/4/6; }
+  .dock { display:flex; min-width:0; min-height:0; overflow:hidden; }
+  .dock-lr { flex-direction:column; } .dock-b { flex-direction:row; }
+  .dock > .cot { flex:1 1 0; min-width:0; min-height:0; border:0; border-right:1px solid var(--vien); }
+  .dock-lr > .cot + .cot { border-top:1px solid var(--vien); }
+  .dock-b > .cot + .cot { border-left:1px solid var(--vien); }
+  .grip { cursor:grab; color:var(--mo); padding:0 6px 0 2px; user-select:none; font-size:14px; } .grip:hover { color:var(--cam); }
+  #dock-ov { position:absolute; inset:0; z-index:20; pointer-events:none; }
+  #dock-ov div { position:absolute; display:flex; align-items:center; justify-content:center; border:2px dashed var(--cam); background:rgba(244,122,32,.10); color:var(--cam-dam); font-weight:600; }
+  #dock-ov div.on { background:rgba(244,122,32,.35); border-style:solid; }
+  #dock-ov [data-z=l] { left:0; top:0; bottom:0; width:20%; } #dock-ov [data-z=r] { right:0; top:0; bottom:0; width:20%; } #dock-ov [data-z=b] { left:20%; right:20%; bottom:0; height:30%; }
+  .chia { background:var(--vien); position:relative; cursor:col-resize; user-select:none; }
+  .dong-x { width:20px; height:20px; padding:0; margin-left:auto; flex:none; border:0; border-radius:3px; background:transparent; color:var(--mo); font-size:12px; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
+  .dong-x:hover { background:var(--xanh-nhat); color:var(--do); border:0; }
+  .tieu:has(.dong-x) { display:flex; align-items:center; gap:4px; }
+  .tab-phai .dong-x { margin-right:4px; align-self:center; position:sticky; right:4px; background:var(--nen2); }
+  .chia:hover, .chia.keo { background:var(--cam); }
+  #than.dang-keo { cursor:col-resize; user-select:none; }
+  .cot { background:var(--sf); overflow:auto; min-width:0; border-right:1px solid var(--vien); }
+  .cot.phai { min-width:0; border-right:0; border-left:1px solid var(--vien); display:flex; flex-direction:column; }
+  .tieu { background:var(--xanh-nhat); color:var(--tx-nhan); padding:5px 10px; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.5px; border-bottom:1px solid var(--xanh-vien); border-left:3px solid var(--cam); position:sticky; top:0; z-index:2; }
+  .ds-file { padding:5px 8px; border-bottom:1px solid var(--ln); display:grid; grid-template-columns:1fr auto; gap:3px; cursor:pointer; }
+  .ds-file:hover { background:var(--hv); }
+  .ds-file.act { background:var(--xanh-nhat); box-shadow:inset 3px 0 var(--xanh); }
+  .ds-file .ten { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ds-file select { grid-column:1 / 2; width:100%; }
+  .ds-file .x { border:0; background:none; color:var(--mo); padding:0 4px; }
+  .ds-file > span { grid-row:1; grid-column:2; white-space:nowrap; }
+  .ds-file .x:hover { color:var(--do); background:none; }
+  .lay { display:grid; grid-template-columns:18px 14px 1fr 34px 18px; gap:4px; padding:3px 8px; align-items:center; border-bottom:1px solid var(--ln); }
+  .lay .mau { width:12px; height:12px; border:1px solid #6b7686; }
+  .lay .ten { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .lay .sl { color:var(--mo); text-align:right; font-size:11px; }
+  .lay select { grid-column:3 / 6; width:100%; font-size:11px; padding:1px 3px; }
+
+  /* Vùng bản vẽ: nền tối kiểu CAD */
+  #giua { display:flex; flex-direction:column; min-width:0; min-height:0; background:var(--dk-nen); color:var(--dk-chu); }
+  #giua button, #giua select, #giua input { color:var(--dk-chu); background:var(--dk-nen2); border-color:var(--dk-vien); }
+  #tab-file { background:var(--dk-nen); display:flex; gap:2px; padding:4px 6px 0; overflow-x:auto; min-height:28px; border-bottom:2px solid var(--xanh); }
+  #tab-file div { background:var(--dk-nen2); padding:4px 14px; border-radius:4px 4px 0 0; cursor:pointer; white-space:nowrap; max-width:240px; overflow:hidden; text-overflow:ellipsis; border:1px solid var(--dk-vien); border-bottom:0; color:var(--dk-mo); }
+  #tab-file div:hover { color:var(--dk-chu); }
+  #tab-file div.act { background:#000; color:#fff; box-shadow:inset 0 2px var(--cam); }
+  #khung { flex:1; min-height:0; position:relative; background:#000; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; cursor:none; }
+  #tip { position:absolute; pointer-events:none; background:rgba(20,26,34,.94); color:var(--dk-chu); border:1px solid var(--cam); border-radius:3px; padding:3px 8px; font-size:11px; white-space:nowrap; z-index:5; }
+  #goc { position:absolute; left:8px; bottom:6px; color:#6c7787; font-size:11px; pointer-events:none; }
+  #trong { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#7b8697; text-align:center; pointer-events:none; }
+
+  #trang-thai { background:var(--dk-nen2); border-top:1px solid var(--dk-vien); padding:3px 12px; display:flex; flex-wrap:wrap; gap:4px 20px; color:var(--dk-mo); font-variant-numeric:tabular-nums; }
+  #trang-thai b { color:#fff; font-weight:500; }
+  #lenh { background:var(--dk-nen); border-top:1px solid var(--dk-vien); display:flex; flex-direction:column; }
+  #lich-su { height:54px; overflow:auto; padding:3px 12px; color:var(--dk-mo); font-family:Consolas, monospace; font-size:11px; }
+  #lich-su .loi { color:#FF7A70; } #lich-su .ok { color:#5FD39A; }
+  #dong-lenh { display:flex; align-items:center; gap:6px; padding:2px 12px 5px; font-family:Consolas, monospace; color:var(--cam); }
+  #giua #dong-lenh input { flex:1; border:0; background:transparent; outline:0; color:var(--dk-chu); }
+
+  /* Bảng bên phải */
+  .tab-phai { display:flex; align-items:stretch; background:var(--nen2); border-bottom:1px solid var(--vien); overflow-x:auto; scrollbar-width:none; }
+  .tab-phai div { padding:7px 13px; cursor:pointer; color:var(--mo); border-right:1px solid var(--vien); white-space:nowrap; flex:none; font-weight:500; }
+  .tab-phai div:hover { color:var(--xanh); background:var(--hv); }
+  .tab-phai div.act { background:var(--sf); color:var(--xanh); box-shadow:inset 0 -3px var(--cam); }
+  .noi-dung { flex:1; overflow:auto; padding:10px; background:var(--sf); }
+  .noi-dung h4 { margin:14px 0 5px; color:var(--xanh); font-size:12.5px; padding-left:8px; border-left:3px solid var(--cam); }
+  .noi-dung h4:first-child { margin-top:0; }
+  table { border-collapse:collapse; width:100%; font-size:11.5px; }
+  th, td { border:1px solid var(--vien); padding:3px 6px; text-align:left; }
+  th { background:var(--xanh-nhat); color:var(--tx-nhan); font-weight:600; position:sticky; top:0; }
+  td.so { text-align:right; font-variant-numeric:tabular-nums; }
+  tr.tong td { font-weight:700; background:var(--sf3); }
+  .khop { color:var(--luc); } .lech { color:var(--do); } .chua { color:var(--vang); }
+  .cb { color:var(--vang); margin:2px 0; font-size:11.5px; }
+  .hang { display:flex; flex-wrap:wrap; gap:6px; align-items:end; margin:6px 0; }
+  .hang label { display:flex; flex-direction:column; font-size:11px; color:var(--mo); gap:2px; }
+  .nho { color:var(--mo); font-size:11px; }
+  table.nhom th:last-child, table.nhom td:last-child { position:sticky; right:0; background:var(--xanh-nhat); box-shadow:-1px 0 0 var(--vien); white-space:nowrap; z-index:1; }
+  table.nhom td, table.nhom th { padding:2px 4px; }
+
+  /* Công cụ tính */
+  .cc-item { padding:6px 10px; border-bottom:1px solid var(--ln); cursor:pointer; display:flex; justify-content:space-between; gap:6px; align-items:baseline; }
+  .cc-item:hover { background:var(--hv); }
+  .cc-item.act { background:var(--xanh-nhat); box-shadow:inset 3px 0 var(--cam); }
+  .cc-item .nho { white-space:nowrap; }
+  .buoc { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0; }
+  .buoc button { padding:5px 11px; }
+  .buoc button.cho { background:var(--cam); border-color:var(--cam); color:#fff; font-weight:700; }
+  .buoc button.xong { border-color:var(--luc); color:var(--luc); }
+  .huong-dan { background:var(--hd-bg); border:1px solid var(--hd-vien); border-left:4px solid var(--cam); border-radius:3px; padding:6px 10px; margin:6px 0; color:var(--hd-tx); }
+  table.cc th, table.cc td { padding:2px 4px; vertical-align:top; }
+  table.cc input[type=text], table.cc input[type=number] { padding:1px 3px; }
+  table.cc tbody.mo td { opacity:.5; }
+  table.cc tbody { border-top:1px solid var(--vien); }
+  table.cc tr.ghi-chu td { border-top:0; padding-top:0; }
+  .nhan-chac { color:var(--vang); font-size:10.5px; }
+  .loi-cc { color:var(--do); }
+  .chip { display:inline-block; border:1px solid var(--xanh-vien); border-radius:9px; padding:0 8px; margin:1px 2px; background:var(--xanh-nhat); color:var(--tx-nhan); cursor:pointer; }
+  .chip:hover { border-color:var(--cam); background:var(--cam-nhat); }
+  details.ct-sua { margin:8px 0; border:1px solid var(--vien); border-radius:4px; padding:5px 9px; }
+  details.ct-sua summary { cursor:pointer; color:var(--xanh); font-weight:500; }
+  tr.sang td, tbody.sang td { background:var(--sang) !important; }
+  table.tong th { white-space:normal; font-size:11px; position:static; } table.tong td { white-space:nowrap; padding:2px 4px; }
+  .biendo { font-family:Consolas, monospace; color:var(--bd); }
+
+  /* Laptop nhỏ và máy tính bảng */
+  @media (max-width:1100px) {
+    #than { grid-template-columns:min(var(--cl, 250px), 28vw) var(--sl, 4px) minmax(0, 1fr) var(--sr, 4px) min(var(--cr, 480px), 42vw); }
+
+  }
+  @media (max-width:800px) {
+    #ribbon { max-height:34vh; overflow:auto; }
+    #than { grid-template-columns:min(var(--cl, 250px), 36vw) var(--sl, 4px) minmax(0, 1fr) var(--sr, 4px) min(var(--cr, 480px), 48vw); }
+    .du-an-o { width:100%; margin-left:0; } #tieu-de input#du-an { flex:1; width:auto; min-width:0; }
+  }
+  /* ===== Công tắc giao diện: Sáng · Chuẩn (mặc định) · Tối =====
+     Chuẩn: khung sáng + vùng vẽ tối. Sáng: tất cả sáng, vùng vẽ nền trắng (đảo màu canvas bằng CSS).
+     Tối: tất cả tối. Chọn lưu trong trình duyệt (azb-giao-dien). */
+  html[data-gd=sang] { --dk-nen:#EEF2F7; --dk-nen2:#E2E9F2; --dk-vien:#CBD5E2; --dk-chu:#1B2430; --dk-mo:#5B6675; }
+  html[data-gd=sang] #khung { background:#fff; }
+  html[data-gd=sang] canvas { filter:invert(1) hue-rotate(180deg); }
+  html[data-gd=sang] #tab-file div.act { background:#fff; color:var(--xanh); }
+  html[data-gd=sang] #trang-thai b { color:var(--chu); }
+  html[data-gd=sang] #lich-su .loi { color:var(--do); } html[data-gd=sang] #lich-su .ok { color:var(--luc); }
+  html[data-gd=sang] #tip { background:rgba(255,255,255,.97); color:var(--chu); }
+  html[data-gd=sang] #goc { color:#8a94a3; } html[data-gd=sang] #trong { color:#7b8697; }
+
+  /* --- Tối: phong cách công nghệ cao cấp (xanh đen sâu, xanh điện + cam AZB phát sáng nhẹ) --- */
+  html[data-gd=toi] { color-scheme:dark;
+    --sf:#0F1623; --sf2:#0A0F19; --sf3:#182237; --hv:#162038; --ln:#1B2740; --sang:#4A3118; --hd-bg:#241E12; --hd-vien:#5C4A1E; --hd-tx:#F3DFA0; --bd:#8EC0FF;
+    --nen:#0A0F19; --nen2:#111A2B; --nen3:#0A0F19; --vien:#25324D; --chu:#E8EDF6; --mo:#8B97AD;
+    --xanh:#3D8BFF; --xanh-hv:#2F78EA; --xanh-nhat:#13213B; --xanh-vien:#2A4A80; --tx-nhan:#8EC0FF; --cam-nhat:#2B1D12;
+    --vang:#FFB454; --do:#FF6B6B; --luc:#4ADE9F;
+    --dk-nen:#060A11; --dk-nen2:#0D1421; --dk-vien:#1F2D47; --dk-chu:#E8EDF6; --dk-mo:#7F8CA3; }
+  html[data-gd=toi] body { background:radial-gradient(1100px 520px at 85% -8%, rgba(61,139,255,.12), transparent 62%), radial-gradient(800px 400px at 0% 110%, rgba(244,122,32,.06), transparent 60%), #0A0F19; }
+  html[data-gd=toi] * { scrollbar-color:#2C3C5C transparent; scrollbar-width:thin; }
+  html[data-gd=toi] .tab-phai { scrollbar-width:none; }
+  /* Header */
+  html[data-gd=toi] #tieu-de { background:linear-gradient(100deg, #050912 0%, #0B1B3A 55%, #0F2D63 100%); border-bottom:1px solid rgba(244,122,32,.75); box-shadow:0 1px 0 rgba(244,122,32,.25), 0 8px 28px rgba(0,0,0,.55); }
+  html[data-gd=toi] .ten-app b { letter-spacing:1.4px; }
+  html[data-gd=toi] .ten-app b em { text-shadow:0 0 14px rgba(244,122,32,.6); }
+  html[data-gd=toi] .ten-app { border-left-color:rgba(142,192,255,.28); }
+  html[data-gd=toi] #tieu-de input { background:rgba(255,255,255,.06); color:var(--chu); border:1px solid rgba(142,192,255,.28); }
+  html[data-gd=toi] #tieu-de input::placeholder { color:rgba(232,237,246,.45); }
+  html[data-gd=toi] #tieu-de input:focus { border-color:var(--xanh); box-shadow:0 0 0 3px rgba(61,139,255,.25); }
+  html[data-gd=toi] #tieu-de .hien-an button { background:rgba(255,255,255,.05); border-color:rgba(142,192,255,.25); backdrop-filter:blur(6px); }
+  html[data-gd=toi] #tieu-de .hien-an button.on { background:linear-gradient(180deg,#FF8E3C,#F47A20); border-color:#FF9A52; box-shadow:0 0 14px rgba(244,122,32,.45); }
+  /* Ribbon: thẻ kính mờ */
+  html[data-gd=toi] #ribbon { background:#070C15; border-bottom:1px solid #16213A; }
+  html[data-gd=toi] #ribbon .nhom { background:linear-gradient(180deg,#141E33,#0F1726); border-color:#22304D; border-radius:10px; box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 6px 18px rgba(0,0,0,.4); }
+  html[data-gd=toi] #ribbon .nhom h6 { color:#8EC0FF; }
+  html[data-gd=toi] #ribbon .nhom h6::before { background:var(--cam); box-shadow:0 0 8px rgba(244,122,32,.8); }
+  html[data-gd=toi] label.nut-file { background:linear-gradient(180deg,#FF8E3C,#F47A20); box-shadow:0 0 14px rgba(244,122,32,.4); }
+  html[data-gd=toi] label.nut-file:hover { box-shadow:0 0 20px rgba(244,122,32,.65); background:linear-gradient(180deg,#FF9A52,#F47A20); }
+  /* Nút, ô nhập */
+  html[data-gd=toi] button:not(.on):not(.cho):not(.dong-x):not(.x) { background:var(--sf3); border-color:#2A3A5C; color:#CFE0FF; }
+  html[data-gd=toi] button:hover:not(:disabled):not(.dong-x):not(.x) { border-color:var(--xanh); box-shadow:0 0 0 1px rgba(61,139,255,.4), 0 0 16px rgba(61,139,255,.28); background:#1B2A47; }
+  html[data-gd=toi] button.on { background:linear-gradient(180deg,#4F9AFF,#2F6FE0); border-color:#6AAEFF; color:#fff; box-shadow:0 0 16px rgba(61,139,255,.5); }
+  html[data-gd=toi] button.on:hover { background:linear-gradient(180deg,#63A8FF,#3A7BEF); }
+  html[data-gd=toi] .buoc button.cho { background:linear-gradient(180deg,#FF8E3C,#F47A20); box-shadow:0 0 14px rgba(244,122,32,.45); }
+  html[data-gd=toi] select, html[data-gd=toi] input[type=text], html[data-gd=toi] input[type=number] { background:#080D16; border-color:#26334C; }
+  html[data-gd=toi] select:focus, html[data-gd=toi] input:focus { border-color:var(--xanh); box-shadow:0 0 0 3px rgba(61,139,255,.22); outline:0; }
+  /* Cột trái, bảng phải */
+  html[data-gd=toi] .cot, html[data-gd=toi] .noi-dung { background:#0C1320; }
+  html[data-gd=toi] .tieu { background:linear-gradient(90deg,#14233F,#0C1320 90%); color:#8EC0FF; border-bottom-color:#1E2E4E; border-left-color:var(--cam); letter-spacing:.8px; }
+  html[data-gd=toi] .tab-phai { background:#070C15; border-bottom-color:#16213A; }
+  html[data-gd=toi] .tab-phai div { border-right-color:#16213A; }
+  html[data-gd=toi] .tab-phai div:hover { background:#101A2D; color:#BFD9FF; }
+  html[data-gd=toi] .tab-phai div.act { background:#0C1320; color:#fff; box-shadow:inset 0 -2px var(--cam), 0 6px 14px -6px rgba(244,122,32,.55); }
+  html[data-gd=toi] .ds-file.act { background:linear-gradient(90deg,rgba(61,139,255,.22),rgba(61,139,255,.03)); box-shadow:inset 3px 0 var(--xanh); }
+  html[data-gd=toi] .cc-item.act { background:linear-gradient(90deg,rgba(244,122,32,.20),rgba(244,122,32,.02)); box-shadow:inset 3px 0 var(--cam); }
+  html[data-gd=toi] .cc-item:hover, html[data-gd=toi] .ds-file:hover { background:#121C30; }
+  html[data-gd=toi] .noi-dung h4 { color:#8EC0FF; border-left-color:var(--cam); }
+  html[data-gd=toi] th { background:#13213B; color:#8EC0FF; letter-spacing:.3px; }
+  html[data-gd=toi] th, html[data-gd=toi] td { border-color:#1B2740; }
+  html[data-gd=toi] tbody tr:hover td { background:#121C30; }
+  html[data-gd=toi] .chip { background:#13213B; border-color:#2A4A80; color:#BFD9FF; }
+  html[data-gd=toi] .chia { background:#0F1829; }
+  html[data-gd=toi] .chia:hover, html[data-gd=toi] .chia.keo { background:var(--cam); box-shadow:0 0 10px rgba(244,122,32,.6); }
+  html[data-gd=toi] .dock > .cot, html[data-gd=toi] .cot.phai { border-color:#16213A; }
+  /* Vùng vẽ */
+  html[data-gd=toi] #tab-file { background:#060A11; border-bottom:1px solid #1F2D47; box-shadow:0 1px 0 rgba(61,139,255,.55); }
+  html[data-gd=toi] #tab-file div { background:#0D1421; border-color:#1F2D47; }
+  html[data-gd=toi] #tab-file div.act { background:#000; box-shadow:inset 0 2px var(--cam); }
+  html[data-gd=toi] #khung { box-shadow:inset 0 0 0 1px #14203A; }
+  html[data-gd=toi] #tip { border-color:rgba(61,139,255,.7); box-shadow:0 4px 18px rgba(0,0,0,.6), 0 0 12px rgba(61,139,255,.25); border-radius:5px; }
+  html[data-gd=toi] #trang-thai { background:#0A101C; border-top-color:#16213A; }
+  html[data-gd=toi] #trang-thai b { color:#8EC0FF; }
+  html[data-gd=toi] #lenh { background:#060A11; border-top-color:#16213A; }
+  html[data-gd=toi] #dong-lenh { color:var(--cam); text-shadow:0 0 8px rgba(244,122,32,.5); }
+
+  /* Điện thoại: xếp chồng, vùng bản vẽ ở trên, các bảng cuộn xuống dưới */
+  @media (max-width:700px) {
+    body { overflow:auto; height:auto; min-height:100%; }
+    #than { display:flex; flex-direction:column; overflow:visible; }
+    #giua { order:1; height:68vh; min-height:340px; flex:none; }
+    #dock-l { order:2; } #dock-r { order:3; } #dock-b { order:4; }
+    .dock { overflow:visible; }
+    .dock > .cot { flex:none; max-height:70vh; border-right:0; border-top:3px solid var(--xanh); }
+    .chia { display:none !important; }
+    #tieu-de span#ten-du-an { display:none; }
+    #ribbon { max-height:none; overflow:visible; }
+    #ribbon .nhom { width:100%; }
+    #ribbon .nut { flex-wrap:wrap; }
+
+  }
+</style>
+</head>
+<body>
+<div id="tieu-de">
+  <div class="thuong-hieu"><img class="logo" id="logo-azb" src="/static/logo-azb-trang.png" alt="AZB - Build Trust on Discipline">
+    <div class="ten-app"><b>AZB <em>TAKE-OFF</em></b><span id="ten-du-an">Bóc khối lượng và thống kê cấu kiện từ bản vẽ CAD</span></div></div>
+  <div class="hien-an"><button id="hien-t" title="Hiện / ẩn cột Công cụ tính, Bản vẽ, Layer">☰ Công cụ &amp; bản vẽ</button><button id="hien-p" title="Hiện / ẩn bảng Công cụ, Đối tượng chọn, Thống kê...">▤ Bảng kết quả</button></div>
+  <div class="hien-an" id="chon-giao-dien" role="group" aria-label="Giao diện sáng / tối"><button type="button" data-gd="sang" title="Giao diện sáng toàn bộ, vùng vẽ nền trắng">☀ Sáng</button><button type="button" data-gd="chuan" class="on" title="Khung sáng, vùng vẽ nền tối (mặc định)">◐ Chuẩn</button><button type="button" data-gd="toi" title="Giao diện tối toàn bộ">☾ Tối</button></div>
+  <label class="du-an-o">Dự án<input id="du-an" type="text" placeholder="Tên dự án (in trên Excel)"></label></div>
+
+<div id="ribbon">
+  <div class="nhom"><div class="nut">
+      <label class="nut-file" for="chon-file">+ Thêm bản vẽ</label>
+      <input type="file" id="chon-file" accept=".dxf,.dwg" multiple hidden>
+      <select id="don-vi" title="Đơn vị bản vẽ"><option value="auto">Đơn vị: tự nhận</option><option>mm</option><option>cm</option><option>m</option></select>
+    </div><h6>Bản vẽ</h6></div>
+  <div class="nhom"><div class="nut">
+      <button id="t-pick" class="on" title="Rê chuột để xem, bấm để chọn, kéo khung để chọn nhiều (trái→phải: Window, phải→trái: Crossing). Shift: chọn thêm. Giữ nút giữa chuột để di chuyển.">Chọn đối tượng</button>
+      <button id="t-nhanh" title="Bật: bấm vào đối tượng là thêm ngay một dòng vào bảng bóc (hình kín tính diện tích, đường hở tính chiều dài). Shift + bấm hoặc kéo khung vẫn chọn như bình thường.">Bóc nhanh</button>
+      <button id="t-pan" title="Kéo chuột trái để di chuyển bản vẽ (công cụ Chọn thì dùng nút giữa chuột)">Pan</button>
+      <button id="t-ze" title="Zoom Extents">Zoom toàn bộ</button>
+      <button id="t-zv" title="Phóng to vùng đã chọn">Zoom vùng</button>
+    </div><h6>Xem</h6></div>
+  <div class="nhom"><div class="nut">
+      <button id="t-vung" title="Kéo khung chữ nhật để chọn mặt bằng cần tính">Chọn vùng</button>
+      <button id="t-bo-vung">Bỏ vùng</button>
+      <input type="number" step="any" id="v0" placeholder="X từ"><input type="number" step="any" id="v1" placeholder="Y từ">
+      <input type="number" step="any" id="v2" placeholder="X đến"><input type="number" step="any" id="v3" placeholder="Y đến">
+    </div><h6>Vùng mặt bằng (mét)</h6></div>
+  <div class="nhom"><div class="nut">
+      <button id="t-tk" class="on">Cập nhật thống kê</button>
+      <button id="t-tk-xlsx">Xuất Excel thống kê</button>
+    </div><h6>Thống kê</h6></div>
+</div>
+
+<div id="than">
+  <div class="dock dock-lr" id="dock-l"></div><div class="dock dock-lr" id="dock-r"></div>
+  <div class="chia chia-h" id="chia-b" title="Kéo để đổi chiều cao vùng phía dưới (bấm đúp: về mặc định)"></div><div class="dock dock-b" id="dock-b"></div>
+  <div id="dock-ov" hidden><div data-z="l">Gắn bên trái</div><div data-z="r">Gắn bên phải</div><div data-z="b">Gắn phía dưới</div></div>
+  <div class="cot" id="pn-t">
+    <div class="tieu" title="Mỗi công cụ có bộ công thức chung của cấu kiện và quy trình quét chọn riêng"><span class="grip" data-pn="t" title="Kéo tay nắm này tới mép trái / phải / dưới để gắn cột vào đó">⠿</span> Công cụ tính<button class="dong-x" id="dong-t" title="Ẩn cột này (mở lại bằng nút trên thanh tiêu đề)">✕</button></div>
+    <div id="ds-cc"></div>
+    <div class="tieu">Bản vẽ trong dự án</div>
+    <div id="ds-file"><div class="nho" style="padding:8px">Chưa có bản vẽ. Bấm "Thêm bản vẽ", có thể chọn nhiều file cùng lúc: mặt bằng, chi tiết cấu kiện, ghi chú chung.</div></div>
+    <div class="tieu" title="Hộp cuối mỗi dòng: khoá layer (không chọn được)">Layer của bản vẽ đang mở · 🔒 khoá</div>
+    <div id="ds-layer"></div>
+  </div>
+
+  <div class="chia" id="chia-t" title="Kéo để đổi độ rộng (kéo hết cỡ để ẩn, bấm đúp: về mặc định)"></div>
+  <div id="giua">
+    <div id="tab-file"></div>
+    <div id="khung"><canvas id="cv"></canvas><div id="trong">Chưa mở bản vẽ</div><div id="goc">Y ↑ X →</div><div id="tip" hidden></div></div>
+    <div id="trang-thai"><span>X: <b id="s-x">–</b></span><span>Y: <b id="s-y">–</b></span><span>Tỉ lệ: <b id="s-zoom">–</b></span>
+      <span>Công cụ: <b id="s-cc">Chọn đối tượng</b></span><span id="s-vung"></span></div>
+    <div id="lenh"><div id="lich-su"></div>
+      <div id="dong-lenh"><span>Lệnh:</span><input id="o-lenh" placeholder="ZE · PAN · CHON · VUNG · BOVUNG · TK · HELP" autocomplete="off"></div></div>
+  </div>
+
+  <div class="chia" id="chia-p" title="Kéo để đổi độ rộng (kéo hết cỡ để ẩn, bấm đúp: về mặc định)"></div>
+  <div class="cot phai" id="pn-p">
+    <div class="tab-phai"><span class="grip" data-pn="p" title="Kéo tay nắm này tới mép trái / phải / dưới để gắn bảng vào đó" style="align-self:center;margin-left:4px">⠿</span><div data-t="cc" class="act">Công cụ</div><div data-t="dt">Đối tượng chọn</div><div data-t="tk">Thống kê</div><div data-t="kl">Khối lượng</div><div data-t="gc">Ghi chú chung</div><button class="dong-x" id="dong-p" title="Ẩn bảng này (mở lại bằng nút trên thanh tiêu đề)" style="margin-left:auto">✕</button></div>
+    <div class="noi-dung" id="p-cc"></div>
+    <div class="noi-dung" id="p-dt" hidden></div>
+    <div class="noi-dung" id="p-tk" hidden></div>
+    <div class="noi-dung" id="p-kl" hidden></div>
+    <div class="noi-dung" id="p-gc" hidden></div>
+  </div>
+</div>
+
+<script>
+const LOAI = {cot:"Cột", dam:"Dầm", san:"Sàn", lo_san:"Lỗ mở sàn", mong:"Móng", vach:"Vách/lõi", khung_dam:"Khung dầm (bao ngoài)",
+  o_dam:"Ô trống giữa dầm", nhan:"Nhãn chữ", ong_gio:"Ống gió (MLINE+block)", bo_qua:"Bỏ qua"};
+const VAI_TRO = {mat_bang:"Mặt bằng", chi_tiet:"Chi tiết cấu kiện", ghi_chu:"Ghi chú chung"};
+const MAU = ["#ff3b30","#ffd60a","#30d158","#32d4e8","#4a8cff","#e061ff","#ffffff","#9b9b9b","#ff9f0a","#a3e635","#2dd4bf","#60a5fa","#a78bfa","#f472b6","#fb7185"];
+const TS = [["chieu_cao_tang","Cao tầng (m)"],["day_san","Dày sàn (m)"],["chieu_cao_dam","Cao dầm (m)"],["day_mong","Cao móng (m)"],
+  ["lot_mong_day","Dày lót (m)"],["lot_mong_mo_rong","Lót mở rộng (m)"],["so_tang_giong_nhau","Số tầng giống nhau"]];
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const so = (x, n=2) => x == null ? "" : Number(x).toLocaleString("vi-VN", {minimumFractionDigits:n, maximumFractionDigits:n});
+const kt = v => v && v.length ? v.join("×") : "";
+const drc = v => v.map(x => x == null ? "–" : x).join("×");
+
+const S = {files:[], act:-1, tool:"pick", hover:null, chon:[], loaiTru:new Set(), nhom:{}, nhomKQ:null, nhomKhoa:"", bang:[], v:{cx:0, cy:0, s:1}, mouse:null, keo:null, mac_dinh:{}, loaiHopLe:Object.keys(LOAI),
+  cc:{ds:[], don_vi:[], ma:null, tt:{}}, buoc:null};
+const F = () => S.files[S.act];
+
+// ---------- Lệnh / thông báo ----------
+function lenh(msg, kieu="") {
+  const d = document.createElement("div"); d.className = kieu; d.textContent = msg;
+  $("lich-su").appendChild(d); $("lich-su").scrollTop = 1e9;
+}
+
+// ---------- Bố cục: ẩn/hiện, kéo giãn, và gắn bảng sang trái / phải / dưới ----------
+const dung = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch {} return null; };
+const CO = {l:{mac:250, min:150, bien:"--cl", chia:"--sl", id:"t"}, r:{mac:Math.max(480, innerWidth * 0.42), min:260, bien:"--cr", chia:"--sr", id:"p"}, b:{mac:300, min:140, bien:"--cb", chia:"--sb", id:"b"}};
+const DK = {t:"l", p:"r"};   // bảng nào đang gắn ở đâu: t = Công cụ & bản vẽ, p = Bảng kết quả
+const AN = {t:false, p:false};  // đang ẩn
+const KT = {l:CO.l.mac, r:CO.r.mac, b:CO.b.mac};
+try { const l = JSON.parse(dung("azb-bo-cuc") || "null"); if (l) { Object.assign(DK, l.dk); Object.assign(AN, l.an); Object.assign(KT, l.kt); } } catch {}
+function xepBoCuc() {
+  const than = $("than");
+  for (const k of ["t", "p"]) {
+    const pn = $("pn-" + k), z = $("dock-" + DK[k]); if (pn.parentElement !== z) z.appendChild(pn);
+    pn.style.display = AN[k] ? "none" : ""; $("hien-" + k).classList.toggle("on", !AN[k]);
+  }
+  for (const z of ["l", "r", "b"]) {  // bảng t luôn đứng trước bảng p trong cùng một vùng
+    const a = $("pn-t"), b = $("pn-p"), d = $("dock-" + z);
+    if (a.parentElement === d && b.parentElement === d && a.nextElementSibling !== b) d.insertBefore(a, b);
+  }
+  for (const z of ["l", "r", "b"]) {
+    const co = ["t", "p"].some(k => DK[k] === z && !AN[k]), c = CO[z];
+    than.style.setProperty(c.bien, co ? KT[z] + "px" : "0px"); than.style.setProperty(c.chia, co ? "4px" : "0px");
+    $("chia-" + c.id).style.display = co ? "" : "none";
+  }
+  dung("azb-bo-cuc", JSON.stringify({dk:DK, an:AN, kt:KT}));
+}
+for (const k of ["t", "p"]) {
+  $("dong-" + k).onclick = () => { AN[k] = true; xepBoCuc(); };
+  $("hien-" + k).onclick = () => { AN[k] = !AN[k]; xepBoCuc(); };
+}
+for (const z of ["l", "r", "b"]) {
+  const c = CO[z], ch = $("chia-" + c.id);
+  ch.addEventListener("mousedown", e => {
+    e.preventDefault(); const p0 = z === "b" ? e.clientY : e.clientX, r0 = KT[z]; ch.classList.add("keo"); $("than").classList.add("dang-keo");
+    const di = ev => {
+      const d = z === "b" ? p0 - ev.clientY : z === "l" ? ev.clientX - p0 : p0 - ev.clientX, v = r0 + d;
+      if (v < c.min / 2) { for (const k of ["t", "p"]) if (DK[k] === z) AN[k] = true; xong(); }  // kéo hết cỡ: ẩn các bảng của vùng này
+      else KT[z] = Math.round(Math.max(c.min, Math.min((z === "b" ? innerHeight : innerWidth) * 0.7, v)));
+      xepBoCuc();
+    };
+    const xong = () => { removeEventListener("mousemove", di); removeEventListener("mouseup", xong); ch.classList.remove("keo"); $("than").classList.remove("dang-keo"); xepBoCuc(); };
+    addEventListener("mousemove", di); addEventListener("mouseup", xong);
+  });
+  ch.addEventListener("dblclick", () => { KT[z] = c.mac; xepBoCuc(); });  // bấm đúp: về độ lớn mặc định
+}
+// Kéo tay nắm ⠿ ở đầu mỗi bảng tới mép trái / phải / dưới của vùng làm việc để gắn bảng vào đó
+const TEN_VUNG = {l:"bên trái", r:"bên phải", b:"phía dưới"};
+document.querySelectorAll(".grip").forEach(g => g.addEventListener("mousedown", e => {
+  e.preventDefault(); const k = g.dataset.pn, ov = $("dock-ov"), r = $("than").getBoundingClientRect(); let dich = null;
+  ov.hidden = false; $("than").classList.add("dang-keo");
+  const di = ev => {
+    const x = (ev.clientX - r.left) / r.width, y = (ev.clientY - r.top) / r.height;
+    dich = x < 0.2 ? "l" : x > 0.8 ? "r" : y > 0.7 ? "b" : null;
+    ov.querySelectorAll("[data-z]").forEach(d => d.classList.toggle("on", d.dataset.z === dich));
+  };
+  const xong = () => {
+    removeEventListener("mousemove", di); removeEventListener("mouseup", xong); ov.hidden = true; $("than").classList.remove("dang-keo");
+    if (dich) { DK[k] = dich; AN[k] = false; xepBoCuc(); lenh(`Đã gắn ${k === "t" ? "cột Công cụ & bản vẽ" : "bảng kết quả"} ${TEN_VUNG[dich]}.`, "ok"); }
+  };
+  addEventListener("mousemove", di); addEventListener("mouseup", xong);
+}));
+xepBoCuc();
+
+async function goi(url, opts) {
+  const r = await fetch(url, opts);
+  if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m; } catch {} throw new Error(m); }
+  return r;
+}
+const json = (url, body) => goi(url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)}).then(r => r.json());
+async function taiXuong(url, body, macDinh) {
+  const r = await goi(url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+  const ten = (r.headers.get("Content-Disposition") || "").match(/filename="(.+)"/)?.[1] || macDinh;
+  const a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob()); a.download = ten; a.click(); URL.revokeObjectURL(a.href);
+}
+
+// ---------- Thêm bản vẽ ----------
+function doanVaiTro(ten) {
+  const t = ten.toLowerCase();
+  if (/ghi ?chu|note|general/.test(t)) return "ghi_chu";
+  if (/chi ?tiet|detail|ct[-_ ]/.test(t)) return "chi_tiet";
+  return "mat_bang";
+}
+
+async function themBanVe(ds) {
+  for (const f of ds) {
+    lenh(`Đang đọc ${f.name} ...`);
+    try {
+      const fd = new FormData(); fd.append("file", f); fd.append("don_vi", $("don-vi").value);
+      const r = await (await goi("/api/tai-len", {method:"POST", body:fd})).json();
+      const h = await (await goi("/api/hinh?id=" + r.id)).json();
+      S.mac_dinh = r.mac_dinh; S.loaiHopLe = r.loai_hop_le;
+      const layers = r.layers.map((l, i) => ({
+        ten:l.ten, loai:l.goi_y, hien:!l.tat && !/^defpoints$/i.test(l.ten), mau:MAU[i % MAU.length],
+        sl:l.so_hinh_kin + l.so_hinh_ghep + l.so_net_ho, so_chu:l.so_chu,
+        khoa:/(^|[-_ ])(grid|truc|axis|dim|text|defpoints|ghi ?chu)|trục|lưới/i.test(l.ten),  // layer phụ trợ: không chọn khi rê chuột / kéo khung
+      }));
+      S.files.push({id:r.id, ten:r.ten_file, vai_tro:doanVaiTro(r.ten_file), layers, hinh:h, vung:null, kl:null});
+      lenh(`Đã mở ${r.ten_file}: đơn vị ${r.don_vi}, ${r.layers.length} layer.`, "ok");
+      r.canh_bao.forEach(c => lenh(c));
+      if (S.files.length === 1) veTabKL();
+      moFile(S.files.length - 1);
+    } catch (e) { lenh(`${f.name}: ${e.message}`, "loi"); }
+  }
+}
+$("chon-file").onchange = async e => { const ds = [...e.target.files]; e.target.value = ""; await themBanVe(ds); };
+
+function moFile(i) {
+  S.act = i; S.chon = []; S.loaiTru = new Set(); S.hover = null; veDT(); ve_ds(); ve_layer(); ve_tab(); dongBoVung(); zoomToanBo(); veLai();
+}
+
+// ---------- Danh sách file, tab, layer ----------
+function ve_ds() {
+  $("ds-file").innerHTML = S.files.map((f, i) => `<div class="ds-file ${i === S.act ? "act" : ""}" data-i="${i}">
+      <div class="ten" title="${esc(f.ten)}">${esc(f.ten)}</div><span><button class="x" data-d="${i}" title="Nhân bản: thêm một vùng/mặt bằng khác của cùng bản vẽ">⧉</button><button class="x" data-x="${i}" title="Bỏ bản vẽ này">✕</button></span>
+      <select data-vt="${i}">${Object.entries(VAI_TRO).map(([k, t]) => `<option value="${k}" ${k === f.vai_tro ? "selected" : ""}>${t}</option>`).join("")}</select></div>`).join("")
+    || `<div class="nho" style="padding:8px">Chưa có bản vẽ. Bấm "Thêm bản vẽ", có thể chọn nhiều file cùng lúc.</div>`;
+}
+$("ds-file").addEventListener("click", e => {
+  if (e.target.dataset.x != null) { xoaFile(+e.target.dataset.x); return; }
+  if (e.target.dataset.d != null) { nhanBan(+e.target.dataset.d); return; }
+  if (e.target.tagName === "SELECT") return;
+  const d = e.target.closest(".ds-file"); if (d) moFile(+d.dataset.i);
+});
+$("ds-file").addEventListener("change", e => {
+  if (e.target.dataset.vt != null) { S.files[+e.target.dataset.vt].vai_tro = e.target.value; ve_layer(); lenh(`Vai trò: ${S.files[+e.target.dataset.vt].ten} → ${VAI_TRO[e.target.value]}`); }
+});
+function nhanBan(i) {
+  // Cùng một bản vẽ, thêm một mục mới có vùng và cách gán layer riêng (mỗi mặt bằng trên một tờ là một mục)
+  const g = S.files[i], n = S.files.filter(f => f.id === g.id).length + 1;
+  S.files.splice(i + 1, 0, {...g, ten:`${g.ten.replace(/ \(\d+\)$/, "")} (${n})`, layers:g.layers.map(l => ({...l})), vung:null, kl:null});
+  lenh(`Đã nhân bản ${g.ten}: chọn vùng mặt bằng khác cho mục mới.`, "ok"); moFile(i + 1);
+}
+function xoaFile(i) {
+  S.files.splice(i, 1);
+  S.act = S.files.length ? Math.min(i, S.files.length - 1) : -1;
+  ve_ds(); ve_layer(); ve_tab(); dongBoVung(); if (S.act >= 0) zoomToanBo(); veLai();
+}
+function ve_tab() {
+  $("tab-file").innerHTML = S.files.map((f, i) => `<div class="${i === S.act ? "act" : ""}" data-i="${i}">${esc(f.ten)}</div>`).join("");
+  $("trong").style.display = S.files.length ? "none" : "flex";
+}
+$("tab-file").addEventListener("click", e => { if (e.target.dataset.i != null) moFile(+e.target.dataset.i); });
+
+function ve_layer() {
+  const f = F();
+  if (!f) { $("ds-layer").innerHTML = ""; return; }
+  const gan = f.vai_tro === "mat_bang";
+  $("ds-layer").innerHTML = f.layers.map((l, i) => `<div class="lay">
+      <input type="checkbox" data-h="${i}" ${l.hien ? "checked" : ""}><span class="mau" style="background:${l.mau}"></span>
+      <span class="ten" title="${esc(l.ten)}">${esc(l.ten)}</span><span class="sl">${l.sl + l.so_chu}</span>
+      <input type="checkbox" data-k="${i}" ${l.khoa ? "checked" : ""} title="Khoá: không chọn được layer này (trục lưới, chữ, kích thước...)">
+      ${gan ? `<select data-l="${i}">${S.loaiHopLe.map(k => `<option value="${k}" ${k === l.loai ? "selected" : ""}>${LOAI[k] || k}</option>`).join("")}</select>` : ""}</div>`).join("");
+}
+$("ds-layer").addEventListener("change", e => {
+  const f = F(); if (!f) return;
+  if (e.target.dataset.h != null) { f.layers[+e.target.dataset.h].hien = e.target.checked; veLai(); }
+  if (e.target.dataset.l != null) f.layers[+e.target.dataset.l].loai = e.target.value;
+  if (e.target.dataset.k != null) f.layers[+e.target.dataset.k].khoa = e.target.checked;
+});
+const loaiLayer = f => Object.fromEntries(f.layers.map(l => [l.ten, l.loai]));
+
+// ---------- Khung xem (canvas) ----------
+const cv = $("cv"), ctx = cv.getContext("2d");
+let W = 0, H = 0, dpr = 1, cho = false;
+function coKhung() {
+  dpr = window.devicePixelRatio || 1;
+  const r = $("khung").getBoundingClientRect(); W = r.width; H = r.height;
+  cv.width = W * dpr; cv.height = H * dpr; veLai();
+}
+new ResizeObserver(coKhung).observe($("khung"));
+const sx = x => (x - S.v.cx) * S.v.s + W / 2, sy = y => H / 2 - (y - S.v.cy) * S.v.s;
+const wx = px => (px - W / 2) / S.v.s + S.v.cx, wy = py => (H / 2 - py) / S.v.s + S.v.cy;
+
+function zoomToanBo() {
+  const f = F(); if (!f) return;
+  let [x0, y0, x1, y1] = f.hinh.khung;
+  const w = Math.max(x1 - x0, 1e-6), h = Math.max(y1 - y0, 1e-6);
+  S.v = {cx:(x0 + x1) / 2, cy:(y0 + y1) / 2, s:Math.min(W / w, H / h) * 0.92 || 1};
+}
+function zoomVung() {
+  const f = F(); if (!f || !f.vung) return lenh("Chưa có vùng chọn.", "loi");
+  const [a, b, c, d] = f.vung, w = Math.abs(c - a) || 1, h = Math.abs(d - b) || 1;
+  S.v = {cx:(a + c) / 2, cy:(b + d) / 2, s:Math.min(W / w, H / h) * 0.85};
+  veLai();
+}
+function veLai() { if (cho) return; cho = true; requestAnimationFrame(() => { cho = false; ve(); }); }
+
+function ve() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+  const f = F();
+  if (f) {
+    const xmin = wx(0), xmax = wx(W), ymin = wy(H), ymax = wy(0), s = S.v.s;
+    ctx.lineWidth = 1; ctx.lineJoin = "round";
+    for (const l of f.layers) {
+      if (!l.hien) continue;
+      const g = f.hinh.layers[l.ten]; if (!g) continue;
+      ctx.strokeStyle = l.mau; ctx.beginPath();
+      for (const arr of [g.hinh, g.net]) for (const p of arr) {
+        let a = p[0][0], b = p[0][0], c = p[0][1], d = p[0][1];
+        if (!p.bb) { for (const q of p) { if (q[0] < a) a = q[0]; if (q[0] > b) b = q[0]; if (q[1] < c) c = q[1]; if (q[1] > d) d = q[1]; } p.bb = [a, b, c, d]; }
+        const bb = p.bb; if (bb[1] < xmin || bb[0] > xmax || bb[3] < ymin || bb[2] > ymax) continue;
+        if ((bb[1] - bb[0]) * s < 0.6 && (bb[3] - bb[2]) * s < 0.6) { ctx.moveTo(sx(bb[0]), sy(bb[2])); ctx.lineTo(sx(bb[0]) + 0.6, sy(bb[2])); continue; }
+        ctx.moveTo(sx(p[0][0]), sy(p[0][1]));
+        for (let i = 1; i < p.length; i++) ctx.lineTo(sx(p[i][0]), sy(p[i][1]));
+      }
+      ctx.stroke();
+    }
+    {  // chữ vẽ theo đúng chiều cao, góc xoay, điểm neo như trong CAD; quá nhỏ (<3px) thì bỏ qua cho đỡ rối
+      let n = 0; ctx.textAlign = "left";
+      const NEN = {t:"top", m:"middle", b:"alphabetic"}, COT = {l:"left", c:"center", r:"right"};
+      for (const l of f.layers) {
+        if (!l.hien) continue; ctx.fillStyle = l.mau;
+        for (const t of (f.hinh.layers[l.ten]?.chu || [])) {
+          const cao = (t.h > 0 ? t.h : 0.25) * s;  // chữ không rõ chiều cao: tạm lấy 250mm
+          if (cao < 3 || t.x < xmin - 5 || t.x > xmax + 5 || t.y < ymin - 5 || t.y > ymax + 5) continue;
+          const dong = t.t.split(/\r?\n|\\P/), a = t.a || "bl", r = -(t.r || 0) * Math.PI / 180;
+          ctx.font = `${cao}px Arial, "Segoe UI", sans-serif`; ctx.textBaseline = NEN[a[0]]; ctx.textAlign = COT[a[1]];
+          ctx.save(); ctx.translate(sx(t.x), sy(t.y)); ctx.rotate(r); if (t.w && t.w !== 1) ctx.scale(t.w, 1);
+          // MTEXT nhiều dòng: dòng đầu ở vị trí neo, các dòng sau xuống dưới (neo giữa/dưới thì dồn lên cho đúng khối chữ)
+          const lech = a[0] === "t" ? 0 : a[0] === "m" ? -(dong.length - 1) / 2 : -(dong.length - 1);
+          dong.forEach((d, i) => ctx.fillText(d, 0, (lech + i) * cao * 1.25));
+          ctx.restore(); if (++n > 4000) break;
+        }
+      }
+      ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    }
+    veNhanCC(f);
+    veDoiTuong(f);
+    if (S.keo && S.keo.kieu === "hop" && S.keo.moved) {  // khung chọn: Window (xanh dương, nét liền) hoặc Crossing (xanh lá, nét đứt)
+      const cat = S.keo.b[0] < S.keo.a[0], x = sx(Math.min(S.keo.a[0], S.keo.b[0])), y = sy(Math.max(S.keo.a[1], S.keo.b[1]));
+      const w = Math.abs(S.keo.b[0] - S.keo.a[0]) * s, h = Math.abs(S.keo.b[1] - S.keo.a[1]) * s;
+      ctx.fillStyle = cat ? "rgba(60,200,90,.16)" : "rgba(45,125,210,.2)"; ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = cat ? "#4cd964" : "#4aa3ff"; ctx.setLineDash(cat ? [6, 4] : []); ctx.strokeRect(x, y, w, h); ctx.setLineDash([]);
+    }
+    if (f.vung || (S.keo && S.keo.kieu === "vung")) {
+      const v = S.keo && S.keo.kieu === "vung" ? [S.keo.a[0], S.keo.a[1], S.keo.b[0], S.keo.b[1]] : f.vung;
+      const x = sx(Math.min(v[0], v[2])), y = sy(Math.max(v[1], v[3])), w = Math.abs(v[2] - v[0]) * s, h = Math.abs(v[3] - v[1]) * s;
+      ctx.fillStyle = "rgba(45,125,210,.18)"; ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = "#4aa3ff"; ctx.setLineDash([6, 4]); ctx.strokeRect(x, y, w, h); ctx.setLineDash([]);
+    }
+  }
+  if (S.mouse) {  // con trỏ chữ thập kiểu AutoCAD
+    const {x, y} = S.mouse; ctx.strokeStyle = "rgba(255,255,255,.75)"; ctx.lineWidth = 1; ctx.beginPath();
+    ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    ctx.strokeStyle = "#fff"; ctx.strokeRect(x - 5, y - 5, 10, 10);
+  }
+  $("s-zoom").textContent = S.v.s >= 1 ? S.v.s.toFixed(1) + " px/m" : (S.v.s).toFixed(3) + " px/m";
+}
+
+function chuotToa(e) { const r = cv.getBoundingClientRect(); return {x:e.clientX - r.left, y:e.clientY - r.top}; }
+cv.addEventListener("mousemove", e => {
+  const m = chuotToa(e); S.mouse = m;
+  $("s-x").textContent = wx(m.x).toFixed(3); $("s-y").textContent = wy(m.y).toFixed(3);
+  if (S.tool === "pick" && !S.keo) capNhatHover(m);
+  if (S.keo) {
+    if (Math.hypot(m.x - S.keo.px, m.y - S.keo.py) > 4) S.keo.moved = true;
+    if (S.keo.kieu === "pan") { S.v.cx = S.keo.cx - (m.x - S.keo.px) / S.v.s; S.v.cy = S.keo.cy + (m.y - S.keo.py) / S.v.s; }
+    else if (S.keo.kieu === "hop") { S.keo.b = [wx(m.x), wy(m.y)]; S.hover = null; $("tip").hidden = true; }
+    else { S.keo.b = [wx(m.x), wy(m.y)]; const f = F(); f.vung = [S.keo.a[0], S.keo.a[1], S.keo.b[0], S.keo.b[1]].map(v => +v.toFixed(3)); dongBoVung(true); }
+  }
+  veLai();
+});
+cv.addEventListener("mouseleave", () => { S.mouse = null; S.hover = null; $("tip").hidden = true; veLai(); });
+cv.addEventListener("mousedown", e => {
+  if (!F()) return; const m = chuotToa(e);
+  if (e.button === 1 || (e.button === 0 && S.tool === "pan")) {
+    S.keo = {kieu:"pan", px:m.x, py:m.y, cx:S.v.cx, cy:S.v.cy, moved:false}; e.preventDefault();
+  }
+  else if (e.button === 0 && S.tool === "pick") {
+    S.keo = {kieu:"hop", px:m.x, py:m.y, a:[wx(m.x), wy(m.y)], b:[wx(m.x), wy(m.y)], shift:e.shiftKey, moved:false}; e.preventDefault();
+  }
+  else if (e.button === 0 && S.tool === "vung") { S.keo = {kieu:"vung", a:[wx(m.x), wy(m.y)], b:[wx(m.x), wy(m.y)]}; }
+});
+window.addEventListener("mouseup", e => {
+  if (S.keo && S.keo.kieu === "hop") {
+    const m = chuotToa(e);  // lấy toạ độ lúc thả chuột, phòng khi kéo nhanh không kịp phát sự kiện di chuyển
+    if (Math.hypot(m.x - S.keo.px, m.y - S.keo.py) > 4) { S.keo.moved = true; S.keo.b = [wx(m.x), wy(m.y)]; }
+    if (S.buoc && S.buoc.so === 3) ganChon(S.keo.a, S.keo.b, S.keo.moved, {x:S.keo.px, y:S.keo.py});
+    else if (S.buoc) { if (S.keo.moved) chayBuoc(S.keo.a, S.keo.b); else lenh("Đang ở bước quét chọn: kéo khung (giữ chuột trái và kéo) quanh vùng cần đọc. Esc để hủy.", "loi"); }
+    else if (!S.keo.moved) chonTaiDiem({x:S.keo.px, y:S.keo.py}, S.keo.shift); else chonTrongKhung(S.keo.a, S.keo.b, S.keo.shift);
+  }
+  if (S.keo && S.keo.kieu === "vung") {
+    const f = F(); const v = f.vung;
+    if (v && (Math.abs(v[2] - v[0]) < 1e-6 || Math.abs(v[3] - v[1]) < 1e-6)) f.vung = null; else lenh(`Vùng: X ${v[0]} → ${v[2]}, Y ${v[1]} → ${v[3]} (m)`, "ok");
+    dongBoVung(); datCongCu("pick");
+  }
+  S.keo = null; veLai();
+});
+cv.addEventListener("wheel", e => {
+  e.preventDefault(); const m = chuotToa(e), k = e.deltaY > 0 ? 1 / 1.25 : 1.25, x = wx(m.x), y = wy(m.y);
+  S.v.s *= k; S.v.cx = x - (m.x - W / 2) / S.v.s; S.v.cy = y + (m.y - H / 2) / S.v.s; veLai();
+}, {passive:false});
+cv.addEventListener("auxclick", e => e.preventDefault());
+
+function datCongCu(t) {
+  S.tool = t; ["pick", "pan", "vung"].forEach(k => $("t-" + k).classList.toggle("on", t === k));
+  $("s-cc").textContent = {pick:"Chọn đối tượng", pan:"Pan", vung:"Chọn vùng (kéo khung)"}[t];
+  if (t !== "pick" && S.buoc) huyBuoc();
+  if (t !== "pick") { S.hover = null; $("tip").hidden = true; }
+}
+$("t-pick").onclick = () => { datCongCu("pick"); lenh("Rê chuột vào đối tượng để xem, bấm để chọn (Shift: chọn thêm)."); };
+$("t-nhanh").onclick = () => {
+  S.nhanh = !S.nhanh; $("t-nhanh").classList.toggle("on", S.nhanh); datCongCu("pick");
+  lenh(S.nhanh ? "Bóc nhanh BẬT: bấm vào đối tượng là thêm ngay vào bảng bóc." : "Bóc nhanh TẮT: bấm để chọn như thường.");
+};
+$("t-pan").onclick = () => datCongCu("pan");
+$("t-vung").onclick = () => { datCongCu("vung"); lenh("Kéo một khung chữ nhật quanh mặt bằng cần tính."); };
+$("t-ze").onclick = () => { zoomToanBo(); veLai(); };
+$("t-zv").onclick = zoomVung;
+$("t-bo-vung").onclick = () => { if (F()) { F().vung = null; dongBoVung(); veLai(); lenh("Đã bỏ vùng, tính toàn bộ bản vẽ."); } };
+["v0", "v1", "v2", "v3"].forEach((id, i) => $(id).addEventListener("input", () => {
+  const f = F(); if (!f) return;
+  const v = ["v0", "v1", "v2", "v3"].map(k => $(k).value);
+  f.vung = v.every(x => x !== "") ? v.map(parseFloat) : null; dongBoVung(true); veLai();
+}));
+function dongBoVung(tuChuot) {
+  const f = F(), v = f?.vung;
+  if (!tuChuot || document.activeElement.type !== "number") ["v0", "v1", "v2", "v3"].forEach((id, i) => $(id).value = v ? v[i] : "");
+  $("s-vung").innerHTML = v ? `Vùng: <b>${v.map(x => (+x).toFixed(2)).join(" , ")}</b>` : "Vùng: toàn bộ bản vẽ";
+}
+
+// ---------- Chọn đối tượng (hover, bấm, kéo khung) và bóc khối lượng theo nhóm ----------
+function pip(p, x, y) {
+  let ngoai = true, j = p.length - 1;
+  for (let i = 0; i < p.length; j = i++) {
+    const a = p[i], b = p[j];
+    if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) ngoai = !ngoai;
+  }
+  return !ngoai;
+}
+function kcDoan(p, x, y) {
+  let m = Infinity;
+  for (let i = 1; i < p.length; i++) {
+    const [ax, ay] = p[i - 1], [bx, by] = p[i], dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+    let t = l2 ? ((x - ax) * dx + (y - ay) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t));
+    m = Math.min(m, Math.hypot(x - (ax + t * dx), y - (ay + t * dy)));
+  }
+  return m;
+}
+function bbCua(p) {
+  if (!p.bb) { let a = p[0][0], b = a, c = p[0][1], d = c; for (const q of p) { if (q[0] < a) a = q[0]; if (q[0] > b) b = q[0]; if (q[1] < c) c = q[1]; if (q[1] > d) d = q[1]; } p.bb = [a, b, c, d]; }
+  return p.bb;
+}
+function giaoHop(p, b) {  // có đoạn nào của p cắt hoặc nằm trong hộp b = [x0, x1, y0, y1]
+  for (let i = 1; i < p.length; i++) {
+    const [x0, y0] = p[i - 1], dx = p[i][0] - x0, dy = p[i][1] - y0; let t0 = 0, t1 = 1;
+    const cat = (pp, qq) => { if (pp === 0) return qq >= 0; const r = qq / pp; if (pp < 0) { if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; } return true; };
+    if (cat(-dx, x0 - b[0]) && cat(dx, b[1] - x0) && cat(-dy, y0 - b[2]) && cat(dy, b[3] - y0)) return true;
+  }
+  return false;
+}
+const hieuLuc = () => S.chon.filter(o => !S.loaiTru.has(o.ten));
+const trung = (a, b) => a.ten === b.ten && a.k === b.k && a.i === b.i;
+
+function timDoiTuong(m) {
+  const f = F(); if (!f) return null;
+  const x = wx(m.x), y = wy(m.y), tol = 6 / S.v.s;
+  let net = null, hinh = null;
+  for (const l of f.layers) {
+    if (!l.hien || l.khoa) continue; const g = f.hinh.layers[l.ten]; if (!g) continue;
+    g.net.forEach((p, i) => {
+      const bb = bbCua(p); if (x < bb[0] - tol || x > bb[1] + tol || y < bb[2] - tol || y > bb[3] + tol) return;
+      const d = kcDoan(p, x, y); if (d <= tol && (!net || d < net.d)) net = {ten:l.ten, k:"net", i, d};
+    });
+    g.hinh.forEach((p, i) => {
+      const bb = bbCua(p); if (x < bb[0] || x > bb[1] || y < bb[2] || y > bb[3]) return;
+      if (!pip(p, x, y)) return;
+      const a = g.hi[i].a; if (!hinh || a < hinh.a) hinh = {ten:l.ten, k:"hinh", i, a};
+    });
+  }
+  return net && (!hinh || net.d < tol * 0.5) ? net : hinh;
+}
+const thongTin = o => {
+  const g = F().hinh.layers[o.ten];
+  return o.k === "hinh" ? {a:g.hi[o.i].a, c:g.hi[o.i].c, nguon:g.hi[o.i].n, lo:g.hi[o.i].lo, h:g.hi[o.i].h}
+                         : {a:0, c:g.ni[o.i], nguon:"Đường/polyline hở", lo:0, h:""};
+};
+function capNhatHover(m) {
+  const o = timDoiTuong(m), cu = S.hover;
+  S.hover = o; const tip = $("tip");
+  if (o) {
+    const t = thongTin(o);
+    const kh = traCC(o);
+    tip.innerHTML = `<b>${esc(o.ten)}</b> · ${esc(t.nguon)}<br>` + (o.k === "hinh" ? `S = ${so(t.a, 3)} m² · P = ${so(t.c, 2)} m` : `Dài = ${so(t.c, 2)} m`)
+      + (kh ? `<br>Ký hiệu: <b style="color:#4cc38a">${esc(kh.ky_hieu || "(chưa có ký hiệu)")}</b> · ${esc(LOAI_CC[kh.loai] || kh.loai)}` : "");
+    tip.hidden = false; tip.style.left = Math.min(m.x + 14, W - 200) + "px"; tip.style.top = (m.y + 16) + "px";
+  } else tip.hidden = true;
+  if (!cu !== !o || (cu && o && !trung(cu, o))) veLai();
+}
+function bocNhanh(m) {
+  const o = timDoiTuong(m); if (!o) return;
+  const key = F().id + "|" + o.ten + "|" + o.k + "|" + o.i;
+  if (S.bang.some(d => d.key === key)) return lenh(`Đối tượng này (${o.ten}) đã có trong bảng bóc.`, "loi");
+  const t = thongTin(o), hinh = o.k === "hinh";
+  S.bang.push({key, ten:o.ten, layer:o.ten, cach:hinh ? "dien_tich" : "chieu_dai", so_luong:1, dien_tich:t.a, chu_vi:+t.c.toFixed(3), cao:null, nguon:"1 đối tượng", file:F().ten});
+  lenh(`Đã bóc ${o.ten}: ${hinh ? so(t.a, 3) + " m²" : so(t.c, 2) + " m"}.`, "ok");
+  chonTab("dt"); veDT();
+}
+function chonTaiDiem(m, them) {
+  if (S.nhanh && !them) return bocNhanh(m);
+  const o = timDoiTuong(m);
+  if (!o) { if (!them) { S.chon = []; S.loaiTru = new Set(); veDT(); veLai(); } return; }
+  const i = S.chon.findIndex(c => trung(c, o));
+  if (them) { if (i >= 0) S.chon.splice(i, 1); else S.chon.push(o); }
+  else { S.chon = i >= 0 && S.chon.length === 1 ? [] : [o]; S.loaiTru = new Set(); }
+  chonTab("dt"); veDT(); veLai();
+}
+function timTrongKhung(a, c) {
+  const f = F(); if (!f) return {kq:[], crossing:false};
+  const b = [Math.min(a[0], c[0]), Math.max(a[0], c[0]), Math.min(a[1], c[1]), Math.max(a[1], c[1])], crossing = c[0] < a[0], kq = [];
+  for (const l of f.layers) {
+    if (!l.hien || l.khoa) continue; const g = f.hinh.layers[l.ten]; if (!g) continue;
+    for (const k of ["hinh", "net"]) g[k].forEach((p, i) => {
+      const bb = bbCua(p); if (bb[1] < b[0] || bb[0] > b[1] || bb[3] < b[2] || bb[2] > b[3]) return;
+      const trong = bb[0] >= b[0] && bb[1] <= b[1] && bb[2] >= b[2] && bb[3] <= b[3];
+      if (crossing ? (trong || giaoHop(p, b) || (k === "hinh" && pip(p, (b[0] + b[1]) / 2, (b[2] + b[3]) / 2))) : trong) kq.push({ten:l.ten, k, i});
+    });
+  }
+  return {kq, crossing};
+}
+function chonTrongKhung(a, c, them) {
+  const f = F(); if (!f) return;
+  const {kq, crossing} = timTrongKhung(a, c);
+  if (them) { const co = new Set(S.chon.map(o => o.ten + "|" + o.k + "|" + o.i)); kq.forEach(o => { if (!co.has(o.ten + "|" + o.k + "|" + o.i)) S.chon.push(o); }); }
+  else { S.chon = kq; S.loaiTru = new Set(); }
+  lenh(`${crossing ? "Crossing" : "Window"}: chọn ${kq.length} đối tượng.`, "ok");
+  chonTab("dt"); veDT(); veLai();
+}
+function duongPath(o) {
+  const p = F().hinh.layers[o.ten][o.k === "hinh" ? "hinh" : "net"][o.i];
+  ctx.beginPath(); ctx.moveTo(sx(p[0][0]), sy(p[0][1]));
+  for (let i = 1; i < p.length; i++) ctx.lineTo(sx(p[i][0]), sy(p[i][1]));
+  if (o.k === "hinh") ctx.closePath();
+}
+function veDoiTuong(f) {
+  const ve1 = (o, mau, to) => {
+    duongPath(o);
+    if (o.k === "hinh") { ctx.fillStyle = to; ctx.fill(); }
+    ctx.strokeStyle = mau; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1;
+  };
+  for (const o of hieuLuc().slice(0, 3000)) ve1(o, "#00e5ff", "rgba(0,229,255,.28)");
+  if (S.hover && !S.chon.some(c => trung(c, S.hover))) ve1(S.hover, "#ffe600", "rgba(255,230,0,.25)");
+}
+
+const CACH = {dien_tich:["Diện tích (m²)", "m²"], the_tich:["Thể tích = S × dày (m³)", "m³"], chieu_dai:["Chiều dài (m)", "m"], van_khuon:["Ván khuôn thành = chu vi × cao (m²)", "m²"]};
+const daiNhom = g => (g.so_hinh ? g.p_hop : 0) + g.dai_net;
+function klNhom(g, st) {
+  const h = parseFloat(st.h) || 0, n = parseFloat(st.n) || 0;
+  return n * (st.cach === "dien_tich" ? g.s_hop : st.cach === "the_tich" ? g.s_hop * h : st.cach === "chieu_dai" ? daiNhom(g) : daiNhom(g) * h);
+}
+const trangThaiNhom = g => (S.nhom[g.ten] = S.nhom[g.ten] || {tick:true, cach:g.so_hinh ? "dien_tich" : "chieu_dai", h:"", n:"1", ten:""});
+
+function veDT() {
+  const el = $("p-dt"); let html = "";
+  if (!S.chon.length) html = `<div class="nho">Chọn đối tượng trên bản vẽ để bóc khối lượng:<br>
+    · <b>Rê chuột</b>: hình đổi màu vàng, hiện diện tích và chu vi. <b>Bấm</b> để chọn, <b>Shift + bấm</b> để chọn thêm.<br>
+    · <b>Kéo khung từ trái sang phải</b> (Window): chọn đối tượng nằm trọn trong khung. <b>Từ phải sang trái</b> (Crossing): chọn cả đối tượng chạm khung.<br>
+    · Layer trục lưới, chữ, kích thước được khoá sẵn (🔒) nên không bị chọn nhầm.</div>`;
+  else {
+    const dem = {}; S.chon.forEach(o => { const d = dem[o.ten] = dem[o.ten] || {h:0, n:0}; d[o.k === "hinh" ? "h" : "n"]++; });
+    html = `<h4>Đã chọn ${S.chon.length} đối tượng · còn ${hieuLuc().length} sau khi lọc layer</h4>
+      <table><thead><tr><th>Lấy</th><th>Layer</th><th>Hình kín</th><th>Đường</th></tr></thead><tbody>
+      ${Object.entries(dem).map(([t, d]) => `<tr><td><input type="checkbox" data-lt="${esc(t)}" ${S.loaiTru.has(t) ? "" : "checked"}></td><td>${esc(t)}</td><td class="so">${d.h}</td><td class="so">${d.n}</td></tr>`).join("")}</tbody></table>
+      <div class="hang"><button id="dt-cung-layer">Chọn cả layer</button><button id="dt-bo">Bỏ chọn</button></div>
+      <h4>Bóc theo nhóm <span class="nho">(mỗi layer một dòng, tự chọn cách bóc và dày/cao)</span></h4>
+      <div id="dt-nhom"><div class="nho">Đang tính ...</div></div>
+      <div class="hang"><button id="dt-them" class="on">+ Thêm các nhóm đã tick vào bảng bóc</button></div>`;
+  }
+  html += veBang();
+  el.innerHTML = html;
+  document.querySelectorAll("[data-lt]").forEach(c => c.onchange = () => { c.checked ? S.loaiTru.delete(c.dataset.lt) : S.loaiTru.add(c.dataset.lt); veDT(); veLai(); });
+  if (S.chon.length) {
+    $("dt-cung-layer").onclick = chonCungLayer; $("dt-bo").onclick = () => { S.chon = []; S.loaiTru = new Set(); veDT(); veLai(); };
+    $("dt-them").onclick = themBang; capNhatNhom();
+  }
+  bangSuKien();
+}
+async function capNhatNhom() {
+  const hl = hieuLuc(), chon = {};
+  hl.forEach(o => { const d = chon[o.ten] = chon[o.ten] || {h:[], n:[]}; d[o.k === "hinh" ? "h" : "n"].push(o.i); });
+  const khoa = F().id + JSON.stringify(chon);
+  if (!hl.length) { S.nhomKQ = {nhom:[]}; S.nhomKhoa = khoa; return veNhom(); }
+  if (S.nhomKhoa !== khoa) {
+    S.nhomKhoa = khoa;
+    try { S.nhomKQ = await json("/api/boc-chon", {id:F().id, chon}); } catch (e) { return $("dt-nhom") && ($("dt-nhom").innerHTML = `<div class="cb">${esc(e.message)}</div>`); }
+    if (S.nhomKhoa !== khoa) return;  // đã chọn lại trong lúc chờ
+  }
+  veNhom();
+}
+function veNhom() {
+  const el = $("dt-nhom"); if (!el || !S.nhomKQ) return;
+  const ds = S.nhomKQ.nhom;
+  if (!ds.length) { el.innerHTML = '<div class="nho">Không còn đối tượng nào (đã bỏ tick hết layer).</div>'; return; }
+  el.innerHTML = `<table class="nhom"><thead><tr><th></th><th>Layer</th><th>S (m²)</th><th>P / dài (m)</th><th>Cách bóc</th><th>Dày/cao (m)</th><th>×</th><th>Tên</th><th>Khối lượng</th></tr></thead><tbody>
+    ${ds.map((g, i) => { const st = trangThaiNhom(g), cb = g.chong > g.s_cong * 0.005 && g.s_cong > 0;
+      return `<tr data-g="${i}"><td><input type="checkbox" data-f="tick" ${st.tick ? "checked" : ""}></td>
+      <td>${esc(g.ten)}<div class="nho">${g.so_hinh} hình · ${g.so_net} đường</div>${cb ? `<div class="chua" title="Cộng riêng từng hình là ${so(g.s_cong, 3)} m²; app đã tính theo hợp các hình">chồng ${so(g.chong, 3)} m²</div>` : ""}</td>
+      <td class="so">${so(g.s_hop, 3)}</td><td class="so">${so(daiNhom(g), 2)}</td>
+      <td><select data-f="cach" style="width:92px">${Object.entries(CACH).map(([k, v]) => `<option value="${k}" ${k === st.cach ? "selected" : ""}>${v[0]}</option>`).join("")}</select></td>
+      <td><input type="number" step="any" data-f="h" value="${st.h}" style="width:52px"></td>
+      <td><input type="number" step="any" data-f="n" value="${st.n}" style="width:38px"></td>
+      <td><input type="text" data-f="ten" value="${esc(st.ten)}" placeholder="${esc(g.ten)}" style="width:64px"></td>
+      <td class="so" data-kl><b>${so(klNhom(g, st), 3)}</b> ${CACH[st.cach][1]}</td></tr>`; }).join("")}</tbody></table>
+    <div class="nho">Diện tích và chu vi tính trên phần hợp của các hình, nên hình vẽ chồng nhau không bị cộng hai lần.</div>`;
+  el.querySelectorAll("[data-f]").forEach(c => c.oninput = c.onchange = () => {
+    const tr = c.closest("tr"), g = ds[+tr.dataset.g], st = trangThaiNhom(g), f = c.dataset.f;
+    st[f] = c.type === "checkbox" ? c.checked : c.value;
+    tr.querySelector("[data-kl]").innerHTML = `<b>${so(klNhom(g, st), 3)}</b> ${CACH[st.cach][1]}`;
+  });
+}
+function chonCungLayer() {
+  const f = F(), ds = new Set(S.chon.map(o => o.ten)); S.chon = [];
+  for (const ten of ds) { const g = f.hinh.layers[ten]; g.hinh.forEach((_, i) => S.chon.push({ten, k:"hinh", i})); g.net.forEach((_, i) => S.chon.push({ten, k:"net", i})); }
+  lenh(`Đã chọn ${S.chon.length} đối tượng của layer ${[...ds].join(", ")}.`, "ok"); veDT(); veLai();
+}
+function themBang() {
+  const ds = (S.nhomKQ?.nhom || []).filter(g => trangThaiNhom(g).tick); let them = 0;
+  for (const g of ds) {
+    const st = trangThaiNhom(g), c = st.cach, h = parseFloat(st.h) || 0;
+    if ((c === "the_tich" || c === "van_khuon") && !h) { lenh(`Nhóm ${g.ten}: nhập dày/cao trước khi thêm.`, "loi"); continue; }
+    S.bang.push({ten:st.ten || g.ten, layer:g.ten, cach:c, so_luong:parseFloat(st.n) || 1, dien_tich:g.s_hop, chu_vi:+daiNhom(g).toFixed(3),
+      cao:(c === "the_tich" || c === "van_khuon") ? h : null, nguon:`${g.so_hinh + g.so_net} đối tượng`, file:F().ten});
+    them++;
+  }
+  if (them) lenh(`Đã thêm ${them} nhóm vào bảng bóc.`, "ok");
+  veDT();
+}
+const DV_HIEN = {m3:"m³", m2:"m²", m:"m", "cái":"cái", kg:"kg", "tấn":"tấn"};
+const klDong = d => d.bt ? d.gia_tri : d.so_luong * (d.cach === "dien_tich" ? d.dien_tich : d.cach === "the_tich" ? d.dien_tich * (d.cao || 0) : d.cach === "chieu_dai" ? d.chu_vi : d.chu_vi * (d.cao || 0));
+const dvDong = d => d.bt ? (DV_HIEN[d.dv] || d.dv) : CACH[d.cach][1];
+const cachDong = d => d.bt ? `<span class="biendo">${esc(d.bt)}</span>` : CACH[d.cach][0];
+function veBang() {
+  if (!S.bang.length) return "";
+  const tong = {}; S.bang.forEach(d => { const dv = dvDong(d); tong[dv] = (tong[dv] || 0) + klDong(d); });
+  return `<h4>Bảng bóc (${S.bang.length} dòng)</h4>
+    <table><thead><tr><th>Tên</th><th>Cách bóc</th><th>SL</th><th>Dày/cao</th><th>Khối lượng</th><th></th></tr></thead><tbody>
+    ${S.bang.map((d, i) => `<tr><td>${d.bt ? esc((d.ky_hieu || "") + " · " + d.ten) : esc(d.ten)}<div class="nho">${esc(d.layer)} · ${esc(d.nguon)}</div></td><td>${cachDong(d)}</td><td class="so">${d.bt ? (d.bien?.n ?? "") : d.so_luong}</td>
+      <td class="so">${d.bt ? (d.bien?.h ?? "") : (d.cao ?? "")}</td><td class="so">${so(klDong(d), 3)} ${dvDong(d)}</td><td><button data-xb="${i}" style="padding:0 6px">✕</button></td></tr>`).join("")}
+    ${Object.entries(tong).map(([dv, v]) => `<tr class="tong"><td colspan="4">Cộng (${dv})</td><td class="so">${so(v, 3)} ${dv}</td><td></td></tr>`).join("")}</tbody></table>
+    <div class="hang"><button id="bang-xlsx">Xuất Excel bảng bóc</button><button id="bang-xoa">Xóa bảng</button></div>`;
+}
+function bangSuKien() {
+  document.querySelectorAll("[data-xb]").forEach(b => b.onclick = () => { S.bang.splice(+b.dataset.xb, 1); veDT(); });
+  if ($("bang-xoa")) $("bang-xoa").onclick = () => { S.bang = []; veDT(); };
+  if ($("bang-xlsx")) $("bang-xlsx").onclick = () => taiXuong("/api/xuat-bang-boc", {du_an:$("du-an").value, dong:S.bang}, "bang_boc.xlsx").catch(e => lenh(e.message, "loi"));
+}
+
+// ---------- Công cụ tính (đào đất, móng, đà kiềng, cột, cấu kiện khác) ----------
+// Mỗi công cụ: bước ① quét chọn mặt bằng (đọc ký hiệu, phân loại móng/cột...), bước ② quét chọn chi tiết (lấy chiều cao),
+// rồi áp bộ công thức chung của cấu kiện đó. Công thức sửa được và lưu làm mặc định.
+const LOAI_CC = {mong:"Móng", cot:"Cột", da_kieng:"Đà kiềng", dam:"Dầm", san:"Sàn", khac:"Khác"};
+const MAU_CC = {mong:"76,195,138", cot:"255,159,10", da_kieng:"167,139,250", dam:"74,140,255", san:"242,201,76", khac:"200,200,200"};
+const dcc = () => S.cc.ds.find(d => d.ma === S.cc.ma);
+const sao = x => JSON.parse(JSON.stringify(x));
+function ttCC(ma) {
+  ma = ma || S.cc.ma; const d = S.cc.ds.find(x => x.ma === ma); if (!d) return null;
+  return S.cc.tt[ma] = S.cc.tt[ma] || {nhom:[], chiTiet:null, canhBao:[], fileId:null, kq:null, kqNhom:[], loiCT:"", dirty:false, tuoi:0, focus:-1, kt:"ct", pick:new Set(), sang:new Set(),
+    ts:sao(d.tham_so), ct:sao(d.cong_thuc), tra:new Map()};
+}
+function traCC(o) {
+  const tt = S.cc.ma && ttCC(), f = F();
+  return tt && f && tt.nhom.length && tt.fileId === f.id ? tt.tra.get(o.ten + "|" + o.k + "|" + o.i) || null : null;
+}
+const tenNhom = g => g.ky_hieu || `(chưa đặt tên) ${g.b != null ? so(g.a * 1000, 0) + "×" + so(g.b * 1000, 0) : "đường"}`;
+
+function veDsCC() {
+  $("ds-cc").innerHTML = S.cc.ds.map(d => `<div class="cc-item ${d.ma === S.cc.ma ? "act" : ""}" data-cc="${d.ma}" title="${esc(d.mo_ta)}">
+    <span>${esc(d.ten)}${d.da_sua ? " ✎" : ""}</span><span class="nho">${d.cong_thuc.length} công thức</span></div>`).join("")
+    || '<div class="nho" style="padding:8px">Không tải được danh sách công cụ.</div>';
+}
+$("ds-cc").addEventListener("click", e => { const x = e.target.closest(".cc-item"); if (x) chonCongCu(x.dataset.cc); });
+function chonCongCu(ma) {
+  if (S.buoc) huyBuoc();
+  S.cc.ma = ma; ttCC(); veDsCC(); chonTab("cc"); veCC(); veLai();
+}
+
+// ----- Các bước quét chọn -----
+function batDauBuoc(buoc) {
+  if (!F()) return lenh("Chưa mở bản vẽ. Bấm 'Thêm bản vẽ' trước.", "loi");
+  const d = dcc(); S.nhanh = false; $("t-nhanh").classList.remove("on"); datCongCu("pick");
+  S.buoc = {ma:d.ma, so:buoc}; $("s-cc").textContent = `Quét chọn · bước ${buoc}`;
+  lenh(buoc === 3 ? `${d.ten} · bước ③ gán hình: bấm hoặc kéo khung chọn hình đã quét (Esc để xong).` : `${d.ten} · bước ${buoc === 1 ? "①" : "②"} ${buoc === 1 ? d.buoc1 : d.buoc2}: kéo khung trên bản vẽ (Esc để hủy).`);
+  veCC();
+}
+function huyBuoc() {
+  if (!S.buoc) return; const gan = S.buoc.so === 3; S.buoc = null; $("s-cc").textContent = "Chọn đối tượng"; veCC(); lenh(gan ? "Xong bước gán hình." : "Đã hủy bước quét chọn.");
+}
+window.addEventListener("keydown", e => { if (e.key === "Escape" && S.buoc) huyBuoc(); });
+
+async function chayBuoc(a, c) {
+  const {so: buoc, ma} = S.buoc, f = F(), tt = ttCC(ma), khung = [a[0], a[1], c[0], c[1]].map(v => +v.toFixed(3));
+  S.buoc = null; $("s-cc").textContent = "Chọn đối tượng"; veCC();
+  try {
+    if (buoc === 1) {
+      const {kq} = timTrongKhung(a, c);
+      if (!kq.length) return lenh("Khung không chứa đối tượng nào. Kiểm tra layer đang bật/khoá, hoặc kéo từ phải sang trái (Crossing) để lấy cả hình chạm khung.", "loi");
+      const chon = {}; kq.forEach(o => (chon[o.ten] = chon[o.ten] || {h:[], n:[]})[o.k === "hinh" ? "h" : "n"].push(o.i));
+      lenh("Đang đọc ký hiệu và phân loại ...");
+      const d = await json("/api/cong-cu/mat-bang", {id:f.id, cong_cu:ma, khung, chon});
+      tt.nhom = d.nhom.map(g => ({...g, tick:g.dung})); tt.fileId = f.id; tt.canhBao = d.canh_bao; tt.kq = null;
+      tt.pick = new Set(); tt.sang = new Set(); xayTra(tt); ghepCT(tt);
+      const dung = tt.nhom.filter(g => g.tick).reduce((tong, g) => tong + g.n, 0);
+      lenh(`Đã quét ${d.so_hinh} hình, đọc được ${d.so_nhan} nhãn: ${tt.nhom.length} nhóm, ${dung} cái thuộc ${dcc().ten.replace(/^Tính KL /, "")}.`, "ok");
+    } else {
+      const d = await json("/api/cong-cu/chi-tiet", {id:f.id, cong_cu:ma, khung});
+      tt.chiTiet = d; ghepCT(tt);
+      const co = d.ky_hieu.filter(k => k.h != null).map(k => k.ky_hieu);
+      lenh(`Chi tiết: đọc ${d.so_chu} dòng chữ, ${d.ky_hieu.length} ký hiệu${co.length ? ", lấy được chiều cao cho " + co.join(", ") : ""}.`, "ok");
+    }
+  } catch (e) { lenh(e.message, "loi"); }
+  veCC(); tinhLaiCC(); veLai();
+}
+const khoaObj = o => o.ten + "|" + o.k + "|" + o.i;
+function xayTra(tt) { tt.tra = new Map(); tt.nhom.forEach(g => g.doi_tuong.forEach(o => tt.tra.set(khoaObj(o), g))); }
+function tinhLaiNhomCC(g) {  // tính lại số liệu của nhóm từ các đối tượng đang thuộc nhóm
+  const ds = g.doi_tuong; g.n = ds.length;
+  const tb = k => { const v = ds.filter(o => o[k] != null); return v.length ? v.reduce((t, o) => t + o[k], 0) / v.length : null; };
+  g.a = tb("a") ?? 0; g.b = tb("b") ?? g.b ?? null; g.S = tb("S") ?? 0; g.P = tb("P") ?? 0; g.L = tb("L") ?? 0;
+  g.dang = ds.some(o => o.rect == null) ? "Đường" : ds.every(o => o.rect) ? "Chữ nhật" : "Đặc biệt";
+  g.layers = {}; ds.forEach(o => g.layers[o.ten] = (g.layers[o.ten] || 0) + 1);
+  if (g.dang !== "Đường") g.b = g.b ?? null;
+}
+// Kích thước dùng để tính: D×R lấy từ chi tiết (nếu có và hình là chữ nhật) hoặc từ hình vẽ trên mặt bằng
+function ef(g) {
+  const tt = ttCC(); let {a, b, S: dt, P: cv, L: l} = g, nguon = "mặt bằng";
+  if (tt.kt === "ct" && g.kt_ct && g.kt_ct.length >= 2) {
+    if (g.loai === "da_kieng" || g.loai === "dam") {  // chi tiết ghi b × h
+      b = g.kt_ct[0] / 1000; nguon = "chi tiết"; if (g.dang === "Chữ nhật") { dt = a * b; cv = 2 * (a + b); }
+    } else if (g.dang === "Chữ nhật") {
+      [a, b] = [g.kt_ct[0], g.kt_ct[1]].sort((x, y) => y - x).map(v => v / 1000); dt = a * b; cv = 2 * (a + b); l = a; nguon = "chi tiết";
+    }
+  }
+  return {a, b, S:dt, P:cv, L:l, nguon};
+}
+function ghepCT(tt) {  // gắn kết quả chi tiết vào từng nhóm theo ký hiệu
+  const ct = tt.chiTiet; if (!ct) return;
+  const theo = Object.fromEntries(ct.ky_hieu.map(k => [k.ky_hieu, k]));
+  for (const g of tt.nhom) {
+    const k = theo[g.ky_hieu]; g.kt_ct = k && k.kt.length ? k.kt[0] : null;
+    g.ung_vien = [...new Set([...(k?.ung_vien || []), ...ct.ung_vien_chung])].sort((x, y) => x - y);
+    g.cd_ung_vien = [...new Set([...(k?.cao_do || []), ...(ct.cao_do_chung || [])])].sort((x, y) => x - y);
+    if (k && k.cao_do && k.cao_do.length >= 2 && g.zd_nguon !== "nhập tay") { g.zd = k.cao_do[0]; g.zm = k.cao_do[k.cao_do.length - 1]; g.zd_nguon = "chi tiết"; }
+    if (k && k.h != null && g.h_nguon !== "nhập tay") { g.h = k.h; g.h_nguon = "chi tiết"; }
+  }
+}
+function doiChieuCT(g) {
+  if (!g.kt_ct || g.b == null) return "";
+  const ve = [g.a, g.b].sort((x, y) => y - x), ct = g.kt_ct.slice(0, 2).map(v => v / 1000).sort((x, y) => y - x);
+  if (ct.length < 2) return "";
+  return ve.every((v, i) => Math.abs(v - ct[i]) / Math.max(ct[i], 1e-6) <= 0.05) ? "khop" : "lech";
+}
+
+// ----- Hiển thị -----
+function veCC() {
+  const el = $("p-cc"), d = dcc();
+  if (!d) { el.innerHTML = `<div class="nho">Chọn một <b>công cụ</b> ở cột bên trái: Tính KL đào đất, móng, đà kiềng, cột... Mỗi công cụ có bộ công thức chung của cấu kiện đó (sửa được) và quy trình quét chọn riêng.<br><br>
+    Ví dụ <b>Tính KL móng</b>: ① quét chọn mặt bằng móng, công cụ đọc ký hiệu M1, M2... và tách móng với cột; ② quét chọn chi tiết móng để lấy chiều cao; sau đó tính bê tông lót, bê tông, ván khuôn.</div>`; return; }
+  const tt = ttCC(), b = S.buoc && S.buoc.ma === d.ma ? S.buoc.so : 0;
+  el.innerHTML = `<h4>${esc(d.ten)}</h4><div class="nho">${esc(d.mo_ta)}</div>
+    <div class="buoc"><button data-act="b1" class="${b === 1 ? "cho" : tt.nhom.length ? "xong" : ""}">① ${esc(d.buoc1)}</button>
+      <button data-act="b2" class="${b === 2 ? "cho" : tt.chiTiet ? "xong" : ""}">② ${esc(d.buoc2)}</button>${b ? '<button data-act="huy">Hủy (Esc)</button>' : ""}</div>
+    ${b ? `<div class="huong-dan">${b === 1
+      ? "Kéo khung quanh mặt bằng cần bóc. Trái→phải (Window): hình nằm trọn trong khung. Phải→trái (Crossing): hình chạm khung. Kéo rộng ra một chút để lấy cả chữ ký hiệu bên cạnh; layer chữ bị khoá vẫn được đọc."
+      : "Kéo khung trùm chi tiết, gồm chữ ký hiệu và chữ kích thước (chi tiết có thể ở tab/bản vẽ khác: mở tab đó rồi bấm lại bước ②)."}</div>` : ""}
+    <div id="cc-cb">${tt.canhBao.map(c => `<div class="cb">${esc(c)}</div>`).join("")}</div>
+    <div id="cc-nhom"></div><div id="cc-gan"></div><div id="cc-ct-info"></div>
+    <h4>Bảng tổng hợp <span class="nho">bấm vào tên để hiện sáng các hình trên bản vẽ</span></h4><div id="cc-tong"></div>
+    <h4>Công thức chung</h4><div id="cc-ct"></div>
+    <h4>Chi tiết từng công thức</h4><div id="cc-kq"></div>`;
+  veCCNhom(); veCCGan(); veCCInfo(); veCCCT(); veCCKQ();
+  if (!tt.kq && tt.nhom.some(g => g.tick)) tinhLaiCC();
+}
+function veCCNhom() {
+  const el = $("cc-nhom"), tt = ttCC(), d = dcc(); if (!el) return;
+  if (!tt.nhom.length) { el.innerHTML = '<div class="nho" style="margin:8px 0">Chưa có nhóm nào. Bấm ① rồi kéo khung quanh mặt bằng.</div>'; return; }
+  const kt = g => { const e = ef(g); return (e.b != null ? `${so(e.a, 3)}×${so(e.b, 3)}` : so(e.a, 3)) + (e.nguon === "chi tiết" ? '<div class="khop" title="Dài×rộng lấy từ chi tiết">ct</div>' : ""); };
+  el.innerHTML = `<h4>Nhóm theo ký hiệu (${tt.nhom.length}) <span class="nho">tick = đưa vào tính · sửa được ký hiệu, loại, SL, h</span></h4>
+    <table class="cc"><thead><tr><th></th><th>Ký hiệu</th><th>Loại</th><th>SL</th><th>Dài×rộng (m)</th><th>S (m²)<br>P (m)</th><th>h (m)</th></tr></thead>
+    ${tt.nhom.map((g, i) => { const dc = doiChieuCT(g);
+      return `<tbody data-g="${i}" class="${g.tick ? "" : "mo"}${tt.sang.has(g) ? " sang" : ""}"><tr data-g="${i}"><td><input type="checkbox" data-f="tick" ${g.tick ? "checked" : ""}></td>
+      <td><input type="text" data-f="ky_hieu" value="${esc(g.ky_hieu)}" placeholder="${esc(tenNhom({...g, ky_hieu:""}))}" style="width:70px"><button data-act="sang" data-g="${i}" title="Hiện sáng và phóng tới các hình của nhóm này" style="padding:0 4px;margin-left:2px">⌖</button></td>
+      <td><select data-f="loai">${Object.entries(LOAI_CC).map(([k, t]) => `<option value="${k}" ${k === g.loai ? "selected" : ""}>${t}</option>`).join("")}</select></td>
+      <td><input type="number" data-f="n" min="0" step="1" value="${g.n}" style="width:42px"></td>
+      <td class="so">${kt(g)}${g.dang === "Đặc biệt" ? '<div class="chua" title="Hình không phải chữ nhật: a×b là hộp bao, S và P lấy theo hình thật">đặc biệt</div>' : ""}</td>
+      <td class="so">${so(g.S, 3)}<br>${so(g.P, 2)}</td>
+      <td><input type="text" data-f="h" list="dl-h-${i}" value="${g.h ?? ""}" style="width:48px" placeholder="?"><datalist id="dl-h-${i}">${(g.ung_vien || []).map(v => `<option value="${v}">`).join("")}</datalist>
+        <div class="nho">${esc(g.h_nguon || "")}</div></td></tr>
+      <tr class="ghi-chu"><td></td><td colspan="6" class="nho">${g.chac ? "" : '<span class="nhan-chac" title="Không đủ căn cứ chắc chắn">chưa chắc · </span>'}${esc(g.ly_do.join("; "))}${g.nguon_ten && g.nguon_ten !== "nhãn" ? ` · ${esc(g.nguon_ten)}` : ""}
+        ${dc ? `<span class="${dc === "khop" ? "khop" : "lech"}"> · ${dc === "khop" ? "Khớp" : "Lệch"} chi tiết ${g.kt_ct.join("×")}</span>` : ""}
+        ${g.canh_bao.map(c => `<div class="chua">${esc(c)}</div>`).join("")}
+        <div>Cao độ (m): đáy <input type="text" data-f="zd" list="dl-cd-${i}" value="${g.zd ?? ""}" style="width:50px" placeholder="?"> mặt <input type="text" data-f="zm" list="dl-cd-${i}" value="${g.zm ?? ""}" style="width:50px" placeholder="?">
+          <datalist id="dl-cd-${i}">${(g.cd_ung_vien || []).map(v => `<option value="${v}">`).join("")}</datalist>
+          ${g.zd_nguon ? `<span class="nho">(${esc(g.zd_nguon)})</span>` : ""}
+          ${g.h == null && g.zd != null && g.zm != null && g.zm > g.zd ? `<span class="chip" data-act="h-cd" data-g="${i}" title="Chiều cao = cao độ mặt − cao độ đáy. Chỉ là gợi ý, Sếp kiểm tra">h = ${+(g.zm - g.zd).toFixed(3)} (từ cao độ)</span>` : ""}</div>
+        <div>${Object.entries(g.layers).map(([l, n]) => esc(l) + " (" + n + ")").join(", ")}</div></td></tr></tbody>`; }).join("")}</table>
+    <div class="nho">Ký hiệu hiện cả trên bản vẽ (màu theo loại) và khi rê chuột. Nhóm có <b>Loại</b> khác ${esc(d.nguon === "khac" ? "" : LOAI_CC[d.nguon])} được bỏ tick sẵn; nếu công cụ phân loại sai, đổi Loại của nhóm đó.</div>`;
+}
+function veCCInfo() {
+  const el = $("cc-ct-info"), tt = ttCC(); if (!el) return;
+  const ct = tt.chiTiet; if (!ct) { el.innerHTML = ""; return; }
+  el.innerHTML = `<h4>Chi tiết đã quét</h4>
+    ${ct.ky_hieu.map(k => `<div><b>${esc(k.ky_hieu)}</b> · ${k.kt.map(v => v.join("×")).join(" ; ") || "chưa có kích thước ghi liền"} ${k.h != null ? `· <span class="khop">h = ${k.h} m</span>` : '<span class="chua">· chưa tìm thấy chiều cao</span>'}
+      ${k.ung_vien.length ? `<div class="nho">Số rời: ${k.ung_vien.map(v => `<span class="chip" data-act="chip" data-v="${v}">${v}</span>`).join("")}</div>` : ""}</div>`).join("")}
+    ${(ct.cao_do_chung || []).length ? `<div class="nho">Cao độ tìm thấy (chưa gắn với ký hiệu nào): ${ct.cao_do_chung.join(" ; ")}</div>` : ""}
+    ${ct.ky_hieu.some(k => k.cao_do.length) ? `<div class="nho">Cao độ theo ký hiệu: ${ct.ky_hieu.filter(k => k.cao_do.length).map(k => `<b>${esc(k.ky_hieu)}</b> ${k.cao_do.join(" ; ")}`).join(" · ")}</div>` : ""}
+    ${ct.ung_vien_chung.length ? `<div class="nho">Số rời tìm thấy (bấm ô h của nhóm rồi bấm số): ${ct.ung_vien_chung.map(v => `<span class="chip" data-act="chip" data-v="${v}">${v}</span>`).join("")}</div>` : ""}
+    ${ct.canh_bao.map(c => `<div class="cb">${esc(c)}</div>`).join("")}`;
+}
+function veCCCT() {
+  const el = $("cc-ct"), tt = ttCC(), d = dcc(); if (!el) return;
+  const bien = Object.entries({n:"số lượng", a:"dài", b:"rộng", h:"cao/dày", S:"diện tích", P:"chu vi", L:"chiều dài", zd:"cao độ đáy", zm:"cao độ mặt"});
+  el.innerHTML = `<div class="nho">Biến (số liệu của một cái): ${bien.map(([k, t]) => `<span class="biendo">${k}</span> ${t}`).join(" · ")}${Object.entries(tt.ts).map(([k, p]) => ` · <span class="biendo">${esc(k)}</span> ${esc(p.ten)}`).join("")}.
+      Dùng + − * / ** ( ) và hàm min, max, abs, sqrt, round.</div>
+    ${Object.keys(tt.ts).length ? `<div class="hang">${Object.entries(tt.ts).map(([k, p]) => `<label>${esc(p.ten)} <span class="biendo">${esc(k)}</span><input type="number" step="any" data-ts="${esc(k)}" value="${p.gia_tri}"></label>`).join("")}</div>` : ""}
+    <table class="cc"><thead><tr><th>Hạng mục</th><th>ĐV</th><th>Công thức</th><th></th></tr></thead><tbody>
+    ${tt.ct.map((c, i) => `<tr><td><input type="text" data-ct="ten" data-i="${i}" value="${esc(c.ten)}" style="width:130px"></td>
+      <td><select data-ct="dv" data-i="${i}">${S.cc.don_vi.map(u => `<option value="${u}" ${u === c.dv ? "selected" : ""}>${DV_HIEN[u] || u}</option>`).join("")}</select></td>
+      <td><input type="text" class="biendo" data-ct="bt" data-i="${i}" value="${esc(c.bt)}" style="width:100%;min-width:120px"></td>
+      <td><button data-act="xoa-ct" data-i="${i}" style="padding:0 6px" title="Xóa công thức">✕</button></td></tr>`).join("")}</tbody></table>
+    <div class="hang"><button data-act="them-ct">+ Thêm công thức</button>
+      <button data-act="luu" ${tt.dirty ? 'class="on"' : "disabled"}>Lưu làm mặc định</button>
+      <button data-act="khoi-phuc" ${tt.dirty || d.da_sua ? "" : "disabled"}>Khôi phục công thức gốc</button>
+      <span class="nho" id="cc-dirty">${tt.dirty ? "Đã sửa, chưa lưu mặc định." : d.da_sua ? "Đang dùng bản đã sửa của Sếp." : "Công thức mặc định."}</span></div>`;
+}
+function veCCKQ() {
+  veCCTong();
+  const el = $("cc-kq"), tt = ttCC(); if (!el) return;
+  if (tt.loiCT) { el.innerHTML = `<div class="cb">${esc(tt.loiCT)}</div>`; return; }
+  if (!tt.kq) { el.innerHTML = '<div class="nho">Chưa có nhóm nào được tick để tính.</div>'; return; }
+  const k = tt.kq, loi = k.dong.filter(x => x.loi);
+  el.innerHTML = `<table class="cc"><thead><tr><th>Ký hiệu</th><th>Hạng mục</th><th>Công thức</th><th>Khối lượng</th></tr></thead><tbody>
+    ${k.dong.map(x => `<tr class="${x.loi ? "loi-cc" : ""}"><td>${esc(x.ky_hieu)}</td><td>${esc(x.ten)}</td><td class="biendo">${esc(x.bt)}</td>
+      <td class="so">${x.loi ? esc(x.loi) : so(x.gia_tri, 3) + " " + (DV_HIEN[x.dv] || x.dv)}</td></tr>`).join("")}
+    ${Object.entries(k.tong).map(([dv, v]) => `<tr class="tong"><td colspan="3">Cộng (${DV_HIEN[dv] || dv})</td><td class="so">${so(v, 3)} ${DV_HIEN[dv] || dv}</td></tr>`).join("")}</tbody></table>
+    ${loi.length ? `<div class="cb">${loi.length} dòng chưa tính được (${[...new Set(loi.map(x => x.loi))].join("; ")}). Nhập ở cột h hoặc làm bước ②.</div>` : ""}
+`;
+}
+function veCCTong() {
+  const el = $("cc-tong"), tt = ttCC(); if (!el) return;
+  const dsg = tt.kqNhom || [], k = tt.kq;
+  if (tt.loiCT || !k || !dsg.length) { el.innerHTML = '<div class="nho">Chưa có số liệu: làm bước ①, tick nhóm cần tính, và nhập đủ h (hoặc làm bước ②).</div>'; return; }
+  const nct = tt.ct.length, coCD = dsg.some(g => g.zd != null || g.zm != null), tong = new Array(nct).fill(0), loi = [];
+  let tsl = 0;
+  const hang = dsg.map((g, gi) => {
+    const e = ef(g); tsl += g.n; const idx = tt.nhom.indexOf(g);
+    const o = tt.ct.map((c, j) => { const d = k.dong[gi * nct + j]; if (d && d.gia_tri != null) tong[j] += d.gia_tri; else if (d?.loi) loi.push(`${tenNhom(g)}: ${d.loi}`); return d; });
+    return `<tr data-sang="${idx}" class="${tt.sang.has(g) ? "sang" : ""}" style="cursor:pointer" title="Bấm để hiện sáng các hình của ${esc(tenNhom(g))} trên bản vẽ">
+      <td class="so">${gi + 1}</td><td><b>${esc(g._ten || tenNhom(g))}</b> ⌖${doiChieuCT(g) === "lech" ? ' <span class="lech" title="Kích thước chi tiết lệch hình vẽ trên mặt bằng quá 5%, Sếp kiểm tra">⚠</span>' : ""}</td><td>cái</td><td class="so">${g.n}</td>
+      <td class="so">${so(e.a, 3)}</td><td class="so">${e.b != null ? so(e.b, 3) : ""}</td><td class="so">${g.h != null ? so(g.h, 3) : '<span class="lech">?</span>'}</td>
+      <td class="so">${so(e.P, 3)}</td><td class="so">${e.S ? so(e.S, 3) : ""}</td>${coCD ? `<td class="so">${g.zd ?? ""}</td><td class="so">${g.zm ?? ""}</td>` : ""}
+      ${o.map(d => `<td class="so">${d && d.gia_tri != null ? so(d.gia_tri, 3) : `<span class="lech" title="${esc(d?.loi || "")}">–</span>`}</td>`).join("")}</tr>`;
+  }).join("");
+  el.innerHTML = `<div class="hang"><label>Dài × rộng lấy từ <select data-kt="1"><option value="ct" ${tt.kt === "ct" ? "selected" : ""}>Chi tiết (nếu có)</option><option value="mb" ${tt.kt === "mb" ? "selected" : ""}>Hình trên mặt bằng</option></select></label></div>
+    <div style="overflow-x:auto"><table class="cc tong"><thead><tr><th>STT</th><th>Tên</th><th>ĐV</th><th>SL</th><th>D (m)</th><th>R (m)</th><th>C (m)</th><th>CV (m)</th><th>DT (m²)</th>${coCD ? "<th>Cđ đáy</th><th>Cđ mặt</th>" : ""}
+      ${tt.ct.map(c => `<th>${esc(c.ten)} (${DV_HIEN[c.dv] || c.dv})</th>`).join("")}</tr></thead><tbody>${hang}
+      <tr class="tong"><td></td><td>CỘNG</td><td></td><td class="so">${tsl}</td><td colspan="${coCD ? 7 : 5}"></td>${tong.map(v => `<td class="so">${so(v, 3)}</td>`).join("")}</tr></tbody></table></div>
+    <div class="nho">SL đếm theo ký hiệu trên mặt bằng; D, R, C lấy theo chi tiết khi có; CV = chu vi, DT = diện tích một cái. ${loi.length ? `<span class="lech">Chưa tính được: ${[...new Set(loi)].join("; ")}.</span>` : ""}</div>
+    <div class="hang"><button data-act="them-bang" class="on">+ Thêm vào bảng bóc</button><button data-act="xuat">Xuất Excel</button><button data-act="anh" title="Lưu ảnh mặt bằng đang hiển thị (có hình hiện sáng) để đối chiếu hoặc trình bày">Lưu ảnh bản vẽ</button></div>`;
+}
+
+let henCC = 0;
+function tinhLaiCC() { clearTimeout(henCC); henCC = setTimeout(chayTinhCC, 180); }
+async function chayTinhCC() {
+  const tt = S.cc.ma && ttCC(); if (!tt) return;
+  const dsg = tt.nhom.filter(g => g.tick && g.n > 0), tuoi = ++tt.tuoi, dem = {};
+  dsg.forEach(g => dem[tenNhom(g)] = (dem[tenNhom(g)] || 0) + 1);  // hai nhóm trùng tên khác loại: thêm loại để không lẫn trong Excel
+  dsg.forEach(g => g._ten = dem[tenNhom(g)] > 1 ? `${tenNhom(g)} [${LOAI_CC[g.loai] || g.loai}]` : tenNhom(g));
+  const nhom = dsg.map(g => { const e = ef(g); return {ky_hieu:g._ten, n:g.n, a:e.a, b:e.b, h:g.h, S:e.S, P:e.P, L:e.L, zd:g.zd ?? null, zm:g.zm ?? null}; });
+  if (!nhom.length) { tt.kq = null; tt.kqNhom = []; tt.loiCT = ""; return veCCKQ(); }
+  try { const d = await json("/api/cong-cu/tinh", {tham_so:tt.ts, cong_thuc:tt.ct, nhom}); if (tuoi !== tt.tuoi) return; tt.kq = d; tt.kqNhom = dsg; tt.loiCT = ""; }
+  catch (e) { if (tuoi !== tt.tuoi) return; tt.kq = null; tt.loiCT = e.message; }
+  veCCKQ();
+}
+
+function veNhanCC(f) {  // lớp phủ: hình đã phân loại tô theo loại, kèm ký hiệu
+  const tt = S.cc.ma && ttCC(); if (!tt || !tt.nhom.length || tt.fileId !== f.id) return;
+  const xmin = wx(0), xmax = wx(W), ymin = wy(H), ymax = wy(0); let dem = 0;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = "bold 12px 'Segoe UI', Arial, sans-serif"; ctx.lineJoin = "round";
+  for (const g of tt.nhom) {
+    const mau = MAU_CC[g.loai] || MAU_CC.khac, on = g.tick;
+    for (const o of g.doi_tuong) {
+      const p = f.hinh.layers[o.ten]?.[o.k === "hinh" ? "hinh" : "net"][o.i]; if (!p) continue;
+      const bb = bbCua(p); if (bb[1] < xmin || bb[0] > xmax || bb[3] < ymin || bb[2] > ymax) continue;
+      if (++dem > 5000) break;
+      duongPath(o); if (o.k === "hinh") { ctx.fillStyle = `rgba(${mau},${on ? .3 : .07})`; ctx.fill(); }
+      ctx.strokeStyle = on ? `rgb(${mau})` : "rgba(150,150,150,.55)"; ctx.lineWidth = 1.5; ctx.setLineDash(on ? [] : [4, 3]); ctx.stroke();
+      if ((bb[1] - bb[0]) * S.v.s > 16 || (bb[3] - bb[2]) * S.v.s > 16) {
+        const t = g.ky_hieu || "?", x = sx(o.x), y = sy(o.y);
+        ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.85)"; ctx.setLineDash([]); ctx.strokeText(t, x, y);
+        ctx.fillStyle = !g.ky_hieu ? "#ff9f0a" : on ? "#fff" : "#9a9a9a"; ctx.fillText(t, x, y);
+      }
+    }
+  }
+  // Nhóm đang hiện sáng (bấm tên trong bảng) và đối tượng đang chọn để gán
+  ctx.setLineDash([]);
+  const sang = (o, mau, to, chu) => {
+    const p = f.hinh.layers[o.ten]?.[o.k === "hinh" ? "hinh" : "net"][o.i]; if (!p) return;
+    ctx.save(); ctx.shadowColor = mau; ctx.shadowBlur = 14; duongPath(o);
+    if (o.k === "hinh") { ctx.fillStyle = to; ctx.fill(); }
+    ctx.strokeStyle = mau; ctx.lineWidth = 3; ctx.stroke(); ctx.restore();
+    if (chu) { ctx.font = "bold 14px 'Segoe UI', Arial, sans-serif"; ctx.lineWidth = 4; ctx.strokeStyle = "#000"; ctx.strokeText(chu, sx(o.x), sy(o.y)); ctx.fillStyle = "#ffe600"; ctx.fillText(chu, sx(o.x), sy(o.y)); }
+  };
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for (const g of tt.sang) for (const o of g.doi_tuong) sang(o, "#ffe600", "rgba(255,230,0,.38)", g.ky_hieu || "?");
+  for (const kk of tt.pick) { const g = tt.tra.get(kk), o = g && g.doi_tuong.find(q => khoaObj(q) === kk); if (o) sang(o, "#00e5ff", "rgba(0,229,255,.4)", ""); }
+  ctx.lineWidth = 1; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+}
+function boDoiTuongCC(tt, nhom) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; const f = F();
+  for (const o of nhom.doi_tuong) { const p = f.hinh.layers[o.ten]?.[o.k === "hinh" ? "hinh" : "net"][o.i]; if (!p) continue; const bb = bbCua(p); x0 = Math.min(x0, bb[0]); x1 = Math.max(x1, bb[1]); y0 = Math.min(y0, bb[2]); y1 = Math.max(y1, bb[3]); }
+  return isFinite(x0) ? [x0, y0, x1, y1] : null;
+}
+function sangNhom(i, phong) {  // hiện sáng nhóm i (bấm lại để tắt); phóng tới nhóm khi cần
+  const tt = ttCC(), g = tt.nhom[i]; if (!g) return;
+  const idx = S.files.findIndex(f => f.id === tt.fileId);
+  if (idx < 0) return lenh("Bản vẽ của nhóm này đã bị đóng.", "loi");
+  if (S.act !== idx) moFile(idx);
+  const dangSang = tt.sang.has(g); tt.sang = new Set(dangSang && !phong ? [] : [g]);
+  if (tt.sang.size) {
+    const bb = boDoiTuongCC(tt, g);
+    if (bb) {
+      const trongKhung = g.doi_tuong.every(o => sx(o.x) >= 0 && sx(o.x) <= W && sy(o.y) >= 0 && sy(o.y) <= H);
+      if (phong || !trongKhung) { const w = Math.max(bb[2] - bb[0], 0.5), h = Math.max(bb[3] - bb[1], 0.5); S.v = {cx:(bb[0] + bb[2]) / 2, cy:(bb[1] + bb[3]) / 2, s:Math.min(W / w, H / h, 120) * 0.8}; }
+    }
+    lenh(`Hiện sáng ${g.n} hình của ${tenNhom(g)}.`, "ok");
+  }
+  veCCNhom(); veCCTong(); veLai();
+}
+
+// ----- Gán đối tượng vào cấu kiện (hình thiếu ký hiệu hoặc phân loại sai) -----
+function ganChon(a, c, moved, m) {
+  const tt = ttCC(); if (!tt) return; const them = [];
+  if (moved) {
+    const x0 = Math.min(a[0], c[0]), x1 = Math.max(a[0], c[0]), y0 = Math.min(a[1], c[1]), y1 = Math.max(a[1], c[1]);
+    for (const g of tt.nhom) if (g.tick) for (const o of g.doi_tuong) if (o.x >= x0 && o.x <= x1 && o.y >= y0 && o.y <= y1) them.push(khoaObj(o));
+    them.forEach(k => tt.pick.add(k));
+  } else {
+    const o = timDoiTuong(m), k = o && khoaObj(o);
+    if (!k || !tt.tra.has(k)) return lenh("Không có hình nào đã quét ở vị trí này. Kéo khung để chọn nhiều hình.", "loi");
+    tt.pick.has(k) ? tt.pick.delete(k) : tt.pick.add(k);
+  }
+  veCCGan(); veLai();
+}
+function veCCGan() {
+  const el = $("cc-gan"), tt = ttCC(), d = dcc(); if (!el) return;
+  if (!tt.nhom.length) { el.innerHTML = ""; return; }
+  const b = S.buoc && S.buoc.ma === d.ma && S.buoc.so === 3, n = tt.pick.size;
+  const tu = {}; tt.pick.forEach(k => { const g = tt.tra.get(k); if (g) tu[tenNhom(g)] = (tu[tenNhom(g)] || 0) + 1; });
+  el.innerHTML = `<h4>Gán hình vào cấu kiện <span class="nho">dùng cho hình thiếu ký hiệu hoặc phân loại sai</span></h4>
+    <div class="buoc"><button data-act="b3" class="${b ? "cho" : ""}">③ Chọn hình trên bản vẽ</button>${b ? '<button data-act="huy">Xong (Esc)</button>' : ""}</div>
+    ${b ? '<div class="huong-dan">Bấm vào hình (bấm lại để bỏ chọn) hoặc kéo khung để chọn nhiều hình. Kéo khung chỉ lấy hình thuộc nhóm đang tick (cột trong móng không bị lấy nhầm); muốn chọn hình của nhóm không tick thì bấm từng hình. Hình được chọn sáng màu xanh lơ.</div>' : ""}
+    ${n ? `<div>Đang chọn <b>${n}</b> hình (đang thuộc: ${Object.entries(tu).map(([k, v]) => esc(k) + " ×" + v).join(", ")}).</div>
+      <div class="hang"><label>Gán vào<select id="gan-dich">${tt.nhom.map((g, i) => `<option value="${i}">${esc(tenNhom(g))} · ${LOAI_CC[g.loai] || g.loai} (${g.n})</option>`).join("")}<option value="moi">+ Tên mới ...</option></select></label>
+        <label>Tên mới<input type="text" id="gan-ten" placeholder="vd: M3" style="width:70px"></label>
+        <label>Loại<select id="gan-loai">${Object.entries(LOAI_CC).map(([k, t]) => `<option value="${k}" ${k === d.nguon ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+        <button data-act="gan" class="on">Gán</button><button data-act="bo-pick">Bỏ chọn</button></div>`
+      : '<div class="nho">Chưa chọn hình nào. Bấm ③ rồi chọn các hình chưa có ký hiệu (hoặc hình bị xếp nhầm loại).</div>'}`;
+}
+function ganVao() {
+  const tt = ttCC(), dich = $("gan-dich").value, keys = [...tt.pick];
+  if (!keys.length) return;
+  let tg;
+  if (dich === "moi") {
+    const ten = $("gan-ten").value.trim().toUpperCase(), loai = $("gan-loai").value;
+    if (!ten) return lenh("Nhập tên cấu kiện mới (vd: M3) rồi bấm Gán.", "loi");
+    tg = tt.nhom.find(x => x.ky_hieu === ten && x.loai === loai);
+    if (!tg) { tg = {ma:`tay|${ten}|${Date.now()}`, ky_hieu:ten, loai, loai_ten:LOAI_CC[loai], chac:true, ly_do:["gán tay"], nguon_ten:"gán tay", n:0, a:0, b:null, S:0, P:0, L:0,
+      h:null, h_nguon:"", kt_nhan:[], dang:"Chữ nhật", layers:{}, doi_tuong:[], canh_bao:[], dung:true, tick:true}; tt.nhom.push(tg); }
+  } else tg = tt.nhom[+dich];
+  const doi = new Set([tg]);
+  for (const k of keys) {
+    const g = tt.tra.get(k), o = g.doi_tuong.find(q => khoaObj(q) === k); if (!o || g === tg) continue;
+    g.doi_tuong.splice(g.doi_tuong.indexOf(o), 1); tg.doi_tuong.push(o); doi.add(g);
+  }
+  tt.nhom = tt.nhom.filter(g => g.doi_tuong.length); doi.forEach(g => g.doi_tuong.length && tinhLaiNhomCC(g));
+  if (!tg.ly_do.includes("gán tay")) tg.ly_do.push("gán tay");
+  tg.tick = true; tg.chac = true; tt.pick = new Set(); tt.sang = new Set([tg]); tt.focus = -1; tt.kq = null;
+  xayTra(tt); ghepCT(tt);
+  lenh(`Đã gán ${keys.length} hình vào ${tenNhom(tg)} (nay có ${tg.n} cái).`, "ok");
+  veCCNhom(); veCCGan(); veCCInfo(); tinhLaiCC(); veCCTong(); veLai();
+}
+
+// ----- Sự kiện trong panel công cụ -----
+function ccSuKien(e) {
+  const t = e.target, tt = S.cc.ma && ttCC(); if (!tt) return;
+  const tr = t.closest("tr[data-g]");
+  if (tr && t.dataset.f) {
+    const g = tt.nhom[+tr.dataset.g], f = t.dataset.f, nguon = dcc().nguon;
+    if (f === "ky_hieu") {
+      if (e.type !== "change") return; const ten = t.value.trim().toUpperCase(), trung = ten && tt.nhom.find(x => x !== g && x.loai === g.loai && x.ky_hieu === ten);
+      if (trung) {  // trùng tên một cấu kiện đã có: gộp vào đó
+        trung.doi_tuong.push(...g.doi_tuong); tt.nhom.splice(tt.nhom.indexOf(g), 1); tinhLaiNhomCC(trung); trung.tick = true; trung.chac = true;
+        if (!trung.ly_do.includes("gán tay")) trung.ly_do.push("gán tay"); tt.sang = new Set([trung]); tt.focus = -1;
+        lenh(`Đã gộp ${g.n} hình vào ${ten} (nay có ${trung.n} cái).`, "ok");
+      } else g.ky_hieu = ten;
+      xayTra(tt); ghepCT(tt); veCCNhom(); veCCGan(); veCCInfo(); veLai();
+    }
+    else if (f === "zd" || f === "zm") { const v = parseFloat(t.value.replace(",", ".")); g[f] = isNaN(v) ? null : v; g.zd_nguon = "nhập tay"; }
+    else if (f === "tick") { g.tick = t.checked; tr.parentElement.classList.toggle("mo", !g.tick); veLai(); }
+    else if (f === "n") g.n = Math.max(0, parseFloat(t.value) || 0);
+    else if (f === "h") { const v = parseFloat(t.value.replace(",", ".")); g.h = isNaN(v) ? null : v; g.h_nguon = isNaN(v) ? "" : "nhập tay"; }
+    else if (f === "loai") { g.loai = t.value; g.tick = g.loai === nguon || nguon === "khac"; veCCNhom(); veLai(); }
+    tt.kq = null; tinhLaiCC(); return;
+  }
+  if (t.dataset.kt != null) { tt.kt = t.value; tt.kq = null; veCCNhom(); tinhLaiCC(); return; }
+  if (t.dataset.ct != null && t.dataset.i != null) { tt.ct[+t.dataset.i][t.dataset.ct] = t.value; capNhatDirty(tt); return; }
+  if (t.dataset.ts != null) { tt.ts[t.dataset.ts].gia_tri = parseFloat(t.value) || 0; capNhatDirty(tt); }
+}
+function capNhatDirty(tt) {  // không vẽ lại bảng công thức khi đang gõ (sẽ mất con trỏ), chỉ bật nút Lưu/Khôi phục
+  tt.dirty = true; tt.kq = null;
+  const luu = document.querySelector('#cc-ct [data-act="luu"]'), kp = document.querySelector('#cc-ct [data-act="khoi-phuc"]');
+  if (luu) { luu.disabled = false; luu.classList.add("on"); } if (kp) kp.disabled = false;
+  const m = $("cc-dirty"); if (m) m.textContent = "Đã sửa, chưa lưu mặc định.";
+  tinhLaiCC();
+}
+$("p-cc").addEventListener("input", ccSuKien);
+$("p-cc").addEventListener("change", ccSuKien);
+$("p-cc").addEventListener("focusin", e => { const tr = e.target.closest("tr[data-g]"); if (tr && e.target.dataset.f === "h") ttCC().focus = +tr.dataset.g; });
+$("p-cc").addEventListener("click", async e => {
+  const hang = e.target.closest("tr[data-sang]");
+  if (hang && !e.target.closest("[data-act],select,input")) return sangNhom(+hang.dataset.sang, false);
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const tt = S.cc.ma && ttCC(), d = dcc(), a = b.dataset.act; if (!tt) return;
+  if (a === "b1") batDauBuoc(1); else if (a === "b2") batDauBuoc(2); else if (a === "huy") huyBuoc();
+  else if (a === "them-ct") { tt.ct.push({ten:"Hạng mục mới", dv:"m3", bt:"n*S*h"}); tt.dirty = true; tt.kq = null; veCCCT(); tinhLaiCC(); }
+  else if (a === "xoa-ct") { tt.ct.splice(+b.dataset.i, 1); tt.dirty = true; tt.kq = null; veCCCT(); tinhLaiCC(); }
+  else if (a === "luu" || a === "khoi-phuc") {
+    const luu = a === "luu";
+    try {
+      const m = await (luu ? goi(`/api/cong-cu/${d.ma}`, {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({tham_so:tt.ts, cong_thuc:tt.ct})})
+                           : goi(`/api/cong-cu/${d.ma}`, {method:"DELETE"})).then(r => r.json());
+      S.cc.ds[S.cc.ds.findIndex(x => x.ma === d.ma)] = m; tt.ts = sao(m.tham_so); tt.ct = sao(m.cong_thuc); tt.dirty = false; tt.kq = null;
+      veDsCC(); veCCCT(); tinhLaiCC(); lenh(luu ? `Đã lưu công thức của ${m.ten} làm mặc định.` : `Đã khôi phục công thức gốc của ${m.ten}.`, "ok");
+    } catch (er) { lenh(er.message, "loi"); }
+  }
+  else if (a === "chip") {
+    const g = tt.nhom[tt.focus]; if (!g) return lenh("Bấm vào ô h của một nhóm trước, rồi bấm số cần lấy.", "loi");
+    g.h = parseFloat(b.dataset.v); g.h_nguon = "chi tiết (chọn tay)";
+    const inp = document.querySelector(`#cc-nhom tr[data-g="${tt.focus}"] [data-f="h"]`); if (inp) inp.value = g.h;
+    tt.kq = null; tinhLaiCC();
+  }
+  else if (a === "b3") batDauBuoc(3);
+  else if (a === "gan") ganVao();
+  else if (a === "bo-pick") { tt.pick = new Set(); veCCGan(); veLai(); }
+  else if (a === "sang") sangNhom(+b.dataset.g, true);
+  else if (a === "h-cd") { const g = tt.nhom[+b.dataset.g]; g.h = +(g.zm - g.zd).toFixed(3); g.h_nguon = "suy từ cao độ (kiểm tra)"; veCCNhom(); tt.kq = null; tinhLaiCC(); }
+  else if (a === "anh") {
+    const m = S.mouse; S.mouse = null; ve(); cv.toBlob(bl => { const u = document.createElement("a"); u.href = URL.createObjectURL(bl); u.download = `mat_bang_${d.ma}.png`; u.click(); URL.revokeObjectURL(u.href); }); S.mouse = m; lenh("Đã lưu ảnh bản vẽ.", "ok");
+  }
+  else if (a === "them-bang") themCCVaoBang(tt, d);
+  else if (a === "xuat") {
+    try { await taiXuong("/api/xuat-bang-boc", {du_an:$("du-an").value, dong:dongCC(tt, d)}, "bang_boc_cong_cu.xlsx"); lenh("Đã xuất Excel công cụ.", "ok"); }
+    catch (er) { lenh(er.message, "loi"); }
+  }
+});
+const viTri = g => g ? g.doi_tuong.slice(0, 12).map(o => `(${o.x.toFixed(1)}; ${o.y.toFixed(1)})`).join(" ") + (g.doi_tuong.length > 12 ? " ..." : "") : "";
+const dongCC = (tt, d) => (tt.kq?.dong || []).filter(x => x.gia_tri != null).map(x => ({
+  cong_cu:d.ten, layer:d.ten, ky_hieu:x.ky_hieu, ten:x.ten, dv:x.dv, bt:x.bt, bien:x.bien, gia_tri:x.gia_tri,
+  vi_tri:viTri((tt.kqNhom || []).find(g => (g._ten || tenNhom(g)) === x.ky_hieu)),
+  nguon:`${x.bien.n} cái`, file:F()?.ten || ""}));
+function themCCVaoBang(tt, d) {
+  const dong = dongCC(tt, d); if (!dong.length) return lenh("Chưa có dòng nào tính được để thêm.", "loi");
+  for (const x of dong) {  // tính lại cùng ký hiệu và hạng mục thì thay dòng cũ
+    const i = S.bang.findIndex(y => y.bt && y.cong_cu === x.cong_cu && y.ky_hieu === x.ky_hieu && y.ten === x.ten);
+    if (i >= 0) S.bang[i] = x; else S.bang.push(x);
+  }
+  const loi = (tt.kq?.dong || []).filter(x => x.loi).length;
+  lenh(`Đã thêm ${dong.length} dòng của ${d.ten} vào bảng bóc${loi ? `, bỏ ${loi} dòng thiếu số liệu` : ""}.`, "ok");
+  chonTab("dt"); veDT();
+}
+async function taiCongCu() {
+  try { const r = await goi("/api/cong-cu").then(x => x.json()); S.cc.ds = r.cong_cu; S.cc.don_vi = r.don_vi; }
+  catch (e) { lenh("Không tải được công cụ: " + e.message, "loi"); }
+  veDsCC(); veCC();
+}
+
+// ---------- Dòng lệnh ----------
+$("o-lenh").addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  const t = e.target.value.trim(); e.target.value = ""; if (!t) return;
+  lenh("Lệnh: " + t);
+  const [c, ...a] = t.toLowerCase().split(/\s+/);
+  if (c === "ze" || c === "zoom") { zoomToanBo(); veLai(); }
+  else if (c === "pan" || c === "p") datCongCu("pan");
+  else if (c === "chon" || c === "select") datCongCu("pick");
+  else if (c === "vung" || c === "region") {
+    if (a.length === 4 && F()) { F().vung = a.map(parseFloat); dongBoVung(); veLai(); lenh("Đã đặt vùng.", "ok"); }
+    else { datCongCu("vung"); lenh("Kéo khung trên bản vẽ, hoặc gõ: VUNG x0 y0 x1 y1"); }
+  }
+  else if (c === "bovung") $("t-bo-vung").onclick();
+  else if (c === "tk") capNhatThongKe();
+  else if (c === "help" || c === "?") lenh("ZE zoom toàn bộ · PAN · VUNG [x0 y0 x1 y1] · BOVUNG · TK thống kê · lăn chuột = zoom, giữ nút giữa = di chuyển");
+  else lenh("Lệnh không có: " + c, "loi");
+});
+
+// ---------- Tab phải ----------
+document.querySelectorAll(".tab-phai div").forEach(d => d.onclick = () => {
+  document.querySelectorAll(".tab-phai div").forEach(x => x.classList.toggle("act", x === d));
+  ["cc", "dt", "tk", "kl", "gc"].forEach(k => $("p-" + k).hidden = k !== d.dataset.t);
+});
+function chonTab(t) { document.querySelector(`.tab-phai div[data-t="${t}"]`).click(); }
+
+// ---------- Thống kê ----------
+function yeuCauTK() {
+  return {du_an:$("du-an").value, files:S.files.map(f => ({id:f.id, vai_tro:f.vai_tro, loai_layer:loaiLayer(f), vung:f.vung || []}))};
+}
+async function capNhatThongKe() {
+  if (!S.files.length) return lenh("Chưa có bản vẽ.", "loi");
+  chonTab("tk"); $("p-tk").innerHTML = '<div class="nho">Đang thống kê ...</div>';
+  try {
+    const d = await json("/api/thong-ke", yeuCauTK());
+    veThongKe(d); veGhiChu(d); lenh(`Thống kê xong: ${d.tong_hop.length} loại cấu kiện.`, "ok");
+  } catch (e) { $("p-tk").innerHTML = `<div class="cb">${esc(e.message)}</div>`; lenh(e.message, "loi"); }
+}
+const lopDoiChieu = t => t.startsWith("Khớp") ? "khop" : t.startsWith("Lệch") ? "lech" : "chua";
+function veThongKe(d) {
+  const tong = d.tong_hop.reduce((a, x) => a + x.so_luong, 0);
+  $("p-tk").innerHTML = `
+    <h4>Tổng hợp cấu kiện (${tong} cấu kiện)</h4>
+    <table><thead><tr><th>Tên</th><th>Loại</th><th title="Cộng các mặt bằng">SL</th><th title="Nhiều nhất trên một mặt bằng: dùng khi cấu kiện vẽ lặp ở nhiều mặt bằng">Tối đa 1 MB</th>
+      <th title="Dài × Rộng × Cao (mm). Dầm: dài là chiều dài từng dầm, rộng = b, cao = h">Dài×Rộng×Cao (mm)</th><th title="Chỉ hiện với hình dạng đặc biệt (không phải chữ nhật)">Chu vi (m)</th><th title="Chỉ hiện với hình dạng đặc biệt">Diện tích (m²)</th><th>Đối chiếu</th></tr></thead><tbody>
+    ${d.tong_hop.map(h => `<tr><td>${esc(h.ten)}</td><td>${h.loai_ten}</td><td class="so">${h.so_luong}</td><td class="so">${h.so_luong_max}</td>
+       <td>${drc([h.dai, h.rong, h.cao])}${h.dang === "Đặc biệt" ? ' <span class="chua" title="Hình không phải chữ nhật: dài×rộng là hộp bao">(đặc biệt)</span>' : ""}</td>
+       <td class="so">${h.dang === "Đặc biệt" ? so(h.chu_vi, 2) : ""}</td><td class="so">${h.dang === "Đặc biệt" ? so(h.dien_tich, 3) : ""}</td>
+       <td class="${lopDoiChieu(h.doi_chieu)}">${esc(h.doi_chieu)}</td></tr>`).join("") || '<tr><td colspan="8">Chưa có cấu kiện: gán layer ở cột trái cho bản vẽ mặt bằng.</td></tr>'}
+    </tbody></table>
+    <h4>Theo từng mặt bằng</h4>
+    <table><thead><tr><th>Bản vẽ</th><th>Tên</th><th>SL</th><th>Dài×Rộng×Cao (mm)</th><th>Nguồn tên</th></tr></thead><tbody>
+    ${d.theo_mat_bang.map(h => `<tr><td>${esc(h.file)}</td><td>${esc(h.ten)}</td><td class="so">${h.so_luong}</td><td>${drc([h.dai, h.rong, h.cao])}${h.dang === "Đặc biệt" ? " (đặc biệt)" : ""}</td><td>${esc(h.nguon_ten)}</td></tr>`).join("")}</tbody></table>
+    <h4>Kích thước ghi trong chi tiết</h4>
+    <table><thead><tr><th>Tên</th><th>Loại</th><th>Dài×Rộng×Cao (mm)</th><th>Trên mặt bằng</th></tr></thead><tbody>
+    ${d.chi_tiet.map(c => `<tr><td>${esc(c.ten)}</td><td>${c.loai_ten}</td><td>${c.drc.map(drc).join(" ; ")}${c.day.length ? " · dày " + c.day.join(" ; ") : ""}</td>
+       <td class="${c.co_tren_mat_bang ? "khop" : "chua"}">${c.co_tren_mat_bang ? "Có" : "Chưa thấy"}</td></tr>`).join("") || '<tr><td colspan="4">Chưa có bản vẽ chi tiết (đặt vai trò "Chi tiết cấu kiện").</td></tr>'}</tbody></table>
+    ${d.canh_bao.length ? "<h4>Cảnh báo</h4>" + [...new Set(d.canh_bao)].map(c => `<div class="cb">${esc(c)}</div>`).join("") : ""}`;
+}
+function veGhiChu(d) {
+  const ds = Object.entries(d.ghi_chu);
+  $("p-gc").innerHTML = ds.map(([ten, g]) => `<h4>${esc(ten)}</h4>
+    <table><thead><tr><th>Thông số phát hiện</th><th>Giá trị</th><th>Dòng ghi chú</th></tr></thead><tbody>
+    ${g.phat_hien.map(p => `<tr><td>${esc(p.khoa)}</td><td>${esc(p.gia_tri)}</td><td>${esc(p.dong)}</td></tr>`).join("") || '<tr><td colspan="3">Không phát hiện thông số.</td></tr>'}</tbody></table>
+    <h4>Toàn bộ dòng chữ</h4><div class="nho">${g.dong.map(esc).join("<br>")}</div>`).join("")
+    || '<div class="nho">Chưa có bản vẽ ghi chú chung (đặt vai trò "Ghi chú chung").</div>';
+}
+$("t-tk").onclick = capNhatThongKe;
+$("t-tk-xlsx").onclick = async () => {
+  try { await taiXuong("/api/xuat-thong-ke", yeuCauTK(), "thong_ke_cau_kien.xlsx"); lenh("Đã xuất Excel thống kê.", "ok"); }
+  catch (e) { lenh(e.message, "loi"); }
+};
+
+// ---------- Khối lượng (mặt bằng đang mở) ----------
+function veTabKL() {
+  $("p-kl").innerHTML = `
+    <div class="nho">Tính cho bản vẽ đang mở (vai trò Mặt bằng), trong vùng đã chọn. Gán layer ở cột trái.</div>
+    <div class="hang">${TS.map(([k, t]) => `<label>${t}<input type="number" step="any" id="ts-${k}" value="${S.mac_dinh[k] ?? ""}"></label>`).join("")}</div>
+    <div class="hang"><button id="kl-tinh">Tính khối lượng</button></div>
+    <div class="nho">Tự tính kết cấu và/hoặc ống gió theo layer đã gán.</div>
+    <div id="kl-kq"></div>`;
+  $("kl-tinh").onclick = tinhKL;
+}
+function yeuCauKL() {
+  const f = F(), thong_so = {}; TS.forEach(([k]) => thong_so[k] = parseFloat($("ts-" + k).value));
+  return {id:f.id, loai_layer:loaiLayer(f), thong_so, dieu_chinh:{}, du_an:$("du-an").value, vung:f.vung || []};
+}
+const KET_CAU = ["cot", "dam", "san", "lo_san", "mong", "vach"];
+async function tinhKL() {
+  const f = F(); if (!f) return lenh("Chưa mở bản vẽ.", "loi");
+  const k = $("kl-kq"); k.innerHTML = '<div class="nho">Đang tính ...</div>';
+  const loai = Object.values(loaiLayer(f));
+  const coOng = loai.includes("ong_gio"), coKetCau = loai.some(l => KET_CAU.includes(l)) || !coOng;
+  k.innerHTML = '<div id="kl-kc"></div><div id="kl-og"></div>';
+  if (coKetCau) await tinhKetCau($("kl-kc"));
+  if (coOng) await tinhOngGio($("kl-og"));
+}
+async function tinhKetCau(k) {
+  try {
+      const d = await json("/api/tinh", yeuCauKL());
+      k.innerHTML = `<table><thead><tr><th>Công tác</th><th>ĐV</th><th>Khối lượng</th></tr></thead><tbody>
+        ${d.tong_hop.map(t => `<tr><td>${esc(t.ten)}</td><td>${t.don_vi}</td><td class="so">${so(t.khoi_luong, 3)}</td></tr>`).join("") || '<tr><td colspan="3">Chưa có khối lượng: kiểm tra gán layer và vùng chọn.</td></tr>'}</tbody></table>
+        <div class="hang"><button id="kl-xlsx">Xuất Excel khối lượng</button></div>
+        ${[...d.canh_bao_chung, ...d.cau_kien.flatMap(c => c.canh_bao.filter(x => x.muc !== "thong_tin").map(x => `${c.id}: ${x.noi_dung}`))].slice(0, 30).map(c => `<div class="cb">${esc(c)}</div>`).join("")}`;
+      $("kl-xlsx").onclick = () => taiXuong("/api/xuat-excel", yeuCauKL(), "khoi_luong.xlsx").catch(e => lenh(e.message, "loi"));
+  } catch (e) { k.innerHTML = `<div class="cb">${esc(e.message)}</div>`; lenh(e.message, "loi"); }
+}
+async function tinhOngGio(k) {
+  try {
+      const d = await json("/api/ong-gio", yeuCauKL());
+      k.innerHTML = `<h4>Ống thẳng</h4><table><thead><tr><th>KT</th><th>Dài (m)</th><th>Dày</th><th>m² tôn</th></tr></thead><tbody>
+        ${d.ong_thang.map(o => `<tr><td>${o.kich_thuoc}</td><td class="so">${so(o.tong)}</td><td class="so">${o.day}</td><td class="so">${so(o.dien_tich)}</td></tr>`).join("")}
+        <tr class="tong"><td>Cộng</td><td class="so">${so(d.tong.mat_bang)}</td><td></td><td class="so">${so(d.tong.ong_thang)}</td></tr></tbody></table>
+        <h4>Phụ kiện</h4><table><thead><tr><th>Loại</th><th>KT</th><th>SL</th><th>m²/cái</th><th>m² tôn</th></tr></thead><tbody>
+        ${d.phu_kien.map(p => `<tr><td>${esc(p.loai)}</td><td>${esc(p.kich_thuoc)}</td><td class="so">${p.so_luong}</td><td class="so">${so(p.m2_cai, 3)}</td><td class="so">${so(p.m2)}</td></tr>`).join("")}
+        <tr class="tong"><td colspan="2">Cộng</td><td class="so">${d.tong.so_phu_kien}</td><td></td><td class="so">${so(d.tong.phu_kien)}</td></tr></tbody></table>
+        <h4>Theo độ dày tôn</h4><table><thead><tr><th>Dày</th><th>Ống</th><th>Phụ kiện</th><th>Cộng</th></tr></thead><tbody>
+        ${d.tong_hop.map(t => `<tr><td class="so">${t.day}</td><td class="so">${so(t.ong_thang)}</td><td class="so">${so(t.phu_kien)}</td><td class="so">${so(t.cong)}</td></tr>`).join("")}
+        <tr class="tong"><td>Cộng</td><td class="so">${so(d.tong.ong_thang)}</td><td class="so">${so(d.tong.phu_kien)}</td><td class="so">${so(d.tong.cong)}</td></tr></tbody></table>
+        <div class="hang"><button id="kl-xlsx-og">Xuất Excel ống gió</button></div>${d.canh_bao.map(c => `<div class="cb">${esc(c)}</div>`).join("")}`;
+      $("kl-xlsx-og").onclick = () => taiXuong("/api/xuat-excel-ong-gio", yeuCauKL(), "ong_gio.xlsx").catch(e => lenh(e.message, "loi"));
+  } catch (e) { k.innerHTML = `<div class="cb">${esc(e.message)}</div>`; lenh(e.message, "loi"); }
+}
+
+// ---------- Khởi động ----------
+taiCongCu(); veDT(); veTabKL(); veThongKe({tong_hop:[], theo_mat_bang:[], chi_tiet:[], canh_bao:[]}); veGhiChu({ghi_chu:{}});
+$("p-tk").insertAdjacentHTML("afterbegin", '<div class="nho" style="margin-bottom:6px">Thêm các bản vẽ (mặt bằng, chi tiết, ghi chú), đặt vai trò, gán layer cho mặt bằng rồi bấm "Cập nhật thống kê".</div>');
+coKhung(); lenh("AZB Take-off sẵn sàng. Gõ HELP để xem lệnh.");
+window.themBanVe = themBanVe;  // dùng khi kiểm thử
+</script>
+<script>
+// Công tắc giao diện Sáng / Chuẩn / Tối (chỉ đổi thuộc tính data-gd của <html>, không liên quan logic bóc khối lượng)
+(function () {
+  var bar = document.getElementById("chon-giao-dien"); if (!bar) return;
+  function dat(g) {
+    document.documentElement.dataset.gd = g;
+    try { localStorage.setItem("azb-giao-dien", g); } catch (e) {}
+    bar.querySelectorAll("button").forEach(function (b) { b.classList.toggle("on", b.dataset.gd === g); });
+  }
+  bar.addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) dat(b.dataset.gd); });
+  dat(document.documentElement.dataset.gd || "chuan");
+})();
+</script>
+</body>
+</html>
