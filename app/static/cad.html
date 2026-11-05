@@ -483,6 +483,22 @@
   html:root .lay .mau { border-radius:3px; }
   html:root .lay select { height:26px; font-size:11.5px; }
 
+  /* Công cụ tính: thu gọn thành một thanh chọn, bấm để xổ danh sách */
+  html:root #ds-cc { padding:8px 10px; }
+  html:root .cc-chon { width:100%; height:38px; display:flex; align-items:center; gap:8px; padding:0 10px 0 12px; text-align:left; background:var(--sf2); border:1px solid var(--vien); border-radius:var(--r-md); color:var(--chu); font-size:13px; font-weight:600; }
+  html:root .cc-chon:hover, html:root .cc-chon.mo { border-color:var(--xanh); background:var(--xanh-nhat); }
+  html:root .cc-chon .cc-ten { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  html:root .cc-chon .nho { font-size:10.5px; font-weight:400; background:var(--sf3); border-radius:10px; padding:1px 8px; white-space:nowrap; }
+  html:root .cc-chon .cc-mui { color:var(--mo); transition:transform .15s; font-size:12px; }
+  html:root .cc-chon.mo .cc-mui { transform:rotate(180deg); }
+  html:root .cc-chon.chua-chon { border-color:var(--cam); color:var(--cam-dam); background:var(--cam-nhat); }
+  html[data-gd=toi]:root .cc-chon { background:#101A2E; border-color:#26334C; color:#E8EDF6; }
+  html[data-gd=toi]:root .cc-chon.mo, html[data-gd=toi]:root .cc-chon:hover { border-color:var(--xanh); background:#14233F; }
+  html[data-gd=toi]:root .cc-chon.chua-chon { color:#FFB27A; background:#2B1D12; border-color:var(--cam); }
+  html:root .cc-ds { margin-top:6px; padding:4px 0; border:1px solid var(--ln); border-radius:var(--r-md); background:var(--sf); box-shadow:var(--sh-2); }
+  html:root .cc-ds[hidden] { display:none; }
+  html:root .cc-ds .cc-item { margin:1px 4px; }
+
   /* ---------- Vùng bản vẽ ---------- */
   html:root #tab-file { gap:3px; padding:6px 8px 0; min-height:36px; border-bottom:2px solid var(--xanh); }
   html:root #tab-file div { padding:5px 14px; border-radius:8px 8px 0 0; font-size:12.5px; background:var(--dk-nen2); border-color:transparent; transition:background .12s, color .12s; }
@@ -1463,12 +1479,22 @@ function traCC(o) {
 }
 const tenNhom = g => g.ky_hieu || `(chưa đặt tên) ${g.b != null ? so(g.a * 1000, 0) + "×" + so(g.b * 1000, 0) : "đường"}`;
 
+let ccMo = false;  // danh sách công cụ đang xổ ra hay thu gọn
 function veDsCC() {
-  $("ds-cc").innerHTML = S.cc.ds.map(d => `<div class="cc-item ${d.ma === S.cc.ma ? "act" : ""}" data-cc="${d.ma}" title="${esc(d.mo_ta)}">
-    <span>${esc(d.ten)}${d.da_sua ? " ✎" : ""}</span><span class="nho">${d.cong_thuc.length} công thức</span></div>`).join("")
-    || '<div class="nho" style="padding:8px">Không tải được danh sách công cụ.</div>';
+  const ds = S.cc.ds, cur = ds.find(d => d.ma === S.cc.ma);
+  if (!ds.length) { $("ds-cc").innerHTML = '<div class="nho" style="padding:8px">Không tải được danh sách công cụ.</div>'; return; }
+  const ten = cur ? esc(cur.ten) + (cur.da_sua ? " ✎" : "") : "Chọn công cụ tính…";
+  const dem = cur ? `<span class="nho">${cur.cong_thuc.length} công thức</span>` : "";
+  $("ds-cc").innerHTML = `<button type="button" class="cc-chon ${cur ? "" : "chua-chon"} ${ccMo ? "mo" : ""}" aria-expanded="${ccMo}" title="Bấm để ${ccMo ? "thu gọn" : "xổ"} danh sách ${ds.length} công cụ tính">
+      <span class="cc-ten">${ten}</span>${dem}<span class="cc-mui">▾</span></button>`
+    + `<div class="cc-ds" ${ccMo ? "" : "hidden"}>` + ds.map(d => `<div class="cc-item ${d.ma === S.cc.ma ? "act" : ""}" data-cc="${d.ma}" title="${esc(d.mo_ta)}">
+    <span>${esc(d.ten)}${d.da_sua ? " ✎" : ""}</span><span class="nho">${d.cong_thuc.length} công thức</span></div>`).join("") + `</div>`;
 }
-$("ds-cc").addEventListener("click", e => { const x = e.target.closest(".cc-item"); if (x) chonCongCu(x.dataset.cc); });
+$("ds-cc").addEventListener("click", e => {
+  const x = e.target.closest(".cc-item");
+  if (x) { ccMo = false; chonCongCu(x.dataset.cc); return; }
+  if (e.target.closest(".cc-chon")) { ccMo = !ccMo; veDsCC(); }
+});
 function chonCongCu(ma) {
   if (S.buoc) huyBuoc();
   S.cc.ma = ma; ttCC(); veDsCC(); chonTab("cc"); veCC(); veLai();
