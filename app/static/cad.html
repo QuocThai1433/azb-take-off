@@ -1751,14 +1751,14 @@ $("t-gn").onclick = () => {
 $("t-gn-xoa").onclick = () => xoaNhan(true);
 $("t-gn-dxf").onclick = async () => {
   const f = F(); if (!f || !S.gn || S.gn.fileId !== f.id || !S.gn.ds.some(p => p.kq)) return lenh("Chưa gán nhãn cho bản vẽ này. Bấm 'Gán nhãn tự động' trước.", "loi");
-  const ds = S.gn.ds.filter(p => p.kq).map(p => { const y = yeuCauGN(f, p); return {khung:y.khung, ty_le:y.ty_le, tang:y.tang, tien_to:y.tien_to, cao_dam:y.cao_dam, nhan_dam:y.nhan_dam, nhan_truc:y.nhan_truc, nhan_cot:y.nhan_cot, nhan_mong:y.nhan_mong, nhan_coc:y.nhan_coc, nhan_san:y.nhan_san}; });
+  const ds = S.gn.ds.filter(p => p.kq).map(p => { const y = yeuCauGN(f, p); return {khung:y.khung, ty_le:y.ty_le, tang:y.tang, tien_to:y.tien_to, cao_dam:y.cao_dam, kt_mong:y.kt_mong, nhan_dam:y.nhan_dam, nhan_truc:y.nhan_truc, nhan_cot:y.nhan_cot, nhan_mong:y.nhan_mong, nhan_coc:y.nhan_coc, nhan_san:y.nhan_san}; });
   try { lenh(`Đang tạo DXF có nhãn (${ds.length} mặt bằng) ...`); await taiXuong("/api/xuat-dxf-nhan", {id:f.id, khung:ds[0].khung, loai_layer:loaiLayer(f), ds}, f.ten.replace(/\.[^.]+$/, "") + "_co_nhan.dxf"); lenh("Đã xuất DXF có nhãn (layer AZB-NHAN).", "ok"); }
   catch (e) { lenh(e.message, "loi"); }
 };
 const mbHienTai = () => S.gn && S.gn.ds[S.gn.sel];
 function yeuCauGN(f, p) {
   const tc = p.tc;
-  return {id:f.id, khung:p.khung, loai_layer:loaiLayer(f), cao_dam:{...tc.cao_dam}, nhan_dam:tc.nhan_dam, nhan_truc:tc.nhan_truc, nhan_cot:tc.nhan_cot, nhan_mong:tc.nhan_mong !== false, nhan_coc:tc.nhan_coc !== false, nhan_san:tc.nhan_san !== false,
+  return {id:f.id, khung:p.khung, loai_layer:loaiLayer(f), cao_dam:{...tc.cao_dam}, kt_mong:JSON.parse(JSON.stringify(tc.kt_mong || {})), nhan_dam:tc.nhan_dam, nhan_truc:tc.nhan_truc, nhan_cot:tc.nhan_cot, nhan_mong:tc.nhan_mong !== false, nhan_coc:tc.nhan_coc !== false, nhan_san:tc.nhan_san !== false,
     ty_le:tc.ty_le || null, tang:tc.tang ?? null, tien_to:tc.tien_to ?? null};
 }
 function docOGN() {  // đọc các ô nhập của bảng Gán nhãn vào thông số của vùng đang chọn
@@ -1768,26 +1768,28 @@ function docOGN() {  // đọc các ô nhập của bảng Gán nhãn vào thôn
   if ($("gn-ct")) tc.nhan_truc = $("gn-ct").checked && tc.loai === "dam";
   if (!$("gn-tl")) return;
   tc.ty_le = +v("gn-tl") || null; tc.tang = v("gn-tang").trim(); tc.tien_to = v("gn-tt").trim();
+  tc.kt_mong = {};
+  document.querySelectorAll("#p-gn input[data-km]").forEach(i => { const [t, k] = i.dataset.km.split("|"); const goc = ((mbHienTai().kq || {}).loai_mong || []).find(l => l.ten === t); if (+i.value > 0 && !(goc && goc[k] === +i.value)) (tc.kt_mong[t] ||= {})[k] = +i.value; });
   document.querySelectorAll("#p-gn input[data-gh]").forEach(i => { if (+i.value > 0) tc.cao_dam[i.dataset.gh] = +i.value; else delete tc.cao_dam[i.dataset.gh]; });
 }
 function chayGanNhan(a, c) {  // chỉ GHI NHẬN vùng; chưa dán nhãn cho tới khi nhân sự chọn loại và bấm "Dán nhãn"
   const f = F(); S.gnCho = false; $("s-cc").textContent = "Chọn đối tượng";
   if (!S.gn || S.gn.fileId !== f.id) S.gn = {fileId:f.id, ds:[], sel:0};
-  const tc = {ty_le:null, tang:null, tien_to:null, cao_dam:{}, loai:null};
+  const tc = {ty_le:null, tang:null, tien_to:null, cao_dam:{}, kt_mong:{}, loai:null};
   datLoaiGN(tc, null);
   S.gn.ds.push({khung:[a[0], a[1], c[0], c[1]].map(v => +v.toFixed(3)), tc, kq:null});
   S.gn.sel = S.gn.ds.length - 1;
   veGN(); chonTab("gn"); veLai();
   lenh(`Đã chọn vùng ${S.gn.sel + 1}. Chọn loại cần dán nhãn (Móng / Cột / Dầm / Sàn) ở tab Gán nhãn rồi bấm 'Dán nhãn'.`, "ok");
 }
-async function goiGanNhan(f, phong) {
+async function goiGanNhan(f, phong, giuKhung) {
   const p = mbHienTai();
   if (!p.tc.loai) return lenh("Chưa chọn loại cần dán nhãn (Móng / Cột / Dầm / Sàn).", "loi");
   lenh(`Vùng ${S.gn.sel + 1}: đang dán nhãn ${LOAI_GN[p.tc.loai].toLowerCase()} ...`);
   try {
     const kq = await json("/api/gan-nhan", yeuCauGN(f, p));
     p.kq = kq; p.tc.ty_le = kq.ty_le; p.tc.tang = kq.tang; p.tc.tien_to = kq.tien_to;
-    veNhanLenHinh(f); veGN(); chonTab("gn"); if (phong) zoomKhung(p.khung); else if (kq.nhan.length) zoomNhan(0);
+    veNhanLenHinh(f); veGN(); chonTab("gn"); if (phong) zoomKhung(p.khung); else if (kq.nhan.length && !giuKhung) zoomNhan(0);
     lenh(`Vùng ${S.gn.sel + 1} (${LOAI_GN[p.tc.loai]}): ${kq.nhan.length} nhãn (tỷ lệ 1/${kq.ty_le}, chữ cao ${so(kq.cao_chu * 1000, 0)} mm).`, "ok");
     kq.canh_bao.forEach(w => lenh(w));
   } catch (e) { lenh(e.message, "loi"); }
@@ -1842,6 +1844,12 @@ function veGN() {
       ${kq.loai_dam.map(l => `<tr><td><b>${esc(l.ten)}</b><div class="nho">hướng ${l.huong} · ${l.vai_tro === "bien" ? "dầm biên" : "dầm giữa"}</div></td><td>${l.b}</td>
         <td><input type="number" min="0" step="10" data-gh="${esc(l.ma)}" value="${l.h || ""}" placeholder="?" style="width:70px">${l.nguon_h ? `<div class="nho">${esc(l.nguon_h)}</div>` : '<div class="chua">chưa biết</div>'}</td>
         <td>${l.so_luong}</td><td>${so(l.tong_dai, 2)}</td></tr>`).join("")}</table>` : '<div class="nho">Không có dầm trong vùng.</div>') : ""}
+    ${tc.loai === "mong" && kq.loai_mong && kq.loai_mong.length ? `<div style="margin:8px 0"><b>Bảng loại móng</b> <span class="nho">(sửa số rồi bấm Cập nhật nhãn, đơn vị mm)</span>
+      <table><tr><th>Loại</th><th>Dài</th><th>Rộng</th><th>Sâu</th><th>SL</th></tr>
+      ${kq.loai_mong.map(l => `<tr><td><b>${esc(l.ten)}</b>${l.khac_nhau ? '<div class="nho chua">kích thước không đều</div>' : ""}</td>
+        ${["a", "b", "h"].map(k => `<td><input type="number" min="0" step="10" data-km="${esc(l.ten)}|${k}" value="${l[k] || ""}" placeholder="?" style="width:64px"></td>`).join("")}
+        <td>${l.so_luong}</td></tr>`).join("")}</table>
+      <button id="gn-ap" class="on" style="margin-top:6px">Cập nhật nhãn theo bảng</button></div>` : ""}
     ${kq.canh_bao.map(w => `<div class="nho chua" style="margin:3px 0">⚠ ${esc(w)}</div>`).join("")}` : ""}
     <div class="nho" style="margin-top:6px">Nhãn chỉ là đề xuất do công cụ tính từ hình học, kỹ sư kiểm tra trước khi dùng. Trong DXF xuất ra, nhãn nằm riêng trên layer ${TEN_NHAN} nên kéo chỉnh hoặc tắt dễ dàng.</div></div>`;
 }
@@ -1855,6 +1863,7 @@ $("p-gn").addEventListener("click", async e => {
   if (e.target.name === "gn-loai") { const q = mbHienTai(), cu = q.tc.loai; docOGN(); if (q.tc.loai !== cu) { q.kq = null; veNhanLenHinh(f); } veGN(); veLai(); }
   else if (e.target.id === "gn-ct") { docOGN(); }
   else if (e.target.id === "gn-lai") { docOGN(); await goiGanNhan(f, false); }
+  else if (e.target.id === "gn-ap") { docOGN(); await goiGanNhan(f, false, true); }
   else if (e.target.id === "gn-xem") zoomNhan((S.gnI ?? -1) + 1);
   else if (e.target.id === "gn-xoa1") { S.gn.ds.splice(S.gn.sel, 1); S.gn.sel = Math.max(0, S.gn.ds.length - 1); veNhanLenHinh(f); veGN(); veLai(); }
   else if (e.target.id === "gn-xoa") xoaNhan(true);

@@ -240,3 +240,26 @@ def test_chi_dan_dung_loai_da_chon(tmp_path):
     assert {n["loai"] for n in kq["nhan"]} <= {"san"}
     kq = gan_nhan(_tao(tmp_path), LOAI, VUNG, {**tat, "nhan_dam": True})
     assert kq["nhan"] and {n["loai"] for n in kq["nhan"]} == {"dam"}
+
+
+def test_nhan_mong_sep_nhap_kich_thuoc_theo_loai(tmp_path):
+    """Sếp sửa dài/rộng/sâu của loại M1 trong bảng: mọi nhãn M1 ghi số mới, bảng loai_mong trả đúng số."""
+    doc = ezdxf.new("R2010")
+    doc.header["$INSUNITS"] = 4
+    for l in ("MONG", "CHU"):
+        doc.layers.add(l)
+    msp = doc.modelspace()
+    _hcn(msp, "MONG", X0 - 400, Y0 - 400, X0 + 400, Y0 + 400)
+    _hcn(msp, "MONG", X1 - 400, Y0 - 400, X1 + 400, Y0 + 400)
+    for x in (X0, X1):
+        msp.add_text("F1", dxfattribs={"layer": "CHU", "height": 150, "insert": (x - 100, Y0 + 700)})
+    msp.add_text("MẶT BẰNG MÓNG TL:1/50", dxfattribs={"layer": "CHU", "height": 150, "insert": (X0, Y0 - 2500)})
+    f = tmp_path / "mong2.dxf"
+    doc.saveas(f)
+    bv = doc_ban_ve(f)
+    tc = {"nhan_dam": False, "nhan_truc": False, "nhan_mong": True, "nhan_coc": False, "nhan_san": False}
+    kq = gan_nhan(bv, {"MONG": "mong"}, VUNG, tc)
+    assert kq["loai_mong"] == [{"ten": "F1", "a": 800, "b": 800, "h": None, "so_luong": 2, "khac_nhau": False}]
+    kq = gan_nhan(bv, {"MONG": "mong"}, VUNG, {**tc, "kt_mong": {"F1": {"a": 1000, "h": 900}}})
+    assert [n["t"] for n in kq["nhan"] if n["loai"] == "mong"] == ["F1 1000x800x900"] * 2
+    assert kq["loai_mong"][0]["h"] == 900 and kq["loai_mong"][0]["a"] == 1000

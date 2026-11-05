@@ -554,6 +554,7 @@ class YeuCauGanNhan(BaseModel):
     tang: str | None = None
     tien_to: str | None = None
     cao_dam: dict = {}
+    kt_mong: dict = {}  # {"M7": {"a": 600, "b": 600, "h": 800}} sếp chỉnh kích thước từng loại móng
     nhan_dam: bool = True
     nhan_truc: bool = True
     nhan_cot: bool = False

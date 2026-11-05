@@ -426,8 +426,9 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
         _nhan_san(ban_ve, dam, tang, cao_chu, va_cham, them, canh_bao)
 
     # ----- Móng -----
+    loai_mong = []
     if tc.get("nhan_mong", True):
-        n_mong = _nhan_mong(ban_ve, trong, loai_layer, cao_chu, va_cham, them, canh_bao)
+        n_mong = _nhan_mong(ban_ve, trong, loai_layer, cao_chu, va_cham, them, canh_bao, ghi_de=tc.get("kt_mong"), loai_mong=loai_mong)
         if not n_mong and any(_ten_mong(c.noi_dung) for c in _tat_ca_chu(trong)):
             canh_bao.append("Có chữ tên móng (F1...) nhưng không tìm thấy hình móng gần đó. Gán layer 'Móng' cho layer chứa hình móng rồi thử lại.")
 
@@ -458,7 +459,7 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
     if da_co:
         canh_bao.append(f"Vùng này đã có {da_co} nhãn dầm trong bản vẽ; nhãn mới sẽ nằm cạnh/chồng lên, Sếp xem lại trước khi xuất.")
     return {"ty_le": ty_le, "nguon_ty_le": nguon_ty_le, "cao_chu": cao_chu, "tang": tang, "tien_to": tien_to,
-            "nhan": nhan, "bong": bong, "loai_dam": loai_dam, "canh_bao": canh_bao, "da_co": da_co}
+            "nhan": nhan, "bong": bong, "loai_dam": loai_dam, "loai_mong": loai_mong, "canh_bao": canh_bao, "da_co": da_co}
 
 
 def _tam_bong(bong_cs, pos, dau, huong, r_bong, cao_truc):
@@ -608,7 +609,7 @@ def _do_layer_mong(chu_mong, ds_hinh, loai_layer, toi_da, dien_tich=(0.2, 80.0))
     return phieu.most_common(1)[0][0] if phieu else None
 
 
-def _nhan_mong(ban_ve, trong, loai_layer, cao_chu, va_cham, them, canh_bao, toi_da=1.5):
+def _nhan_mong(ban_ve, trong, loai_layer, cao_chu, va_cham, them, canh_bao, toi_da=1.5, ghi_de=None, loai_mong=None):
     """Mỗi chữ tên móng (F1) trong vùng → tìm hình móng gần nhất, ghi "F1 800x800x700".
 
     Kích thước: lấy từ bảng thống kê móng nếu có, đối chiếu với hình vẽ (lệch quá 5% thì cảnh báo).
@@ -622,6 +623,8 @@ def _nhan_mong(ban_ve, trong, loai_layer, cao_chu, va_cham, them, canh_bao, toi_
             if h.geom.area >= 0.01:
                 ds_hinh.append((t, h.geom))
     da_dat, so_nhan, thieu_sau, chong = set(), 0, {}, 0
+    ghi_de = {str(k).upper(): v for k, v in (ghi_de or {}).items()}
+    thong_ke = {}  # tên móng -> {kích thước (a, b, h): số lượng}
     chu_mong = [(c, _ten_mong(c.noi_dung)) for c in _tat_ca_chu(trong)]
     chu_mong = [(c, ten) for c, ten in chu_mong if ten]
     if chu_mong and not _co_hinh_mong(chu_mong, ds_hinh, mong_layer, toi_da):
@@ -662,6 +665,10 @@ def _nhan_mong(ban_ve, trong, loai_layer, cao_chu, va_cham, them, canh_bao, toi_
                 canh_bao.append(f"Móng {ten}: bảng thống kê ghi {ka}x{kb} nhưng hình vẽ đo {_lam_tron_mm(a)}x{_lam_tron_mm(b)}. Nhãn dùng số trong bảng.")
         else:
             ka, kb, kh = _lam_tron_mm(a), _lam_tron_mm(b), None
+        gd = ghi_de.get(ten) or {}  # sếp nhập tay thì dùng số của sếp
+        ka, kb = int(gd.get("a") or ka), int(gd.get("b") or kb)
+        kh = int(gd.get("h") or 0) or kh
+        thong_ke.setdefault(ten, Counter())[(ka, kb, kh or None)] += 1
         kich_thuoc = f"{ka}x{kb}x{kh if kh else '?'}"
         if not kh:
             thieu_sau[ten] = thieu_sau.get(ten, 0) + 1
@@ -683,6 +690,10 @@ def _nhan_mong(ban_ve, trong, loai_layer, cao_chu, va_cham, them, canh_bao, toi_
             them("mong", kich_thuoc, x1 + khe, y0, 0.0, cao_chu, "bl")
             chong += 1
         so_nhan += 1
+    if loai_mong is not None:
+        for ten, dem in sorted(thong_ke.items()):
+            (ka, kb, kh), _ = dem.most_common(1)[0]
+            loai_mong.append({"ten": ten, "a": ka, "b": kb, "h": kh, "so_luong": sum(dem.values()), "khac_nhau": len(dem) > 1})
     if chong:
         canh_bao.append(f"{chong} nhãn móng không tìm được chỗ trống nên chồng lên nét/chữ khác (mặt bằng móng dày). Sếp thử nhập Tỷ lệ 1/ nhỏ hơn (chữ nhỏ lại) rồi dán lại, hoặc dời nhãn trong CAD.")
     if thieu_sau:  # gộp một dòng cho cả loại, không lặp mỗi cái móng một cảnh báo
