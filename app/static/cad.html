@@ -429,7 +429,7 @@
       <div class="hang"><select id="lay-loc" style="flex:1"><option value="tat_ca">Tất cả layer</option><option value="chua">Chưa gán (Bỏ qua)</option><option value="da">Đã gán</option><option value="hinh">Có hình kín</option><option value="chu">Có chữ</option></select>
         <select id="lay-sx" style="flex:1"><option value="sl">Nhiều hình nhất trước</option><option value="ten">Theo tên A-Z</option></select></div>
       <div class="hang"><button id="lay-hoi" title="Bật rồi bấm vào một hình trên bản vẽ: danh sách sẽ nhảy tới layer của hình đó (kể cả layer đang khóa) để Sếp biết nó là gì và gán loại ngay">🎯 Hình này thuộc layer nào?</button>
-        <button id="lay-het" title="Bật mọi layer; bấm lần nữa khi đã hiện hết thì tắt mọi layer">Hiện tất cả</button></div>
+        <button id="lay-het" title="Bật mọi layer; bấm lần nữa để về trạng thái ban đầu (như lúc vừa tải file)">Hiện tất cả</button></div>
       <div class="dem" id="lay-dem"></div>
     </div>
     <div id="ds-layer"></div>
@@ -604,7 +604,7 @@ Nhập thêm các trang cần mở (ví dụ 2,3 hoặc 2-5), để trống nế
 }
 function layerMacDinh(r) {
   return r.layers.map((l, i) => ({
-    ten:l.ten, loai:l.goi_y, ly_do:l.goi_y_ly_do || "", hien:!l.tat && !/^defpoints$/i.test(l.ten), mau:MAU[i % MAU.length],
+    ten:l.ten, loai:l.goi_y, ly_do:l.goi_y_ly_do || "", hien:!l.tat && !/^defpoints$/i.test(l.ten), hien0:!l.tat && !/^defpoints$/i.test(l.ten), mau:MAU[i % MAU.length],
     sl:l.so_hinh_kin + l.so_hinh_ghep + l.so_net_ho, so_chu:l.so_chu,
     khoa:/(^|[-_ ])(grid|truc|axis|dim|text|defpoints|ghi ?chu)|trục|lưới/i.test(l.ten),  // layer phụ trợ: không chọn khi rê chuột / kéo khung
   }));
@@ -767,11 +767,14 @@ $("lay-sx").addEventListener("change", e => { LAY.sx = e.target.value; ve_layer(
 $("lay-het").addEventListener("click", () => {
   const f = F(); if (!f) return;
   const dp = l => /^defpoints$/i.test(l.ten);
-  const dangHetHet = f.layers.filter(l => !dp(l)).every(l => l.hien);   // đã hiện hết → bấm lần nữa sẽ tắt hết
-  f.layers.forEach(l => l.hien = dangHetHet ? false : !dp(l));
-  $("lay-het").textContent = dangHetHet ? "Hiện tất cả" : "Tắt tất cả";
+  const dauTien = l => l.hien0 !== undefined ? l.hien0 : !(l.tat || dp(l));   // trạng thái ngay sau khi tải file / tự gán
+  const dangHetHet = f.layers.every(l => l.hien === !dp(l));
+  const giongBanDau = f.layers.every(l => l.hien === dauTien(l));
+  if (dangHetHet && !giongBanDau) { f.layers.forEach(l => l.hien = dauTien(l)); $("lay-het").textContent = "Hiện tất cả"; ve_layer(true); veLai(); lenh("Đã về trạng thái ban đầu (như lúc vừa tải file). Bấm \"Hiện tất cả\" để hiện hết.", "ok"); return; }
+  f.layers.forEach(l => l.hien = !dp(l));
+  $("lay-het").textContent = giongBanDau && dangHetHet ? "Hiện tất cả" : "Về ban đầu";
   ve_layer(true); veLai();
-  lenh(dangHetHet ? "Đã tắt tất cả layer. Bấm \"Hiện tất cả\" để bật lại." : "Đã hiện tất cả layer (trừ Defpoints). Bấm lần nữa để tắt hết.", "ok");
+  lenh(giongBanDau && dangHetHet ? "Đang ở trạng thái ban đầu và đã hiện hết layer rồi." : "Đã hiện tất cả layer (trừ Defpoints). Bấm lần nữa để về trạng thái ban đầu.", "ok");
 });
 $("lay-hoi").addEventListener("click", () => {
   LAY.hoi = !LAY.hoi; ve_layer(true);
