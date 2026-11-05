@@ -776,18 +776,19 @@ $("lay-het").addEventListener("click", () => {
   ve_layer(true); veLai();
   lenh(giongBanDau && dangHetHet ? "Đang ở trạng thái ban đầu và đã hiện hết layer rồi." : "Đã hiện tất cả layer (trừ Defpoints). Bấm lần nữa để về trạng thái ban đầu.", "ok");
 });
+window.addEventListener("keydown", e => { if (e.key === "Escape" && LAY.hoi) { LAY.hoi = false; ve_layer(true); lenh("Đã tắt chế độ hỏi layer."); } });
 $("lay-hoi").addEventListener("click", () => {
   LAY.hoi = !LAY.hoi; ve_layer(true);
-  lenh(LAY.hoi ? "Bấm vào một hình trên bản vẽ để biết nó thuộc layer nào." : "Đã tắt chế độ hỏi layer.");
+  lenh(LAY.hoi ? "Bấm vào các hình trên bản vẽ để biết layer của chúng (bấm nhiều lần được). Esc để thoát." : "Đã tắt chế độ hỏi layer.");
 });
 // Bấm một hình trên bản vẽ: danh sách nhảy tới layer của hình, gán loại ngay tại đó.
 function hoiLayerTaiDiem(m) {
   const o = timDoiTuong(m, true), f = F();
   if (!o) { lenh("Không có hình nào ở chỗ này (hoặc layer của nó đang ẩn).", "loi"); return; }
   const l = f.layers.find(x => x.ten === o.ten);
-  LAY.noi = o.ten; LAY.q = ""; LAY.loc = "tat_ca"; $("lay-q").value = ""; $("lay-loc").value = "tat_ca"; LAY.hoi = false;
+  LAY.noi = o.ten; LAY.q = ""; LAY.loc = "tat_ca"; $("lay-q").value = ""; $("lay-loc").value = "tat_ca";   // giữ chế độ hỏi: bấm tiếp hình khác, Esc để thoát
   ve_layer(true); $("ds-layer").querySelector(".lay.noi")?.scrollIntoView({block:"center"});
-  lenh(`Hình này thuộc layer "${o.ten}" (hiện gán: ${LOAI[l?.loai] || l?.loai || "chưa gán"}). Chọn loại ở danh sách bên trái.`, "ok");
+  lenh(`Hình này thuộc layer "${o.ten}" (hiện gán: ${LOAI[l?.loai] || l?.loai || "chưa gán"}). Chọn loại ở danh sách bên trái, hoặc bấm hình khác (Esc để thoát).`, "ok");
 }
 // Cổng kiểm tra gán layer (chạy nền, gọi lại sau mỗi lần đổi): hiện số cảnh báo trên tab "Gán layer".
 let ktChoTimer = null;
