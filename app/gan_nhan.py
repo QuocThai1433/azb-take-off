@@ -592,17 +592,17 @@ def _co_hinh_mong(chu_mong, ds_hinh, mong_layer, toi_da):
 
 
 def _do_layer_mong(chu_mong, ds_hinh, loai_layer, toi_da, dien_tich=(0.2, 80.0)):
-    """Layer chưa gán loại nhưng chứa hình móng: mỗi chữ tên móng bỏ một phiếu cho layer của hình chữ nhật gần nhất
-    (loại hình quá nhỏ/quá lớn như khung bản vẽ, và layer đã gán cột/dầm/sàn). Layer nhiều phiếu nhất thắng."""
+    """Layer chưa gán loại nhưng chứa hình móng: mỗi chữ tên móng bỏ một phiếu cho layer của hình chữ nhật NHỎ NHẤT
+    trong bán kính toi_da (ô lưới/ô sàn bao quanh móng luôn lớn hơn móng, chữ tên thường nằm trong ô đó).
+    Bỏ hình quá nhỏ/quá lớn (ô cọc bên trong, khung bản vẽ) và layer đã gán cột/dầm/sàn. Layer nhiều phiếu nhất thắng."""
     khong = {t for t, v in loai_layer.items() if v in ("cot", "dam", "san", "khung_dam", "o_dam", "coc")}
     ung = [(t, g) for t, g in ds_hinh if t not in khong and dien_tich[0] <= g.area <= dien_tich[1] and _hinh_chu_nhat(g)[2] >= 0.95]
     phieu = Counter()
     for c, _ in chu_mong:
         tot = None
         for t, g in ung:
-            d = g.distance(c.diem)
-            if d <= toi_da and (tot is None or d < tot[0]):
-                tot = (d, t)
+            if g.distance(c.diem) <= toi_da and (tot is None or g.area < tot[0]):
+                tot = (g.area, t)
         if tot:
             phieu[tot[1]] += 1
     return phieu.most_common(1)[0][0] if phieu else None
@@ -648,6 +648,9 @@ def _nhan_mong(ban_ve, trong, loai_layer, cao_chu, va_cham, them, canh_bao, toi_
             continue
         ung_vien.sort(key=lambda u: (u[0], u[1]))
         _, _, g, a, b = ung_vien[0]
+        for u in ung_vien:  # hình lồng nhau cùng layer (móng 600x600 có ô 300x300 bên trong): lấy hình ngoài cùng
+            if u[0] == ung_vien[0][0] and u[2].area > g.area and u[2].contains(g.centroid):
+                _, _, g, a, b = u
         x0, y0, x1, y1 = g.bounds
         khoa = (ten, round((x0 + x1) / 2, 2), round((y0 + y1) / 2, 2))
         if khoa in da_dat:
