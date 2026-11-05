@@ -1,7 +1,7 @@
 // Xem 3D kết cấu: dựng khối (extrude) từ kết quả /api/tinh. Mặt bằng X,Y (m) -> three: x = X, z = -Y, cao = y.
 (function () {
-  const MAU3D = {cot: 0xe0584f, dam: 0xe0a93a, san: 0x6fa8dc, mong: 0x8d8d8d, vach: 0x9b6fd1};
-  const TEN3D = {cot: "Cột", dam: "Dầm", san: "Sàn", mong: "Móng", vach: "Vách/lõi"};
+  const MAU3D = {cot: 0xe0584f, dam: 0xe0a93a, san: 0x6fa8dc, mong: 0x8d8d8d, vach: 0x9b6fd1, ong_gio: 0x35c2c9};
+  const TEN3D = {cot: "Cột", dam: "Dầm", san: "Sàn", mong: "Móng", vach: "Vách/lõi", ong_gio: "Ống gió"};
   let dang = null;
 
   function khoiDoc(ck, H) {
@@ -28,10 +28,10 @@
   }
 
   function dung(THREE, scene, d, loc) {
-    const H = parseFloat(d.thong_so.chieu_cao_tang) || 3.6;
+    const H = parseFloat((d.thong_so || {}).chieu_cao_tang) || 3.6;
     const nhom = new THREE.Group();
     const dem = {};
-    d.cau_kien.forEach(ck => {
+    (d.cau_kien || []).forEach(ck => {
       const dz = khoiDoc(ck, H);
       if (!dz) return;
       const loai = ck.loai_bo ? "loai_bo" : ck.loai;
@@ -57,6 +57,26 @@
       });
       dem[ck.loai] = (dem[ck.loai] || 0) + 1;
     });
+    // Ống gió: mỗi đoạn MLINE thành hộp chữ nhật dọc theo đường tim; đỉnh ống cách đáy sàn 0,2 m (ước lượng)
+    (d.ong_gio || []).forEach(o => {
+      const y0 = H - 0.2 - o.cao;
+      for (let i = 0; i + 1 < o.diem.length; i++) {
+        const a = o.diem[i], b = o.diem[i + 1], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy);
+        if (L < 1e-6) continue;
+        const geo = new THREE.BoxGeometry(L, o.cao, o.rong);
+        const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color: MAU3D.ong_gio, transparent: true, opacity: 0.85}));
+        mesh.position.set((a[0] + b[0]) / 2, y0 + o.cao / 2, -(a[1] + b[1]) / 2);
+        mesh.rotation.y = Math.atan2(dy, dx);
+        mesh.userData = {ten: `${(o.rong * 1000).toFixed(0)}x${(o.cao * 1000).toFixed(0)}`, loai: "ong_gio", dz: [y0, y0 + o.cao]};
+        mesh.visible = !!loc.ong_gio;
+        nhom.add(mesh);
+        const vien = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({color: 0x000000, transparent: true, opacity: 0.35}));
+        vien.position.copy(mesh.position); vien.rotation.copy(mesh.rotation); vien.visible = mesh.visible;
+        mesh.userData.vien = vien;
+        nhom.add(vien);
+      }
+      dem.ong_gio = (dem.ong_gio || 0) + Math.max(o.diem.length - 1, 0);
+    });
     return {nhom, dem, H};
   }
 
@@ -66,7 +86,7 @@
       return;
     }
     if (dang) dang.dong();
-    const loc = {cot: true, dam: true, san: true, mong: true, vach: true, canhBao: false};
+    const loc = {cot: true, dam: true, san: true, mong: true, vach: true, ong_gio: true, canhBao: false};
     const lop = document.createElement("div");
     lop.style.cssText = "position:fixed;inset:0;z-index:9999;background:#1b1d22;display:flex;flex-direction:column";
     lop.innerHTML = `<div style="display:flex;gap:14px;align-items:center;padding:8px 12px;background:#26292f;color:#eee;font:13px Roboto,sans-serif;flex-wrap:wrap">
@@ -119,7 +139,7 @@
       scene.remove(kq.nhom); kq.nhom.traverse(o => { if (o.geometry) o.geometry.dispose(); });
       kq = dung(THREE, scene, d, loc); scene.add(kq.nhom); hienLai();
     };
-    lop.querySelector("#x3-tt").textContent = `Cao tầng ${kq.H} m · ${d.cau_kien.filter(c => c.loai_bo).length} cấu kiện bị loại (xám mờ)`;
+    lop.querySelector("#x3-tt").textContent = `Cao tầng ${kq.H} m · ${(d.cau_kien || []).filter(c => c.loai_bo).length} cấu kiện bị loại (xám mờ)`;
 
     // rê chuột: hiện tên cấu kiện
     const tip = document.createElement("div");

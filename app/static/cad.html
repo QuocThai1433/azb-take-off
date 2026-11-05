@@ -2267,7 +2267,12 @@ $("t-3d").onclick = async () => {
         if (l && (x.hanh_dong === "tu_dien" || (x.hanh_dong === "xac_nhan" && x.tin_cay >= 0.8)) && x.loai && KET_CAU.includes(x.loai) && l.loai !== x.loai) { l.loai = x.loai; n++; } });
       if (n) { ve_layer(); lenh(`Tự gán ${n} layer kết cấu theo đề xuất, đang dựng 3D ...`); d = await json("/api/tinh", yeuCauKL()); }
     }
-    if (!d.cau_kien.length) return lenh("Chưa có cấu kiện kết cấu: gán layer cột/dầm/sàn/móng ở cột trái rồi thử lại.", "loi");
+    let og = [];
+    if (Object.values(loaiLayer(f)).includes("ong_gio")) {
+      try { og = (await json("/api/ong-gio", yeuCauKL())).hinh_3d || []; } catch (e) { if (!d.cau_kien.length) throw e; }
+    }
+    if (!d.cau_kien.length && !og.length) return lenh("Chưa có cấu kiện để dựng 3D: gán layer cột/dầm/sàn/móng hoặc Ống gió ở cột trái rồi thử lại.", "loi");
+    d.ong_gio = og;
     window.xem3D(d); } catch (e) { lenh(e.message, "loi"); }
 };
 $("t-tk-xlsx").onclick = async () => {

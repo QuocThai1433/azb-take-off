@@ -154,6 +154,7 @@ def boc_ong_gio(ban_ve, loai_layer):
     nhan = _nhan_kich_thuoc(ban_ve.doc, he_so)
 
     run = defaultdict(lambda: {"mat_bang": 0.0, "so_doan": 0, "diem": []})
+    duong_3d = []  # (w_mm, [(x, y) m]) để dựng 3D
     phu_kien = defaultdict(int)
     thiet_bi = defaultdict(int)
     so_mline = 0
@@ -169,6 +170,7 @@ def boc_ong_gio(ban_ve, loai_layer):
             if e.is_closed:
                 pts.append(pts[0])
             dai = LineString(pts).length
+            duong_3d.append((round(e.dxf.scale_factor * he_so * 1000, 3), pts))
             w_mm = round(e.dxf.scale_factor * he_so * 1000, 3)
             r = run[w_mm]
             r["mat_bang"] += dai
@@ -184,9 +186,11 @@ def boc_ong_gio(ban_ve, loai_layer):
         canh_bao.append("Layer đã chọn không có MLINE hay block nào. Ống gió vẽ bằng LINE/POLYLINE chưa được hỗ trợ.")
 
     ong = []
+    cao_theo_rong = {}
     for w_mm, r in sorted(run.items(), reverse=True):
         diem = r["diem"][0]
         h_mm = _chon_kich_thuoc(w_mm, diem, nhan, canh_bao)
+        cao_theo_rong[w_mm] = h_mm
         day = day_ton(max(w_mm, h_mm), bang)
         chu_vi = _chu_vi_vuong(w_mm, h_mm)
         dai = _lam_tron(r["mat_bang"], so_le_dai)
@@ -219,6 +223,8 @@ def boc_ong_gio(ban_ve, loai_layer):
     return {
         "ten_file": ban_ve.ten_file, "don_vi": ban_ve.don_vi, "layers": sorted(layers), "canh_bao": canh_bao,
         "ong_thang": ong, "phu_kien": pk,
+        "hinh_3d": [{"rong": w / 1000, "cao": cao_theo_rong.get(w, w) / 1000, "diem": [[round(x, 3), round(y, 3)] for x, y in pts]}
+                    for w, pts in duong_3d],
         "thiet_bi": [{"block": k, "so_luong": v} for k, v in sorted(thiet_bi.items())],
         "tong_hop": tong_hop,
         "tong": {
