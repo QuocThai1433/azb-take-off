@@ -1787,10 +1787,16 @@ async function goiGanNhan(f, phong) {
   try {
     const kq = await json("/api/gan-nhan", yeuCauGN(f, p));
     p.kq = kq; p.tc.ty_le = kq.ty_le; p.tc.tang = kq.tang; p.tc.tien_to = kq.tien_to;
-    veNhanLenHinh(f); veGN(); chonTab("gn"); if (phong) zoomKhung(p.khung);
+    veNhanLenHinh(f); veGN(); chonTab("gn"); if (phong) zoomKhung(p.khung); else if (kq.nhan.length) zoomNhan(0);
     lenh(`Vùng ${S.gn.sel + 1} (${LOAI_GN[p.tc.loai]}): ${kq.nhan.length} nhãn (tỷ lệ 1/${kq.ty_le}, chữ cao ${so(kq.cao_chu * 1000, 0)} mm).`, "ok");
     kq.canh_bao.forEach(w => lenh(w));
   } catch (e) { lenh(e.message, "loi"); }
+}
+function zoomNhan(i) {  // đưa khung nhìn tới nhãn thứ i (zoom đủ gần để đọc được chữ)
+  const ds = (S.gn ? S.gn.ds : []).filter(q => q.kq).flatMap(q => q.kq.nhan); if (!ds.length) return;
+  S.gnI = ((i % ds.length) + ds.length) % ds.length; const n = ds[S.gnI];
+  S.v = {cx:n.x, cy:n.y, s:Math.max(40, 14 / (n.cao || 0.45))}; veLai();
+  lenh(`Nhãn ${S.gnI + 1}/${ds.length}: "${n.t}" (chữ tím hồng ở giữa khung xem).`, "ok");
 }
 function zoomKhung(k) {
   const w = Math.abs(k[2] - k[0]) || 1, h = Math.abs(k[3] - k[1]) || 1;
@@ -1825,7 +1831,7 @@ function veGN() {
     <div style="margin-bottom:6px">${S.gn.ds.map(chip).join("")}<span class="chip" data-mb="them" title="Kéo khung chọn vùng tiếp theo">+ Chọn thêm vùng</span></div>
     <div style="margin:8px 0"><b>Vùng ${S.gn.sel + 1} là:</b><div style="margin-top:4px">${radio}</div>
       ${tc.loai === "dam" ? `<label style="display:block;margin-top:4px"><input type="checkbox" id="gn-ct" ${tc.nhan_truc ? "checked" : ""}> Dán thêm tên trục</label>` : ""}</div>
-    <div style="margin:8px 0;display:flex;gap:6px;flex-wrap:wrap"><button id="gn-lai" class="on" ${tc.loai ? "" : "disabled"}>${kq ? "Dán nhãn lại" : "Dán nhãn"} vùng này${tc.loai ? " (" + LOAI_GN[tc.loai].toLowerCase() + ")" : ""}</button><button id="gn-xoa1">Bỏ vùng này</button><button id="gn-xoa">Xóa hết nhãn</button><button id="gn-dxf" ${xong ? "" : "disabled"}>Xuất DXF có nhãn (${xong} vùng)</button></div>
+    <div style="margin:8px 0;display:flex;gap:6px;flex-wrap:wrap"><button id="gn-lai" class="on" ${tc.loai ? "" : "disabled"}>${kq ? "Dán nhãn lại" : "Dán nhãn"} vùng này${tc.loai ? " (" + LOAI_GN[tc.loai].toLowerCase() + ")" : ""}</button><button id="gn-xem" ${kq && kq.nhan.length ? "" : "disabled"}>Xem nhãn (nhãn kế tiếp)</button><button id="gn-xoa1">Bỏ vùng này</button><button id="gn-xoa">Xóa hết nhãn</button><button id="gn-dxf" ${xong ? "" : "disabled"}>Xuất DXF có nhãn (${xong} vùng)</button></div>
     ${tc.loai ? "" : '<div class="nho chua">Chọn loại của vùng (Móng / Cột / Dầm / Sàn) rồi bấm Dán nhãn.</div>'}
     ${kq ? `<div class="nho">Tỷ lệ <b>1/${kq.ty_le}</b> (${esc(kq.nguon_ty_le)}) → chữ cao <b>${so(kq.cao_chu * 1000, 0)} mm</b> trong bản vẽ = ${CHU_MM} mm trên giấy. ${kq.nhan.length} nhãn.</div>
     <div style="display:flex;flex-wrap:wrap;gap:6px 12px;margin:8px 0;align-items:center">
@@ -1849,6 +1855,7 @@ $("p-gn").addEventListener("click", async e => {
   if (e.target.name === "gn-loai") { const q = mbHienTai(), cu = q.tc.loai; docOGN(); if (q.tc.loai !== cu) { q.kq = null; veNhanLenHinh(f); } veGN(); veLai(); }
   else if (e.target.id === "gn-ct") { docOGN(); }
   else if (e.target.id === "gn-lai") { docOGN(); await goiGanNhan(f, false); }
+  else if (e.target.id === "gn-xem") zoomNhan((S.gnI ?? -1) + 1);
   else if (e.target.id === "gn-xoa1") { S.gn.ds.splice(S.gn.sel, 1); S.gn.sel = Math.max(0, S.gn.ds.length - 1); veNhanLenHinh(f); veGN(); veLai(); }
   else if (e.target.id === "gn-xoa") xoaNhan(true);
   else if (e.target.id === "gn-dxf") $("t-gn-dxf").click();
