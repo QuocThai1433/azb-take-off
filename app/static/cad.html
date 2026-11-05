@@ -1044,7 +1044,11 @@ function capNhatHover(m) {
     const kh = traCC(o);
     tip.innerHTML = `<b>${esc(o.ten)}</b> · ${esc(t.nguon)}<br>` + (o.k === "hinh" ? `S = ${so(t.a, 3)} m² · P = ${so(t.c, 2)} m` : `Dài = ${so(t.c, 2)} m`)
       + (kh ? `<br>Ký hiệu: <b style="color:#4cc38a">${esc(kh.ky_hieu || "(chưa có ký hiệu)")}</b> · ${esc(LOAI_CC[kh.loai] || kh.loai)}` : "");
-    tip.hidden = false; tip.style.left = Math.min(m.x + 14, W - 200) + "px"; tip.style.top = (m.y + 16) + "px";
+    tip.hidden = false;
+    // Đo chiều rộng/cao thật của tooltip (đã có nội dung) để không bị tràn mép khung
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    let x = m.x + 14; if (x + tw > W) x = m.x - tw - 14; x = Math.max(0, Math.min(x, W - tw));
+    tip.style.left = x + "px"; tip.style.top = Math.max(0, Math.min(m.y + 16, H - th)) + "px";
   } else tip.hidden = true;
   if (!cu !== !o || (cu && o && !trung(cu, o))) veLai();
 }
