@@ -433,9 +433,7 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
 
     # ----- Cọc -----
     if tc.get("nhan_coc", True):
-        n_coc = _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao)
-        if not n_coc and any(RE_TEN_COC.match(_nfc(c.noi_dung)) for c in _tat_ca_chu(trong)):
-            canh_bao.append("Có chữ tên cọc (P1...) nhưng không tìm thấy hình tròn của cọc gần đó.")
+        _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao)  # tự báo lý do khi không dán được cọc nào
 
     # ----- Trục -----
     bong = []
@@ -735,29 +733,27 @@ def _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao, toi_da=0.8):
             d = max(x1 - x0, y1 - y0)
             if 0.05 <= d <= 3.0 and g.area / (math.pi * (d / 2) ** 2) >= 0.9:
                 tron.append((g, d))
-    da_dat, so = set(), 0
-    for c in _tat_ca_chu(trong):
+    ten_coc = [c for c in _tat_ca_chu(trong) if RE_TEN_COC.match(_nfc(c.noi_dung))]
+    da_dat, so, lech_dk = set(), 0, []
+    for c in ten_coc:
         m = RE_TEN_COC.match(_nfc(c.noi_dung))
-        if not m:
-            continue
         ten = f"P{m.group(1).upper()}"
-        uv = []
-        for g, d in tron:
-            kc = g.distance(c.diem)
-            if kc > toi_da:
-                continue
-            if dk_bang and abs(d * 1000 - dk_bang) > 0.05 * dk_bang:
-                continue
-            uv.append((kc, g, d))
-        if not uv:
+        gan = [(g.distance(c.diem), g, d) for g, d in tron if g.distance(c.diem) <= toi_da]
+        if not gan:
             continue
+        # Đúng đường kính trong bảng thống kê trước; nếu không khớp cái nào thì vẫn dán theo hình vẽ và báo lại.
+        uv = [u for u in gan if not dk_bang or abs(u[2] * 1000 - dk_bang) <= 0.05 * dk_bang]
+        if not uv:
+            uv = gan
+            lech_dk.append(_lam_tron_mm(min(u[2] for u in gan)))
         kc, g, d = min(uv, key=lambda u: u[0])
         x0, y0, x1, y1 = g.bounds
         khoa = (ten, round((x0 + x1) / 2, 2), round((y0 + y1) / 2, 2))
         if khoa in da_dat:
             continue
         da_dat.add(khoa)
-        dk = dk_bang or _lam_tron_mm(d)
+        dung_bang = bool(dk_bang) and abs(d * 1000 - dk_bang) <= 0.05 * dk_bang
+        dk = dk_bang if dung_bang else _lam_tron_mm(d)
         chu = f"{ten} D{dk}" + (f" L={dai_bang:g}m" if dai_bang else "")
         khe, cy, cx = KHE_NHAN * cao_chu, (y0 + y1) / 2, (x0 + x1) / 2
         dat = False
@@ -773,6 +769,20 @@ def _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao, toi_da=0.8):
         canh_bao.append("Cọc: không đọc được đường kính từ bảng thống kê cọc, nhãn dùng số đo từ hình vẽ.")
     if so and not dai_bang:
         canh_bao.append("Cọc: không đọc được chiều dài cọc từ bảng thống kê, nhãn không ghi L.")
+    if lech_dk:
+        canh_bao.append(f"Cọc: hình tròn đo được D{sorted(set(lech_dk))} không khớp đường kính bảng thống kê D{dk_bang}. "
+                        "Nhãn ghi theo hình vẽ, Sếp kiểm tra lại.")
+    if not so:  # báo lý do thay vì trả 0 nhãn im lặng
+        so_tron = len(tron)
+        if ten_coc and not so_tron:
+            canh_bao.append(f"Cọc: có {len(ten_coc)} chữ tên cọc (P1...) nhưng không thấy hình tròn cọc trong vùng. "
+                            "Kiểm tra layer chứa hình cọc (tròn kín, đường kính 0,05-3 m).")
+        elif ten_coc:
+            canh_bao.append(f"Cọc: có {len(ten_coc)} chữ tên cọc nhưng không có hình tròn cọc nào nằm trong {toi_da} m quanh chữ.")
+        elif so_tron:
+            canh_bao.append(f"Cọc: thấy {so_tron} hình tròn cọc nhưng không có chữ tên cọc (P1...) trong vùng, nên không dán nhãn cọc.")
+        else:
+            canh_bao.append("Cọc: không thấy hình tròn cọc cũng không thấy chữ tên cọc (P1...) trong vùng.")
     return so
 
 

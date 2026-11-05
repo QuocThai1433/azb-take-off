@@ -169,6 +169,52 @@ def test_nhan_mong_lay_kich_thuoc_tu_bang_thong_ke(tmp_path):
     assert [n["t"] for n in mong] == ["F1 800x800x700", "F1 800x800x700"]
 
 
+def _tao_coc(tmp_path, ten_cac, dk_mm, dk_bang=None):
+    """Mặt bằng cọc: 4 hình tròn, chữ tên cạnh mỗi cọc (ten_cac), bảng thống kê ghi đường kính dk_bang."""
+    doc = ezdxf.new("R2010")
+    doc.header["$INSUNITS"] = 4
+    for l in ("COC", "CHU"):
+        doc.layers.add(l)
+    msp = doc.modelspace()
+    pos = [(10500, 20500), (13500, 20500), (10500, 23500), (13500, 23500)]
+    for i, (x, y) in enumerate(pos, 1):
+        if dk_mm:
+            msp.add_circle((x, y), dk_mm / 2, dxfattribs={"layer": "COC"})
+        if ten_cac:
+            msp.add_text(f"P{i}", dxfattribs={"layer": "CHU", "height": 150, "insert": (x + 250, y)})
+    if dk_bang:
+        msp.add_text("ĐƯỜNG KÍNH CỌC", dxfattribs={"layer": "CHU", "height": 125, "insert": (17000, 19500)})
+        msp.add_text(str(dk_bang), dxfattribs={"layer": "CHU", "height": 125, "insert": (19000, 19500)})
+    f = tmp_path / "coc.dxf"
+    doc.saveas(f)
+    return doc_ban_ve(f)
+
+
+COC_CHON = {"nhan_dam": False, "nhan_truc": False, "nhan_mong": False, "nhan_coc": True, "nhan_san": False}
+
+
+def test_coc_dan_nhan_dung_duong_kinh_bang(tmp_path):
+    kq = gan_nhan(_tao_coc(tmp_path, True, 300, dk_bang=300), LOAI, VUNG, COC_CHON)
+    assert sorted(n["t"] for n in kq["nhan"]) == ["P1 D300", "P2 D300", "P3 D300", "P4 D300"]
+    assert not any("không khớp" in c or "không thấy" in c or "không đọc được đường kính" in c for c in kq["canh_bao"])
+
+
+def test_coc_khong_co_chu_ten_thi_bao_ly_do(tmp_path):
+    kq = gan_nhan(_tao_coc(tmp_path, False, 300, dk_bang=300), LOAI, VUNG, COC_CHON)
+    assert kq["nhan"] == [] and any("không thấy chữ tên cọc" in c or "chữ tên cọc" in c for c in kq["canh_bao"])
+
+
+def test_coc_duong_kinh_khong_khop_bang_van_dan_va_bao(tmp_path):
+    kq = gan_nhan(_tao_coc(tmp_path, True, 400, dk_bang=300), LOAI, VUNG, COC_CHON)
+    assert len(kq["nhan"]) == 4 and all(n["t"].startswith("P") and "D400" in n["t"] for n in kq["nhan"])
+    assert any("không khớp đường kính bảng" in c for c in kq["canh_bao"])
+
+
+def test_coc_khong_co_hinh_tron_thi_bao(tmp_path):
+    kq = gan_nhan(_tao_coc(tmp_path, True, None), LOAI, VUNG, COC_CHON)
+    assert kq["nhan"] == [] and any("không thấy hình tròn cọc" in c for c in kq["canh_bao"])
+
+
 def test_chi_dan_dung_loai_da_chon(tmp_path):
     """Nhân sự chọn loại nào thì chỉ dán loại đó (không tự dán dầm, trục, móng... khi chưa được lệnh)."""
     tat = {"nhan_dam": False, "nhan_truc": False, "nhan_cot": False, "nhan_mong": False, "nhan_coc": False, "nhan_san": False}
