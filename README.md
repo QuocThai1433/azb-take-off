@@ -118,6 +118,15 @@ Khác với dòng *"cốt thép ước tính theo hàm lượng"* ở các công
 - **Sửa tay** ô đọc sai, bỏ tick dòng không tính, xuất Excel (mỗi con số là công thức, có sheet tổng hợp theo Ø).
 - **Giới hạn:** các bản vẽ mẫu hiện có không chứa bảng thép nên bộ đọc mới được thử trên bảng dựng theo các cách trình bày thường gặp, chưa trên bảng thật của đơn vị thiết kế nào. Bảng CAD vẽ bằng chữ lệch cột sẽ đọc sai: luôn xem lại các dòng đã đọc.
 
+## 3g. Xem 3D (nút "Xem 3D" ở thanh công cụ)
+
+Dựng khung kết cấu 3D từ bản vẽ đang mở để kiểm tra nhanh. Bấm nút **❔ Hướng dẫn** (hoặc phím `?`) trong màn hình 3D để xem hướng dẫn đầy đủ.
+
+- **Điều hướng:** chuột trái xoay, chuột phải dịch, lăn để zoom. Phím `1` góc 3D, `2` trên, `3` trước, `4` phải, `F` vừa khung.
+- **Chọn / ẩn / cô lập:** bấm một khối để xem tên, layer, kích thước, thể tích, cảnh báo. `H` ẩn, `I` chỉ hiện khối đó, `A` hiện lại tất cả. Nhấp đúp để bay tới.
+- **Khoét lỗ dầm cho ống gió (tự động):** nếu có layer Ống gió, app khoét lỗ thật trên dầm tại chỗ ống đi xuyên, đánh giá từng lỗ (đạt / lỗ lớn > 1/3 chiều cao dầm / lẹm mép / cắt đứt dầm), báo va chạm ống với cột và vách, và xuất danh sách lỗ ra CSV. Chỉnh được cao độ đỉnh ống và khe hở quanh ống. Ngưỡng chỉ để tham khảo, kỹ sư kết cấu quyết định.
+- **Mặt cắt** (`C`) theo cao độ, **xuyên thấu** (`X`), **đo khoảng cách** (`M`), **chụp ảnh PNG**, **tự xoay** (`R`).
+
 ## 4. Bản vẽ cần như thế nào để bóc chính xác
 
 | Yêu cầu | Lý do |
