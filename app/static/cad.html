@@ -429,7 +429,7 @@
       <div class="hang"><select id="lay-loc" style="flex:1"><option value="tat_ca">Tất cả layer</option><option value="chua">Chưa gán (Bỏ qua)</option><option value="da">Đã gán</option><option value="hinh">Có hình kín</option><option value="chu">Có chữ</option></select>
         <select id="lay-sx" style="flex:1"><option value="sl">Nhiều hình nhất trước</option><option value="ten">Theo tên A-Z</option></select></div>
       <div class="hang"><button id="lay-hoi" title="Bật rồi bấm vào một hình trên bản vẽ: danh sách sẽ nhảy tới layer của hình đó (kể cả layer đang khóa) để Sếp biết nó là gì và gán loại ngay">🎯 Hình này thuộc layer nào?</button>
-        <button id="lay-het" title="Bật lại mọi layer (sau khi dùng nút ◎ chỉ hiện một layer)">Hiện tất cả</button></div>
+        <button id="lay-het" title="Bật mọi layer; bấm lần nữa khi đã hiện hết thì tắt mọi layer">Hiện tất cả</button></div>
       <div class="dem" id="lay-dem"></div>
     </div>
     <div id="ds-layer"></div>
@@ -763,7 +763,15 @@ $("ds-layer").addEventListener("click", e => {
 $("lay-q").addEventListener("input", e => { LAY.q = e.target.value; ve_layer(true); });
 $("lay-loc").addEventListener("change", e => { LAY.loc = e.target.value; ve_layer(true); });
 $("lay-sx").addEventListener("change", e => { LAY.sx = e.target.value; ve_layer(true); });
-$("lay-het").addEventListener("click", () => { const f = F(); if (!f) return; f.layers.forEach(l => l.hien = !(/^defpoints$/i.test(l.ten))); ve_layer(true); veLai(); lenh("Đã hiện tất cả layer (trừ Defpoints).", "ok"); });
+$("lay-het").addEventListener("click", () => {
+  const f = F(); if (!f) return;
+  const dp = l => /^defpoints$/i.test(l.ten);
+  const dangHetHet = f.layers.filter(l => !dp(l)).every(l => l.hien);   // đã hiện hết → bấm lần nữa sẽ tắt hết
+  f.layers.forEach(l => l.hien = dangHetHet ? false : !dp(l));
+  $("lay-het").textContent = dangHetHet ? "Hiện tất cả" : "Tắt tất cả";
+  ve_layer(true); veLai();
+  lenh(dangHetHet ? "Đã tắt tất cả layer. Bấm \"Hiện tất cả\" để bật lại." : "Đã hiện tất cả layer (trừ Defpoints). Bấm lần nữa để tắt hết.", "ok");
+});
 $("lay-hoi").addEventListener("click", () => {
   LAY.hoi = !LAY.hoi; ve_layer(true);
   lenh(LAY.hoi ? "Bấm vào một hình trên bản vẽ để biết nó thuộc layer nào." : "Đã tắt chế độ hỏi layer.");
