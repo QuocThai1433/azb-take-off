@@ -1,0 +1,21 @@
+# HỆ THỐNG MEP HIỂN THỊ TRONG XEM 3D (ngoài ống gió, ống gió có cấu hình riêng ở ong_gio.yaml)
+# Mỗi loại: hình = tron (ống tròn, đường kính d_mm) hoặc chu_nhat (rong_mm x cao_mm).
+# nhat_xuong = đỉnh ống thấp hơn đỉnh sàn bao nhiêu mét (mặc định, sửa được trong màn hình 3D).
+# Kích thước thật nên ghi trong TÊN LAYER, ví dụ "P-WATER-D100", "PCCC DN65", "KHAY CAP 400x100".
+# Layer không ghi kích thước thì dùng mặc định bên dưới.
+ong_nuoc:
+  ten: Ống cấp thoát nước
+  hinh: tron
+  d_mm: 100
+  nhat_xuong: 0.30
+ong_pccc:
+  ten: Ống PCCC
+  hinh: tron
+  d_mm: 100
+  nhat_xuong: 0.30
+khay_cap:
+  ten: Khay / máng cáp
+  hinh: chu_nhat
+  rong_mm: 300
+  cao_mm: 100
+  nhat_xuong: 0.45

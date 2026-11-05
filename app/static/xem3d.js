@@ -9,14 +9,25 @@
     mong:   {ten: "Móng",     mau: 0x9aa3ad},
     vach:   {ten: "Vách/lõi", mau: 0xa982e0},
     ong_gio:{ten: "Ống gió",  mau: 0x2fd0c8},
+    ong_nuoc:{ten: "Ống nước", mau: 0x3d8bff},
+    ong_pccc:{ten: "Ống PCCC", mau: 0xd946a8},
+    khay_cap:{ten: "Khay cáp",  mau: 0xc9a46a},
   };
+  const MEPK = ["ong_gio", "ong_nuoc", "ong_pccc", "khay_cap"];
+  const NHAT_XUONG = {ong_gio: 0.2, ong_nuoc: 0.3, ong_pccc: 0.3, khay_cap: 0.45};   // đỉnh ống thấp hơn đỉnh sàn (m), mặc định
+  const CAT_DUOC = ["dam", "san", "vach"];                                           // cấu kiện có thể khoét lỗ
   const BE_TONG = ["cot", "dam", "san", "mong", "vach"];
   const MAU_HEX = k => "#" + LOAI[k].mau.toString(16).padStart(6, "0");
   const TRANG_THAI = {
     ok:   {ten: "Đạt",              mau: 0x3ecf8e, css: "#3ecf8e"},
-    lon:  {ten: "Lỗ lớn > 1/3 h",   mau: 0xffb020, css: "#ffb020"},
-    mep:  {ten: "Lẹm mép dầm",      mau: 0xff7a45, css: "#ff7a45"},
-    dut:  {ten: "Cắt đứt dầm",      mau: 0xff4d4f, css: "#ff4d4f"},
+    lon:  {ten: "Lỗ lớn",           mau: 0xffb020, css: "#ffb020"},
+    mep:  {ten: "Lẹm mép",          mau: 0xff7a45, css: "#ff7a45"},
+    dut:  {ten: "Cắt đứt",          mau: 0xff4d4f, css: "#ff4d4f"},
+  };
+  const TEN_TT = {   // tên đánh giá theo loại cấu kiện bị khoét
+    dam:  {ok: "Đạt", lon: "Lỗ lớn > 1/3 h", mep: "Lẹm mép dầm", dut: "Cắt đứt dầm"},
+    san:  {ok: "Đạt", lon: "Lỗ > 300 mm", mep: "Lỗ > 300 mm", dut: "Lỗ / rãnh > 600 mm"},
+    vach: {ok: "Đạt", lon: "Lỗ > 300 mm", mep: "Lẹm mép vách", dut: "Cắt đứt vách"},
   };
   let dang = null;
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
@@ -65,6 +76,17 @@
     return {parts, trong: rest};
   }
 
+  // đa giác (gần như) lồi: dầm, vách dạng dải, mảng sàn chữ nhật. Chỉ loại này mới tách khối an toàn bằng cắt nửa mặt phẳng.
+  function loiXuyen(P) {
+    if (P.length < 3) return false;
+    const pts = P.map(p => [p[0], p[1]]).sort((a, b) => a[0] - b[0] || a[1] - b[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const lo = [], up = [];
+    pts.forEach(p => { while (lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); });
+    for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length > 1 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+    const hull = lo.slice(0, -1).concat(up.slice(0, -1));
+    return hull.length >= 3 && dtRing(P) >= 0.985 * dtRing(hull);
+  }
+
   // ---------- chiều đứng từng loại ----------
   function khoiDoc(ck, H) {
     const ts = ck.thong_so || {};
@@ -87,17 +109,25 @@
       return;
     }
     if (dang) dang.dong();
-    const ongGio = d.ong_gio || [];
-    const coOng = ongGio.some(o => o.diem && o.diem.length > 1);
+    const nguonOng = [];
+    (d.ong_gio || []).forEach((o, i) => (o.diem || []).length > 1 && nguonOng.push({loai: "ong_gio", tron: false, rong: o.rong, cao: o.cao, diem: o.diem, key: "g" + i}));
+    (d.mep || []).forEach((o, i) => (o.diem || []).length > 1 && LOAI[o.loai] && nguonOng.push({loai: o.loai, tron: !!o.tron, rong: o.rong, cao: o.cao, diem: o.diem, key: "m" + i, layer: o.layer}));
+    const coOng = nguonOng.length > 0;
+    const macDinh = d.mep_mac_dinh || {};
     const H = parseFloat((d.thong_so || {}).chieu_cao_tang) || 3.6;
     const st = {
-      loc: {cot: true, dam: true, san: true, mong: true, vach: true, ong_gio: true},
-      xray: false, bong: true, luoi: true, xoay: false, canhBao: false,
-      khoet: true, offset: 0.2, hoMm: 25,
+      loc: {cot: true, dam: true, san: true, mong: true, vach: true, ong_gio: true, ong_nuoc: true, ong_pccc: true, khay_cap: true},
+      xray: false, bong: true, luoi: true, xoay: false, canhBao: false, ten: false,
+      khoet: true, hoMm: 25, tt: 2.4, mep: {},
       cat: false, catY: 0, an: new Set(), co: null, chon: null, ruoi: null, cc: null,
       pn: innerWidth > 900, dem: [],
     };
-    let objs = new Map(), holes = [], vaCham = [], nhomMain = null, nhomHo = null, tong = {};
+    let objs = new Map(), holes = [], vaCham = [], vaMep = [], khongKhoet = [], thongThuy = null, nhomMain = null, nhomHo = null, tong = {};
+    MEPK.forEach(k => {   // mặc định cao độ + kích thước theo từng hệ thống
+      const x = nguonOng.find(o => o.loai === k); if (!x) return;
+      const md = macDinh[k] || {};
+      st.mep[k] = {off: md.nhat_xuong != null ? md.nhat_xuong : NHAT_XUONG[k], kt: null, kt0: [Math.round(x.rong * 1000), Math.round(x.cao * 1000)], tron: x.tron};
+    });
     let hop = null, tam = null, bk = 10;
 
     // ---------- giao diện ----------
@@ -122,6 +152,12 @@
       .x3-cv canvas{display:block;outline:0}
       .x3-bar{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:6px;padding:6px;background:rgba(14,20,33,.86);border:1px solid #26334f;border-radius:12px;backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:calc(100% - 20px);flex-wrap:wrap;justify-content:center}
       .x3-bar .sep{width:1px;background:#2a3957;margin:2px 3px}
+      .x3-nh{position:absolute;pointer-events:none;font-size:10.5px;font-weight:600;color:#fff;background:rgba(8,12,20,.72);border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:0 5px;transform:translate(-50%,-100%);white-space:nowrap;z-index:2}
+      .x3-mp{display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--ln)}
+      .x3-mp:last-of-type{border-bottom:0}
+      .x3-mp .t{display:flex;align-items:center;gap:7px;font-weight:600}
+      .x3-mp .f{grid-column:1/3;display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:#8b97ad;font-size:12px}
+      .x3-mp input[type=number]{width:62px}
       .x3-tip{position:absolute;pointer-events:none;background:rgba(8,12,20,.92);border:1px solid #3a5078;border-radius:6px;padding:4px 9px;font-size:12px;display:none;white-space:nowrap;z-index:3}
       .x3-do{position:absolute;pointer-events:none;background:#f0b341;color:#1b1400;font-weight:600;font-size:12px;padding:2px 8px;border-radius:10px;transform:translate(-50%,-130%);white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.5)}
       .x3-pn{width:330px;flex:none;background:var(--pn);border-left:1px solid var(--ln);overflow:auto;display:flex;flex-direction:column}
@@ -168,6 +204,7 @@
           <button id="x3-xr" title="Xuyên thấu: thấy xuyên qua mọi khối (phím X)">◫ Xuyên thấu</button>
           <button id="x3-ct" title="Mặt cắt ngang theo cao độ (phím C)">✂ Mặt cắt</button>
           <button id="x3-xoay" title="Tự xoay quanh mô hình (phím R)">⟳ Tự xoay</button>
+          <button id="x3-ten" title="Hiện tên cột, dầm, vách, sàn, móng trên mô hình (phím L)">🏷 Tên</button>
           <span class="sep"></span>
           <button id="x3-anh" title="Lưu ảnh PNG của khung nhìn hiện tại">📷 Chụp ảnh</button>
         </div>
@@ -206,23 +243,28 @@
     }
     function dung() {
       xoaMo();
-      objs = new Map(); holes = []; vaCham = []; tong = {};
+      objs = new Map(); holes = []; vaCham = []; vaMep = []; khongKhoet = []; tong = {};
       nhomMain = new THREE.Group(); nhomHo = new THREE.Group();
       const marg = Math.max(st.hoMm, 0) / 1000;
-      // 1) hộp ống gió
+      // 1) các đoạn ống (gió, nước, PCCC, khay cáp) với kích thước và cao độ đang chọn
       const ong = [];
-      ongGio.forEach((o, oi) => {
-        const n = (o.diem || []).length;
+      nguonOng.forEach(o0 => {
+        const cf = st.mep[o0.loai] || {};
+        const o = {loai: o0.loai, tron: o0.tron, rong: o0.rong, cao: o0.cao};
+        if (o0.loai !== "ong_gio" && cf.kt) { o.rong = cf.kt[0] / 1000; o.cao = cf.kt[1] / 1000; }
+        const off = cf.off != null ? cf.off : NHAT_XUONG[o0.loai], n = o0.diem.length;
         for (let i = 0; i + 1 < n; i++) {
-          const a = o.diem[i], b = o.diem[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 1e-6) continue;
-          const y0 = H - st.offset - o.cao, ext = o.rong / 2;
-          ong.push({o, oi, a, b, y0, y1: y0 + o.cao, e0: i > 0 ? ext : 0, e1: i + 2 < n ? ext : 0, id: `og${oi}_${i}`,
-            dai: daiOng(a, b, o.rong / 2 + marg, marg + (i > 0 ? ext : 0), marg + (i + 2 < n ? ext : 0)),
-            daiTrue: daiOng(a, b, o.rong / 2, 0, 0)});
+          const a = o0.diem[i], b = o0.diem[i + 1]; if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 1e-6) continue;
+          const y0 = H - off - o.cao, ext = o.tron ? 0 : o.rong / 2, e0 = i > 0 ? ext : 0, e1 = i + 2 < n ? ext : 0, w = o.rong / 2 + marg + ext;
+          ong.push({o, loai: o0.loai, run: o0.key, i, a, b, y0, y1: y0 + o.cao, e0, e1, id: `${o0.key}_${i}`, nut: i > 0,
+            bb: [Math.min(a[0], b[0]) - w, Math.min(a[1], b[1]) - w, Math.max(a[0], b[0]) + w, Math.max(a[1], b[1]) + w],
+            dai: daiOng(a, b, o.rong / 2 + marg, marg + e0, marg + e1), daiTrue: daiOng(a, b, o.rong / 2, 0, 0)});
         }
       });
-      // 2) cấu kiện bê tông
-      const dsCK = (d.cau_kien || []);
+      const giaoBB = (p, q) => p[0] <= q[2] && p[2] >= q[0] && p[1] <= q[3] && p[3] >= q[1];
+      const bbP = P => { let x0 = 1e18, y0 = 1e18, x1 = -1e18, y1 = -1e18; P.forEach(p => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }); return [x0, y0, x1, y1]; };
+      // 2) cấu kiện bê tông (dầm, sàn, vách được khoét lỗ cho ống đi xuyên)
+      const dsCK = d.cau_kien || [];
       dsCK.forEach(ck => {
         const dz = khoiDoc(ck, H); if (!dz) return;
         const loai = ck.loai, bo = !!ck.loai_bo;
@@ -236,75 +278,117 @@
         o.mat = mat;
         const khoiTho = (poly, y0, y1) => {
           let geo;
-          try { geo = new THREE.ExtrudeGeometry(poly.length > 1 || poly.holes ? hinhShape(THREE, poly) : new THREE.Shape(poly[0].map(p => new THREE.Vector2(p[0], p[1]))), {depth: Math.max(y1 - y0, 0.01), bevelEnabled: false}); }
+          try { geo = new THREE.ExtrudeGeometry(poly.length > 1 ? hinhShape(THREE, poly) : new THREE.Shape(poly[0].map(p => new THREE.Vector2(p[0], p[1]))), {depth: Math.max(y1 - y0, 0.01), bevelEnabled: false}); }
           catch (e) { return; }
           geo.rotateX(-Math.PI / 2); geo.translate(0, y0, 0);
           themMesh(o, geo, mat, loai !== "san" && !bo);
         };
+        const catDuoc = CAT_DUOC.includes(loai) && !bo && ong.length > 0;
+        let phucTap = false;
         ck.hinh.forEach(poly => {
-          // Dầm: khoét lỗ cho ống gió (chỉ khi dầm là một vòng liền, không có lỗ sẵn)
-          if (loai === "dam" && !bo && poly.length === 1 && ong.length) {
+          if (catDuoc && poly.length === 1 && loiXuyen(poly[0])) {
             let khoi = [{P: lamSach(poly[0]), y0: dz[0], y1: dz[1]}];
-            ong.forEach(s => {
+            for (const s of ong) {
+              if (khoi.length > 300) { khongKhoet.push(`${ck.ten} (quá nhiều lỗ, dừng khoét)`); break; }
               const moi = [];
               khoi.forEach(k => {
+                if (!giaoBB(bbP(k.P), s.bb)) { moi.push(k); return; }
                 const rs = tachKhoi(k.P, k.y0, k.y1, s.dai, s.y0 - marg, s.y1 + marg);
                 if (!rs) { moi.push(k); return; }
                 rs.parts.forEach(x => moi.push(x));
-                // ghi nhận lỗ (một lần cho mỗi khối giao nhau theo chiều đứng)
                 const yb = Math.max(s.y0 - marg, k.y0), yt = Math.min(s.y1 + marg, k.y1);
                 if (!holes.some(h => h.k === k && h.s === s)) {
                   const u = s.dai.ux, v = s.dai.uy, us = rs.trong.map(p => u * p[0] + v * p[1]);
                   const cx = rs.trong.reduce((t, p) => t + p[0], 0) / rs.trong.length, cy = rs.trong.reduce((t, p) => t + p[1], 0) / rs.trong.length;
-                  const hD = dz[1] - dz[0], hh = yt - yb;
-                  const bi = yb <= dz[0] + 1e-6, ti = yt >= dz[1] - 1e-6;
-                  const tt = (bi && ti) ? "dut" : (bi || ti) ? "mep" : hh > hD / 3 + 1e-6 ? "lon" : "ok";
-                  holes.push({k, s, o, ck, dam: ck.ten, rong: s.o.rong + 2 * marg, cao: hh, dai: Math.max(...us) - Math.min(...us), hD,
-                    yb, yt, cx, cy, tt, ang: Math.atan2(s.b[1] - s.a[1], s.b[0] - s.a[0]), id: ck.id});
+                  const hh = yt - yb, rongLo = s.o.rong + 2 * marg, dai = Math.max(...us) - Math.min(...us);
+                  holes.push({k, s, host: ck, hLoai: loai, dam: ck.ten, rong: rongLo, cao: hh, dai, hD: dz[1] - dz[0], yb, yt, cx, cy,
+                    tt: danhGia(loai, hh, rongLo, dai, yb, yt, dz), ang: Math.atan2(s.b[1] - s.a[1], s.b[0] - s.a[0]), id: ck.id});
                 }
               });
-              khoi = st.khoet ? moi : khoi;
-            });
+              if (st.khoet) khoi = moi;
+            }
             khoi.forEach(k => khoiTho([k.P], k.y0, k.y1));
-          } else ck.hinh.length && khoiTho(poly, dz[0], dz[1]);
+          } else {
+            if (catDuoc && poly[0]) { const bp = bbP(poly[0]); if (ong.some(s => giaoBB(bp, s.bb) && s.y1 > dz[0] + 1e-6 && s.y0 < dz[1] - 1e-6)) phucTap = true; }
+            khoiTho(poly, dz[0], dz[1]);
+          }
         });
+        if (phucTap) khongKhoet.push(`${ck.ten} (${LOAI[loai].ten} hình phức tạp)`);
       });
+      const nang = {dut: 0, mep: 1, lon: 2, ok: 3};
+      holes.sort((p, q) => nang[p.tt] - nang[q.tt]);
 
-      // 3) ống gió (hộp) + va chạm với cột/vách
+      // 3) ống: dựng khối + va chạm với cột + giao cắt giữa các hệ thống MEP
       ong.forEach(s => {
-        const o = {id: s.id, loai: "ong_gio", ten: `Ống gió ${(s.o.rong * 1000).toFixed(0)}x${(s.o.cao * 1000).toFixed(0)}`, dz: [s.y0, s.y1], meshes: [], edges: [], bo: false, coLoi: false, vol: 0, ck: null, duct: s};
-        const mat = new THREE.MeshStandardMaterial({color: LOAI.ong_gio.mau, roughness: 0.4, metalness: 0.25, transparent: true, opacity: 0.88});
+        const kt = s.o.tron ? `Ø${f2(s.o.rong * 1000, 0)}` : `${f2(s.o.rong * 1000, 0)}×${f2(s.o.cao * 1000, 0)}`;
+        const o = {id: s.id, loai: s.loai, ten: `${LOAI[s.loai].ten} ${kt}`, dz: [s.y0, s.y1], meshes: [], edges: [], bo: false, coLoi: false, vol: 0, ck: null, duct: s, kt};
+        const mat = new THREE.MeshStandardMaterial({color: LOAI[s.loai].mau, roughness: 0.4, metalness: 0.25, transparent: true, opacity: 0.88});
         o.mat = mat; objs.set(s.id, o);
-        const L = s.daiTrue.L + s.e0 + s.e1;
-        const geo = new THREE.BoxGeometry(L, s.o.cao, s.o.rong);
-        const ux = s.daiTrue.ux, uy = s.daiTrue.uy, off = (s.e1 - s.e0) / 2;
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set((s.a[0] + s.b[0]) / 2 + ux * off, s.y0 + s.o.cao / 2, -((s.a[1] + s.b[1]) / 2 + uy * off));
-        mesh.rotation.y = Math.atan2(s.b[1] - s.a[1], s.b[0] - s.a[0]);
-        mesh.castShadow = true; mesh.receiveShadow = true;
-        mesh.userData.id = s.id; o.meshes.push(mesh); nhomMain.add(mesh);
-        const vien = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({color: 0x04302e, transparent: true, opacity: 0.55}));
-        vien.position.copy(mesh.position); vien.rotation.copy(mesh.rotation); o.edges.push(vien); nhomMain.add(vien);
-        tong.ong_gio = tong.ong_gio || {n: 0, v: 0}; tong.ong_gio.n++;
-        // va chạm cột / vách (không khoét được): chỉ cần giao nhau trên mặt bằng và chồng cao độ
+        const L = s.daiTrue.L + s.e0 + s.e1, ux = s.daiTrue.ux, uy = s.daiTrue.uy, off = (s.e1 - s.e0) / 2;
+        const geo = s.o.tron ? new THREE.CylinderGeometry(s.o.rong / 2, s.o.rong / 2, L, 20) : new THREE.BoxGeometry(L, s.o.cao, s.o.rong);
+        if (s.o.tron) geo.rotateZ(Math.PI / 2);
+        const dat = (g, x, y, z, ry) => {
+          const mesh = new THREE.Mesh(g, mat); mesh.position.set(x, y, z); mesh.rotation.y = ry || 0;
+          mesh.castShadow = true; mesh.receiveShadow = true; mesh.userData.id = s.id; o.meshes.push(mesh); nhomMain.add(mesh);
+          const vien = new THREE.LineSegments(new THREE.EdgesGeometry(g, 30), new THREE.LineBasicMaterial({color: 0x06121a, transparent: true, opacity: 0.55}));
+          vien.position.copy(mesh.position); vien.rotation.copy(mesh.rotation); o.edges.push(vien); nhomMain.add(vien);
+        };
+        dat(geo, (s.a[0] + s.b[0]) / 2 + ux * off, s.y0 + s.o.cao / 2, -((s.a[1] + s.b[1]) / 2 + uy * off), Math.atan2(s.b[1] - s.a[1], s.b[0] - s.a[0]));
+        if (s.o.tron && s.nut) dat(new THREE.SphereGeometry(s.o.rong / 2, 16, 12), s.a[0], s.y0 + s.o.cao / 2, -s.a[1], 0);
+        tong[s.loai] = tong[s.loai] || {n: 0, v: 0}; tong[s.loai].n++;
         dsCK.forEach(ck => {
-          if (ck.loai_bo || (ck.loai !== "cot" && ck.loai !== "vach")) return;
+          if (ck.loai_bo || ck.loai !== "cot") return;
           const dz = khoiDoc(ck, H); if (!dz || s.y1 <= dz[0] + 1e-6 || s.y0 >= dz[1] - 1e-6) return;
-          const hit = ck.hinh.some(p => tachKhoi(lamSach(p[0]), dz[0], dz[1], s.daiTrue, s.y0, s.y1));
-          if (hit) { vaCham.push({ck, s, id: ck.id}); o.va = true; const oc = objs.get(ck.id); if (oc) oc.va = true; }
+          const hit = ck.hinh.some(p => giaoBB(bbP(p[0]), s.bb) && tachKhoi(lamSach(p[0]), dz[0], dz[1], s.daiTrue, s.y0, s.y1));
+          if (hit) { const oc = objs.get(ck.id); vaCham.push({ck, s, id: ck.id}); o.va = true; o.vaGhi = "Ống đụng cột"; if (oc) { oc.va = true; oc.vaGhi = "Va chạm ống"; } }
         });
       });
+      // giao cắt giữa hai tuyến MEP khác nhau (cắt ngang hoàn toàn nhau, chồng cao độ)
+      const hcn = s => { const w = s.o.rong / 2, ux = s.daiTrue.ux, uy = s.daiTrue.uy, vx = -uy, vy = ux; return [[s.a[0] + vx * w, s.a[1] + vy * w], [s.b[0] + vx * w, s.b[1] + vy * w], [s.b[0] - vx * w, s.b[1] - vy * w], [s.a[0] - vx * w, s.a[1] - vy * w]]; };
+      for (let i = 0; i < ong.length && vaMep.length < 200; i++) for (let j = i + 1; j < ong.length; j++) {
+        const A = ong[i], B = ong[j];
+        if (A.run === B.run || !giaoBB(A.bb, B.bb) || A.y1 <= B.y0 + 1e-3 || B.y1 <= A.y0 + 1e-3) continue;
+        let P = hcn(A); for (const h of B.daiTrue.planes) { P = catNua(P, h[0], h[1], h[2]); if (P.length < 3) break; }
+        if (P.length < 3) continue;
+        if (dtRing(P) >= 0.85 * A.o.rong * B.o.rong) {
+          vaMep.push({a: A, b: B}); [A, B].forEach(x => { const ob = objs.get(x.id); ob.va = true; ob.vaGhi = "Giao cắt với tuyến MEP khác"; });
+        }
+      }
       scene.add(nhomMain);
+      thongThuy = ong.length ? Math.min(...ong.map(s => s.y0)) : null;
       // 4) khung đánh dấu lỗ
       holes.forEach((h, i) => {
         const g = new THREE.BoxGeometry(Math.max(h.dai, 0.05) + 0.02, h.cao, h.rong);
         const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({color: TRANG_THAI[h.tt].mau, transparent: true, opacity: 0.28, depthWrite: false}));
-        m.position.set(h.cx, (h.yb + h.yt) / 2, -h.cy); m.rotation.y = h.ang; m.userData.chung = false; m.userData.ho = i;
+        m.position.set(h.cx, (h.yb + h.yt) / 2, -h.cy); m.rotation.y = h.ang; m.userData.ho = i;
         const ln = new THREE.LineSegments(new THREE.EdgesGeometry(g), new THREE.LineBasicMaterial({color: TRANG_THAI[h.tt].mau}));
         ln.position.copy(m.position); ln.rotation.copy(m.rotation);
         nhomHo.add(m); nhomHo.add(ln); h.mesh = m; h.ln = ln;
       });
       scene.add(nhomHo);
+      dungNhan();
+    }
+    function danhGia(loai, hh, rongLo, dai, yb, yt, dz) {
+      const hD = dz[1] - dz[0], bi = yb <= dz[0] + 1e-6, ti = yt >= dz[1] - 1e-6;
+      if (loai === "dam") return (bi && ti) ? "dut" : (bi || ti) ? "mep" : hh > hD / 3 + 1e-6 ? "lon" : "ok";
+      if (loai === "vach") { if (bi && ti) return "dut"; if (bi || ti) return "mep"; return Math.max(rongLo, hh) > 0.3 + 1e-6 ? "lon" : "ok"; }
+      const m = Math.max(rongLo, dai);
+      return m > 0.6 + 1e-6 ? "dut" : m > 0.3 + 1e-6 ? "lon" : "ok";
+    }
+    const tenTT = h => (TEN_TT[h.hLoai] || TEN_TT.dam)[h.tt];
+    // nhãn tên cấu kiện (bật bằng nút Tên / phím L)
+    let nhan = [];
+    function dungNhan() {
+      nhan.forEach(n => n.el.remove()); nhan = [];
+      if (!st.ten) return;
+      let dem = 0;
+      ["cot", "dam", "vach", "san", "mong"].forEach(k => objs.forEach(o => {
+        if (o.loai !== k || dem >= 250 || !o.meshes.length) return;
+        const b = new THREE.Box3(); o.meshes.forEach(m => b.expandByObject(m));
+        const c = b.getCenter(new THREE.Vector3()); c.y = b.max.y + 0.05;
+        const el = document.createElement("div"); el.className = "x3-nh"; el.textContent = o.ten; kg.appendChild(el);
+        nhan.push({o, el, p: c}); dem++;
+      }));
     }
     function themMesh(o, geo, mat, bong) {
       const m = new THREE.Mesh(geo, mat);
@@ -322,13 +406,13 @@
         o.hien = hien;
         o.meshes.forEach(m => m.visible = hien); o.edges.forEach(v => v.visible = hien);
         const mat = o.mat; if (!mat) return;
-        const loiMau = o.loai === "ong_gio" ? o.va : (st.canhBao && o.coLoi) || o.va;
+        const loiMau = MEPK.includes(o.loai) ? o.va : (st.canhBao && o.coLoi) || o.va;
         mat.color.setHex(o.bo ? 0x555b66 : loiMau ? 0xff3b3b : LOAI[o.loai].mau);
         const tr0 = mat.transparent;
         if (st.xray) { mat.transparent = true; mat.opacity = 0.22; mat.depthWrite = false; }
         else if (o.loai === "san") { mat.transparent = true; mat.opacity = 0.42; mat.depthWrite = false; }
         else if (o.bo) { mat.transparent = true; mat.opacity = 0.25; mat.depthWrite = false; }
-        else if (o.loai === "ong_gio") { mat.transparent = true; mat.opacity = 0.88; mat.depthWrite = true; }
+        else if (MEPK.includes(o.loai)) { mat.transparent = true; mat.opacity = 0.88; mat.depthWrite = true; }
         else { mat.transparent = false; mat.opacity = 1; mat.depthWrite = true; }
         if (st.chon === o.id) ganEmi(o, 0xffd166, 0.55); else if (st.ruoi === o.id) ganEmi(o, 0x4c9aff, 0.35); else ganEmi(o, 0x000000, 0);
         if (tr0 !== mat.transparent) mat.needsUpdate = true;
@@ -438,7 +522,7 @@
       if (id !== st.ruoi) { st.ruoi = id; ap(); }
       if (o && st.cc !== "do") {
         const b = r.domElement.getBoundingClientRect();
-        tip.innerHTML = `<b>${esc(o.ten)}</b> · ${LOAI[o.loai].ten}<br><span class="x3-mut">đáy ${f2(o.dz[0])} → đỉnh ${f2(o.dz[1])} m` + (o.bo ? " · loại bỏ" : "") + (o.va ? " · <span style='color:#ff7a45'>va chạm ống gió</span>" : "") + `</span>`;
+        tip.innerHTML = `<b>${esc(o.ten)}</b> · ${LOAI[o.loai].ten}<br><span class="x3-mut">đáy ${f2(o.dz[0])} → đỉnh ${f2(o.dz[1])} m` + (o.bo ? " · loại bỏ" : "") + (o.va ? ` · <span style='color:#ff7a45'>${o.vaGhi || "va chạm"}</span>` : "") + `</span>`;
         tip.style.left = (e.clientX - b.left + 14) + "px"; tip.style.top = (e.clientY - b.top + 14) + "px"; tip.style.display = "block";
       } else tip.style.display = "none";
     });
@@ -485,19 +569,29 @@
         <div class="x3-row"><label><input type="checkbox" data-o="cat" ${st.cat ? "checked" : ""}>Bật mặt cắt (cắt bỏ phần phía trên cao độ)</label></div>
         <input type="range" id="x3-cr" min="${f2(hop.min.y)}" max="${f2(hop.max.y + 0.01)}" step="0.01" value="${st.catY}" ${st.cat ? "" : "disabled"}>
         <div class="x3-mut">Cao độ cắt: <b id="x3-cv2" style="color:#e6ebf5">${f2(st.catY)}</b> m · 0 = mặt sàn tầng. Kéo xuống để nhìn vào bên trong.</div></div>`;
-      // ống gió + lỗ
+      // MEP + khoét lỗ
       if (coOng) {
-        const c = soHo(), nv = vaCham.length;
-        s += `<div class="x3-sec"><h5>Ống gió &amp; khoét lỗ dầm</h5>
-          <div class="x3-row"><label><input type="checkbox" data-o="khoet" ${st.khoet ? "checked" : ""}>Khoét lỗ dầm cho ống gió đi xuyên</label></div>
-          <div class="x3-row"><span>Đỉnh ống thấp hơn đỉnh sàn</span><span class="n"><input type="number" id="x3-off" step="0.05" min="0" max="${H}" value="${st.offset}"> m</span></div>
+        const c = soHo(), nv = vaCham.length + vaMep.length, loaiO = MEPK.filter(k => st.mep[k]);
+        const ngMau = k => `<span class="x3-dot" style="background:${MAU_HEX(k)}"></span>`;
+        s += `<div class="x3-sec"><h5>Hệ thống MEP &amp; khoét lỗ</h5>
+          <div class="x3-row"><label><input type="checkbox" data-o="khoet" ${st.khoet ? "checked" : ""}>Khoét lỗ dầm, sàn, vách cho ống đi xuyên</label></div>
           <div class="x3-row"><span>Khe hở quanh ống (mỗi phía)</span><span class="n"><input type="number" id="x3-hm" step="5" min="0" max="200" value="${st.hoMm}"> mm</span></div>
-          <div class="x3-mut" style="margin:4px 0 6px">Hạ ống xuống dưới đáy dầm thì không còn lỗ. Kết quả tức thời khi đổi số.</div>
-          ${holes.length ? `<div class="x3-row" style="flex-wrap:wrap;gap:6px">${["ok", "lon", "mep", "dut"].filter(k => c[k]).map(k => `<span class="x3-chip" style="background:${TRANG_THAI[k].css}">${TRANG_THAI[k].ten}: ${c[k]}</span>`).join("")}</div>` : '<div class="x3-mut">Không có ống gió nào giao với dầm.</div>'}
-          ${nv ? `<div class="x3-cb">${nv} va chạm ống gió với cột/vách (tô đỏ).</div>` : ""}
-          ${holes.length ? `<div style="margin-top:6px;max-height:240px;overflow:auto">${holes.map((h, i) => `<div class="x3-ho ${st.chon === h.id ? "sel" : ""}" data-h="${i}"><span><b>${esc(h.dam)}</b> · lỗ ${f2(h.rong * 1000, 0)}×${f2(h.cao * 1000, 0)}</span><span class="x3-chip" style="background:${TRANG_THAI[h.tt].css}">${TRANG_THAI[h.tt].ten}</span><span class="x3-mut">dầm cao ${f2(h.hD * 1000, 0)} mm · lỗ/dầm ${f2(h.cao / h.hD * 100, 0)}%</span><span></span></div>`).join("")}</div>
-          <div class="x3-row" style="margin-top:6px"><button data-a="csv">⬇ Xuất danh sách lỗ (CSV)</button></div>` : ""}</div>`;
+          ${loaiO.map(k => { const m = st.mep[k], kt = m.kt || m.kt0;
+            return `<div class="x3-mp"><span class="t">${ngMau(k)}${LOAI[k].ten}</span><span class="x3-mut">${tong[k] ? tong[k].n : 0} đoạn</span>
+              <div class="f">Đỉnh ống thấp hơn đỉnh sàn <input type="number" data-mo="${k}" step="0.05" min="0" max="${H}" value="${f2(m.off)}"> m
+              ${k === "ong_gio" ? "" : m.tron ? `· Ø <input type="number" data-md="${k}" step="10" min="10" max="2000" value="${kt[0]}"> mm` : `· Rộng <input type="number" data-mw="${k}" step="10" min="10" max="3000" value="${kt[0]}"> × cao <input type="number" data-mh="${k}" step="10" min="10" max="3000" value="${kt[1]}"> mm`}</div></div>`; }).join("")}
+          <div class="x3-mut" style="margin:6px 0">Hạ ống xuống dưới đáy dầm thì không còn lỗ. Kích thước ống nước / PCCC / khay cáp lấy từ tên layer (vd D100, 300x100), sửa được ở đây. Lỗ cho ống tròn tính theo hình vuông bao quanh ống.</div>
+          <div class="x3-row"><span>Cao thông thủy tối thiểu cần</span><span class="n"><input type="number" id="x3-tmin" step="0.1" min="0" max="${H}" value="${st.tt}"> m</span></div>
+          ${thongThuy != null ? `<div class="${thongThuy < st.tt ? "x3-cb" : "x3-mut"}" style="${thongThuy < st.tt ? "" : "padding:2px 0"}">Đáy MEP thấp nhất cách sàn <b style="color:#e6ebf5">${f2(thongThuy)} m</b>${thongThuy < st.tt ? ` (thấp hơn ${f2(st.tt)} m cần có)` : " (đạt)"}.</div>` : ""}
+          ${holes.length ? `<div class="x3-row" style="flex-wrap:wrap;gap:6px;margin-top:4px">${["ok", "lon", "mep", "dut"].filter(k => c[k]).map(k => `<span class="x3-chip" style="background:${TRANG_THAI[k].css}">${TRANG_THAI[k].ten}: ${c[k]}</span>`).join("")}</div>` : '<div class="x3-mut">Không có ống nào giao với dầm, sàn, vách.</div>'}
+          ${nv ? `<div class="x3-cb">${vaCham.length} ống đụng cột (không khoét được) · ${vaMep.length} chỗ giao cắt giữa các tuyến MEP. Tất cả tô đỏ.</div>` : ""}
+          ${khongKhoet.length ? `<div class="x3-cb">Chưa khoét được ${khongKhoet.length} cấu kiện: ${khongKhoet.slice(0, 4).map(esc).join(", ")}${khongKhoet.length > 4 ? "…" : ""}.</div>` : ""}
+          ${holes.length ? `<div style="margin-top:6px;max-height:260px;overflow:auto">${holes.map((h, i) => `<div class="x3-ho ${st.chon === h.id ? "sel" : ""}" data-h="${i}"><span><b>${esc(h.dam)}</b> · ${LOAI[h.hLoai].ten}</span><span class="x3-chip" style="background:${TRANG_THAI[h.tt].css}">${tenTT(h)}</span><span class="x3-mut">${LOAI[h.s.loai].ten} · lỗ ${f2(h.rong * 1000, 0)}×${f2(h.cao * 1000, 0)} mm${h.hLoai === "dam" ? ` · ${f2(h.cao / h.hD * 100, 0)}% chiều cao dầm` : ""}</span><span></span></div>`).join("")}</div>` : ""}
+          ${vaCham.length + vaMep.length ? `<div style="margin-top:6px;max-height:160px;overflow:auto">${vaCham.map((v, i) => `<div class="x3-ho" data-vc="c${i}"><span><b>${esc(v.ck.ten)}</b> · Cột</span><span class="x3-chip" style="background:#ff4d4f">Va chạm</span><span class="x3-mut">${esc(objs.get(v.s.id).ten)}</span><span></span></div>`).join("")}${vaMep.map((v, i) => `<div class="x3-ho" data-vc="m${i}"><span><b>${esc(objs.get(v.a.id).ten)}</b></span><span class="x3-chip" style="background:#ff4d4f">Giao cắt</span><span class="x3-mut">với ${esc(objs.get(v.b.id).ten)}</span><span></span></div>`).join("")}</div>` : ""}
+          <div class="x3-row" style="margin-top:6px;flex-wrap:wrap"><button data-a="csv" ${holes.length || nv ? "" : "disabled"}>⬇ Xuất lỗ &amp; va chạm (CSV)</button></div></div>`;
       }
+      s += `<div class="x3-sec"><h5>Xuất mô hình</h5><div class="x3-row" style="flex-wrap:wrap"><button data-a="glb">⬇ Xuất .glb (SketchUp, Blender, Revit...)</button></div>
+        <div class="x3-mut">Giữ màu và các lỗ đã khoét. Đơn vị mét.</div></div>`;
       // số đo
       s += `<div class="x3-sec"><h5>Đo khoảng cách</h5>${soDo.length ? soDo.map((m, i) => `<div class="x3-row"><span>Số đo ${i + 1}</span><span class="n">${f2(m.a.distanceTo(m.b))} m</span></div>`).join("") : '<div class="x3-mut">Bấm nút 📏 Đo (hoặc phím M), rồi bấm 2 điểm trên mô hình.</div>'}
         ${soDo.length ? '<div class="x3-row"><button data-a="xoa-do">Xóa số đo</button></div>' : ""}</div>`;
@@ -508,13 +602,28 @@
       const t = e.target;
       if (t.dataset.l) { st.loc[t.dataset.l] = t.checked; ap(); return; }
       if (t.dataset.o) { const k = t.dataset.o; st[k] = t.checked; if (k === "khoet" || k === "cat") { if (k === "khoet") { dung(); } ap(); } else ap(); capNhatPn(); return; }
-      if (t.id === "x3-off") { st.offset = Math.max(0, parseFloat(t.value) || 0); dung(); ap(); capNhatPn(); return; }
+      const dd = t.dataset;
+      if (dd.mo) { st.mep[dd.mo].off = Math.max(0, parseFloat(t.value) || 0); dung(); ap(); capNhatPn(); return; }
+      if (dd.md || dd.mw || dd.mh) {
+        const k = dd.md || dd.mw || dd.mh, m = st.mep[k], kt = (m.kt || m.kt0).slice(), v = Math.max(10, parseFloat(t.value) || 10);
+        if (dd.md) { kt[0] = v; kt[1] = v; } else if (dd.mw) kt[0] = v; else kt[1] = v;
+        m.kt = kt; dung(); ap(); capNhatPn(); return;
+      }
+      if (t.id === "x3-tmin") { st.tt = Math.max(0, parseFloat(t.value) || 0); capNhatPn(); return; }
       if (t.id === "x3-hm") { st.hoMm = Math.max(0, parseFloat(t.value) || 0); dung(); ap(); capNhatPn(); }
     });
     pn.addEventListener("input", e => { if (e.target.id === "x3-cr") { st.catY = parseFloat(e.target.value); $("#x3-cv2").textContent = f2(st.catY); ap(); } });
     pn.addEventListener("click", e => {
       const hb = e.target.closest("[data-h]"); if (hb) { const h = holes[+hb.dataset.h]; st.chon = h.id; ap(); capNhatPn();
         const c = new THREE.Vector3(h.cx, (h.yb + h.yt) / 2, -h.cy), hu = cam.position.clone().sub(dk.target).normalize(); hu.y = Math.max(hu.y, 0.4); bay(c.clone().add(hu.normalize().multiplyScalar(Math.max(h.hD, 0.6) * 5 + 2)), c); return; }
+      const vc = e.target.closest("[data-vc]");
+      if (vc) {
+        const [k, i] = [vc.dataset.vc[0], +vc.dataset.vc.slice(1)], v = k === "c" ? vaCham[i] : vaMep[i], o = k === "c" ? objs.get(v.id) : objs.get(v.a.id), oo = objs.get(k === "c" ? v.s.id : v.b.id);
+        st.chon = o.id; ap(); capNhatPn();
+        const b = new THREE.Box3(); [o, oo].forEach(x => x.meshes.forEach(m => b.expandByObject(m)));
+        const c = b.getCenter(new THREE.Vector3()), hu = cam.position.clone().sub(dk.target).normalize(); hu.y = Math.max(hu.y, 0.4); hu.normalize();
+        bay(c.clone().add(hu.multiplyScalar(Math.max(b.getSize(new THREE.Vector3()).length(), 1) * 1.8 + 1.5)), c); return;
+      }
       const a = e.target.closest("[data-a]"); if (!a) return; hanhDong(a.dataset.a);
     });
     function hanhDong(k) {
@@ -525,12 +634,32 @@
       else if (k === "co" && o) { st.co = new Set([o.id]); ap(); capNhatPn(); }
       else if (k === "xoa-do") xoaDo();
       else if (k === "csv") xuatCSV();
+      else if (k === "glb") xuatGLB();
     }
     function xuatCSV() {
-      const dong = [["Dầm", "Chiều cao dầm (mm)", "Rộng lỗ (mm)", "Cao lỗ (mm)", "Dài xuyên (mm)", "Đáy lỗ (m)", "Đỉnh lỗ (m)", "Lỗ/dầm (%)", "Đánh giá", "Tọa độ X (m)", "Tọa độ Y (m)"]]
-        .concat(holes.map(h => [h.dam, h.hD * 1000, h.rong * 1000, h.cao * 1000, h.dai * 1000, h.yb, h.yt, h.cao / h.hD * 100, TRANG_THAI[h.tt].ten, h.cx, h.cy].map(v => typeof v === "number" ? +v.toFixed(3) : v)));
-      const csv = "﻿" + dong.map(r_ => r_.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\r\n");
-      taiVe(new Blob([csv], {type: "text/csv;charset=utf-8"}), "danh_sach_lo_xuyen_dam.csv");
+      const so = v => typeof v === "number" ? +v.toFixed(3) : v;
+      const dong = [["Cấu kiện bị khoét", "Loại", "Hệ thống ống", "Kích thước ống", "Rộng lỗ (mm)", "Cao lỗ (mm)", "Dài xuyên (mm)", "Đáy lỗ (m)", "Đỉnh lỗ (m)", "Lỗ / chiều cao dầm (%)", "Đánh giá", "Tọa độ X (m)", "Tọa độ Y (m)"]]
+        .concat(holes.map(h => [h.dam, LOAI[h.hLoai].ten, LOAI[h.s.loai].ten, objs.get(h.s.id).kt, h.rong * 1000, h.cao * 1000, h.dai * 1000, h.yb, h.yt, h.hLoai === "dam" ? h.cao / h.hD * 100 : "", tenTT(h), h.cx, h.cy].map(so)));
+      if (vaCham.length + vaMep.length) {
+        dong.push([], ["VA CHẠM / GIAO CẮT", "Đối tượng 1", "Đối tượng 2", "Ghi chú"]);
+        vaCham.forEach(v => dong.push(["Ống đụng cột", "Cột " + v.ck.ten, objs.get(v.s.id).ten, "Không khoét được, cần dời ống hoặc đổi cao độ"]));
+        vaMep.forEach(v => dong.push(["Giao cắt MEP", objs.get(v.a.id).ten, objs.get(v.b.id).ten, "Hai tuyến cắt ngang nhau ở cùng cao độ"]));
+      }
+      const csv = "\ufeff" + dong.map(r_ => r_.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+      taiVe(new Blob([csv], {type: "text/csv;charset=utf-8"}), "lo_xuyen_va_va_cham.csv");
+    }
+    function napScript(url) {
+      return new Promise((ok, loi) => { const s = document.createElement("script"); s.src = url; s.onload = ok; s.onerror = () => loi(new Error("Không tải được bộ xuất .glb (cần mạng).")); document.head.appendChild(s); });
+    }
+    async function xuatGLB() {
+      try {
+        if (!THREE.GLTFExporter) await napScript("https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js");
+        const vien = []; nhomMain.traverse(o => { if (o.isLineSegments && o.visible) { o.visible = false; vien.push(o); } });
+        new THREE.GLTFExporter().parse(nhomMain, res => {
+          vien.forEach(o => o.visible = true);
+          taiVe(new Blob([res], {type: "model/gltf-binary"}), "AZB-3D-" + (d.ten_file || "mo-hinh").replace(/\.[^.]+$/, "") + ".glb");
+        }, {binary: true, onlyVisible: true});
+      } catch (e) { alert(e.message); }
     }
     function taiVe(blob, ten) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = ten; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
     function chupAnh() {
@@ -548,6 +677,7 @@
     $("#x3-ct").onclick = () => { st.cat = !st.cat; $("#x3-ct").classList.toggle("on", st.cat); if (st.cat) { st.pn = true; if (st.catY >= hop.max.y) st.catY = hop.min.y + (hop.max.y - hop.min.y) * 0.55; } ap(); capNhatPn(); };
     $("#x3-xoay").onclick = () => { st.xoay = !st.xoay; dk.autoRotate = st.xoay; dk.autoRotateSpeed = 1.6; $("#x3-xoay").classList.toggle("on", st.xoay); };
     $("#x3-anh").onclick = chupAnh;
+    $("#x3-ten").onclick = () => { st.ten = !st.ten; $("#x3-ten").classList.toggle("on", st.ten); dungNhan(); };
     $("#x3-bg").onclick = () => { st.pn = !st.pn; capNhatPn(); setTimeout(datLai, 0); };
 
     // ---------- hướng dẫn ----------
@@ -559,15 +689,19 @@
         <li>Các nút dưới màn hình: <kbd>1</kbd> góc 3D · <kbd>2</kbd> nhìn từ trên · <kbd>3</kbd> chính diện · <kbd>4</kbd> bên phải · <kbd>F</kbd> vừa khung.</li></ul>
         <h4>2. Chọn, ẩn, cô lập cấu kiện</h4><ul><li>Bấm vào một khối để xem tên, layer, kích thước, thể tích và cảnh báo ở bảng bên phải. <b>Nhấp đúp</b> để bay tới khối đó.</li>
         <li><kbd>H</kbd> ẩn khối đang chọn · <kbd>I</kbd> chỉ hiện khối đó · <kbd>A</kbd> hiện lại tất cả. Tích / bỏ tích từng lớp (Cột, Dầm, Sàn...) ở mục <i>Lớp hiển thị</i>.</li></ul>
-        <h4>3. Khoét lỗ dầm cho ống gió (tự động)</h4><ul><li>Khi bản vẽ có layer Ống gió, app tự tìm chỗ ống đi xuyên dầm và <b>khoét lỗ thật trên khối dầm</b>, có khung màu đánh dấu quanh lỗ.</li>
-        <li>Chỉnh <b>Đỉnh ống thấp hơn đỉnh sàn</b> (m) và <b>Khe hở quanh ống</b> (mm) ở mục <i>Ống gió &amp; khoét lỗ dầm</i>; lỗ và danh sách cập nhật ngay. Hạ ống xuống dưới đáy dầm thì không còn lỗ.</li>
-        <li>Màu đánh giá (ngưỡng tham khảo, kỹ sư kết cấu quyết định): <span class="x3-chip" style="background:${TRANG_THAI.ok.css}">Đạt</span> lỗ cao ≤ 1/3 chiều cao dầm · <span class="x3-chip" style="background:${TRANG_THAI.lon.css}">Lỗ lớn</span> cao hơn 1/3 · <span class="x3-chip" style="background:${TRANG_THAI.mep.css}">Lẹm mép</span> lỗ chạm đáy/đỉnh dầm · <span class="x3-chip" style="background:${TRANG_THAI.dut.css}">Cắt đứt</span> ống cao bằng dầm.</li>
-        <li>Bấm một dòng trong danh sách lỗ để bay tới lỗ đó. Nút <b>Xuất danh sách lỗ (CSV)</b> mở được bằng Excel, dùng để gửi cho bên kết cấu duyệt.</li>
-        <li>Ống đụng <b>cột / vách</b> không khoét được nên cả hai tô đỏ để bạn dời ống hoặc đổi cao độ.</li></ul>
-        <h4>4. Mặt cắt, xuyên thấu</h4><ul><li><kbd>C</kbd> bật <b>Mặt cắt</b>, kéo thanh cao độ để cắt bỏ phần phía trên và nhìn vào trong (ví dụ cắt ngay dưới sàn để thấy hệ dầm cột).</li>
+        <h4>3. Hệ thống MEP và khoét lỗ tự động</h4><ul>
+        <li>Hiển thị: <b>ống gió</b>, <b>ống cấp thoát nước</b>, <b>ống PCCC</b> (tròn) và <b>khay cáp</b> (chữ nhật). Ở cột trái, gán layer tương ứng cho loại <i>Ống nước, Ống PCCC, Khay cáp</i> (app tự đoán theo tên layer). Kích thước đọc từ tên layer, ví dụ <kbd>P-WATER-D100</kbd>, <kbd>PCCC DN65</kbd>, <kbd>KHAY CAP 400x100</kbd>; không ghi thì dùng mặc định và sửa được ở bảng bên phải.</li>
+        <li>App tìm chỗ ống đi xuyên <b>dầm, sàn, vách</b> và <b>khoét lỗ thật</b> trên khối bê tông, có khung màu đánh dấu quanh lỗ. Lỗ cho ống tròn tính theo hình vuông bao quanh ống. Sàn / vách hình phức tạp (không lồi) chưa khoét được, app báo tên.</li>
+        <li>Chỉnh ở mục <i>Hệ thống MEP &amp; khoét lỗ</i>: <b>Đỉnh ống thấp hơn đỉnh sàn</b> (m) cho từng hệ thống, <b>khe hở</b> quanh ống (mm), kích thước ống. Lỗ và danh sách cập nhật ngay. Hạ ống xuống dưới đáy dầm thì không còn lỗ.</li>
+        <li>Đánh giá lỗ (ngưỡng tham khảo, kỹ sư kết cấu quyết định): <b>Dầm</b>: <span class="x3-chip" style="background:${TRANG_THAI.ok.css}">Đạt</span> lỗ cao ≤ 1/3 chiều cao dầm · <span class="x3-chip" style="background:${TRANG_THAI.lon.css}">Lỗ lớn</span> hơn 1/3 · <span class="x3-chip" style="background:${TRANG_THAI.mep.css}">Lẹm mép</span> lỗ chạm đáy / đỉnh dầm · <span class="x3-chip" style="background:${TRANG_THAI.dut.css}">Cắt đứt</span> ống cao bằng dầm. <b>Sàn</b>: lỗ lớn nhất ≤ 300 mm đạt, 300 đến 600 mm lỗ lớn (cần gia cường), trên 600 mm đỏ. <b>Vách</b>: ≤ 300 mm đạt; chạm đáy / đỉnh vách là lẹm mép; ống cao bằng vách là cắt đứt.</li>
+        <li>Bấm một dòng trong danh sách để bay tới lỗ. Nút <b>Xuất lỗ &amp; va chạm (CSV)</b> mở được bằng Excel, dùng để gửi bên kết cấu duyệt.</li></ul>
+        <h4>4. Va chạm và cao thông thủy (tự động)</h4><ul>
+        <li>Ống <b>đụng cột</b> (không khoét được) và hai tuyến MEP <b>cắt ngang nhau ở cùng cao độ</b> được tô đỏ và liệt kê; bấm một dòng để bay tới. Chỗ ống rẽ nhánh (chữ T) không bị tính là va chạm.</li>
+        <li><b>Cao thông thủy:</b> app báo đáy MEP thấp nhất cách sàn bao nhiêu mét và cảnh báo nếu thấp hơn mức bạn đặt (mặc định 2,4 m).</li></ul>
+        <h4>5. Mặt cắt, xuyên thấu</h4><ul><li><kbd>C</kbd> bật <b>Mặt cắt</b>, kéo thanh cao độ để cắt bỏ phần phía trên và nhìn vào trong (ví dụ cắt ngay dưới sàn để thấy hệ dầm cột).</li>
         <li><kbd>X</kbd> <b>Xuyên thấu</b>: mọi khối thành trong mờ, tiện soi ống gió nằm sau dầm.</li></ul>
-        <h4>5. Đo khoảng cách</h4><ul><li><kbd>M</kbd> bật đo, bấm 2 điểm (tự hít vào góc gần nhất). Kết quả gồm khoảng cách thẳng, ngang và đứng. Bấm <b>Xóa số đo</b> để làm lại.</li></ul>
-        <h4>6. Xuất ảnh &amp; trình bày</h4><ul><li><b>Chụp ảnh</b> lưu PNG khung nhìn hiện tại. <kbd>R</kbd> tự xoay để trình chiếu. Tắt <i>Đổ bóng</i> nếu máy yếu bị giật.</li></ul>
+        <h4>6. Đo khoảng cách</h4><ul><li><kbd>M</kbd> bật đo, bấm 2 điểm (tự hít vào góc gần nhất). Kết quả gồm khoảng cách thẳng, ngang và đứng. Bấm <b>Xóa số đo</b> để làm lại.</li></ul>
+        <h4>7. Tên, xuất ảnh, xuất mô hình</h4><ul><li><kbd>L</kbd> hiện <b>tên</b> cột, dầm, vách... ngay trên mô hình (tối đa 250 nhãn).</li><li><b>Chụp ảnh</b> lưu PNG khung nhìn hiện tại. <kbd>R</kbd> tự xoay để trình chiếu. Tắt <i>Đổ bóng</i> nếu máy yếu bị giật.</li><li><b>Xuất .glb</b> (cuối bảng bên phải) để mở trong SketchUp, Blender, Revit... giữ màu và các lỗ đã khoét, đơn vị mét.</li></ul>
         <h4>Phím tắt</h4><p><kbd>Esc</kbd> bỏ chọn / thoát đo / đóng · <kbd>?</kbd> mở hướng dẫn này.</p>
         <div class="bt"><button class="cam" id="x3-gd-ok">Đã hiểu</button></div></div>`;
       gd.hidden = false; gd.querySelector("#x3-gd-ok").onclick = () => moGD(false);
@@ -584,7 +718,7 @@
       if (k === "escape") { if (!gd.hidden) moGD(false); else if (st.cc) datCC(false); else if (st.chon) { st.chon = null; ap(); capNhatPn(); } else dong(); return; }
       if (k === "?" || (k === "/" && e.shiftKey)) moGD(gd.hidden);
       else if (k === "1") nhin("iso"); else if (k === "2") nhin("top"); else if (k === "3") nhin("front"); else if (k === "4") nhin("right"); else if (k === "f") nhin("fit");
-      else if (k === "x") $("#x3-xr").click(); else if (k === "c") $("#x3-ct").click(); else if (k === "m") $("#x3-do").click(); else if (k === "r") $("#x3-xoay").click();
+      else if (k === "x") $("#x3-xr").click(); else if (k === "c") $("#x3-ct").click(); else if (k === "m") $("#x3-do").click(); else if (k === "r") $("#x3-xoay").click(); else if (k === "l") $("#x3-ten").click();
       else if (k === "h") hanhDong("an"); else if (k === "i") hanhDong("co"); else if (k === "a") hanhDong("hien-het");
     }
     addEventListener("keydown", phim);
@@ -596,7 +730,7 @@
     datLai(); addEventListener("resize", datLai);
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(datLai) : null; ro && ro.observe(kg);
     capNhatPn();
-    $("#x3-tt").textContent = `Cao tầng ${H} m · ${(d.cau_kien || []).filter(c => c.loai_bo).length} cấu kiện bị loại (xám mờ)` + (coOng ? ` · ${holes.length} lỗ xuyên dầm` : "");
+    $("#x3-tt").textContent = `Cao tầng ${H} m · ${(d.cau_kien || []).filter(c => c.loai_bo).length} cấu kiện bị loại (xám mờ)` + (coOng ? ` · ${holes.length} lỗ khoét · ${vaCham.length + vaMep.length} va chạm` : "");
     $("#x3-ft").textContent = "Chuột trái: xoay · Phải: dịch · Lăn: zoom · Bấm: chọn · Nhấp đúp: bay tới · Bấm ❔ Hướng dẫn hoặc phím ? để xem chi tiết. Khối dựng từ hình 2D và chiều cao đã tính, chưa phải mô hình BIM.";
     let chay = true;
     const bnd = new THREE.Vector3();
@@ -605,6 +739,7 @@
       if (anim) { const k = Math.min(1, (performance.now() - anim.s) / anim.ms), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; cam.position.lerpVectors(anim.p0, anim.p1, e); dk.target.lerpVectors(anim.t0, anim.t1, e); if (k >= 1) anim = null; }
       dk.update(); r.render(scene, cam);
       if (soDo.length) { const b = r.domElement.getBoundingClientRect(), kb = kg.getBoundingClientRect(); soDo.forEach(m => { bnd.copy(m.a).add(m.b).multiplyScalar(.5).project(cam); const vis = bnd.z < 1; m.el.style.display = vis ? "" : "none"; m.el.style.left = ((bnd.x + 1) / 2 * b.width + b.left - kb.left) + "px"; m.el.style.top = ((1 - bnd.y) / 2 * b.height + b.top - kb.top) + "px"; }); }
+      if (nhan.length) { const b = r.domElement.getBoundingClientRect(), kb = kg.getBoundingClientRect(); nhan.forEach(n => { bnd.copy(n.p).project(cam); const v = bnd.z < 1 && n.o.hien; n.el.style.display = v ? "" : "none"; if (v) { n.el.style.left = ((bnd.x + 1) / 2 * b.width + b.left - kb.left) + "px"; n.el.style.top = ((1 - bnd.y) / 2 * b.height + b.top - kb.top) + "px"; } }); }
       requestAnimationFrame(vong);
     })();
     let daXem = false; try { daXem = !!localStorage.getItem("azb-3d-gd"); } catch (e) {}
@@ -612,7 +747,7 @@
 
     function dong() {
       chay = false; removeEventListener("resize", datLai); removeEventListener("keydown", phim); ro && ro.disconnect();
-      xoaMo(); xoaDo(); [nenDat, luoi].forEach(o => { if (o) { o.geometry.dispose(); o.material.dispose(); } });
+      xoaMo(); xoaDo(); nhan.forEach(n => n.el.remove()); [nenDat, luoi].forEach(o => { if (o) { o.geometry.dispose(); o.material.dispose(); } });
       scene.background && scene.background.dispose && scene.background.dispose();
       dk.dispose(); r.dispose(); lop.remove(); dang = null;
     }

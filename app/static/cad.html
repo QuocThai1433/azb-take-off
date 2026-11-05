@@ -698,10 +698,10 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-<script src="/static/xem3d.js?v=3"></script>
+<script src="/static/xem3d.js?v=4"></script>
 <script>
 const LOAI = {cot:"Cột", dam:"Dầm", san:"Sàn", lo_san:"Lỗ mở sàn", mong:"Móng", coc:"Cọc", vach:"Vách/lõi", khung_dam:"Khung dầm (bao ngoài)",
-  o_dam:"Ô trống giữa dầm", nhan:"Nhãn chữ", ong_gio:"Ống gió (MLINE+block)", bo_qua:"Bỏ qua"};
+  o_dam:"Ô trống giữa dầm", nhan:"Nhãn chữ", ong_gio:"Ống gió (MLINE+block)", ong_nuoc:"Ống nước (chỉ dựng 3D)", ong_pccc:"Ống PCCC (chỉ dựng 3D)", khay_cap:"Khay cáp (chỉ dựng 3D)", bo_qua:"Bỏ qua"};
 const VAI_TRO = {mat_bang:"Mặt bằng", chi_tiet:"Chi tiết cấu kiện", ghi_chu:"Ghi chú chung"};
 const MAU = ["#ff3b30","#ffd60a","#30d158","#32d4e8","#4a8cff","#e061ff","#ffffff","#9b9b9b","#ff9f0a","#a3e635","#2dd4bf","#60a5fa","#a78bfa","#f472b6","#fb7185"];
 const TS = [["chieu_cao_tang","Cao tầng (m)"],["day_san","Dày sàn (m)"],["chieu_cao_dam","Cao dầm (m)"],["day_mong","Cao móng (m)"],
@@ -2576,8 +2576,13 @@ $("t-3d").onclick = async () => {
     if (Object.values(loaiLayer(f)).includes("ong_gio")) {
       try { og = (await json("/api/ong-gio", yeuCauKL())).hinh_3d || []; } catch (e) { if (!d.cau_kien.length) throw e; }
     }
-    if (!d.cau_kien.length && !og.length) return lenh("Chưa có cấu kiện để dựng 3D: gán layer cột/dầm/sàn/móng hoặc Ống gió ở cột trái rồi thử lại.", "loi");
-    d.ong_gio = og;
+    let mep = [];
+    if (Object.values(loaiLayer(f)).some(l => ["ong_nuoc", "ong_pccc", "khay_cap"].includes(l))) {
+      try { const m = await json("/api/mep-3d", yeuCauKL()); mep = m.duong || []; d.mep_mac_dinh = m.mac_dinh; (m.canh_bao || []).forEach(c => lenh(c, "loi")); }
+      catch (e) { lenh("MEP: " + e.message, "loi"); }
+    }
+    if (!d.cau_kien.length && !og.length && !mep.length) return lenh("Chưa có cấu kiện để dựng 3D: gán layer cột/dầm/sàn/móng, Ống gió hoặc ống nước / PCCC / khay cáp ở cột trái rồi thử lại.", "loi");
+    d.ong_gio = og; d.mep = mep;
     window.xem3D(d); } catch (e) { lenh(e.message, "loi"); }
 };
 $("t-tk-xlsx").onclick = async () => {

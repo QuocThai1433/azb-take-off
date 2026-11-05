@@ -15,7 +15,7 @@
 #
 # Các loại hợp lệ:
 #   cot, dam, san, lo_san (trừ vào sàn), mong, coc, vach, nhan (chữ ghi tên cấu kiện),
-#   ong_gio, bo_qua (không tính)
+#   ong_gio, ong_nuoc, ong_pccc, khay_cap (cơ điện: chỉ dựng 3D), bo_qua (không tính)
 
 rules:
   # --- 1. Hệ thống / kiến trúc: không bao giờ là bê tông kết cấu ---
@@ -31,6 +31,18 @@ rules:
     type: ong_gio
     conf: 0.9
     ly_do: "Layer ống gió HVAC"
+  - pattern: 'khay ?cap|cable ?tray|cable ?ladder|may ?cap'
+    type: khay_cap
+    conf: 0.9
+    ly_do: "Layer khay / máng cáp điện"
+  - pattern: 'pccc|sprinkler|chua ?chay|fire ?(fighting|pipe|protection)|(?<![a-z])fp(?![a-z])'
+    type: ong_pccc
+    conf: 0.9
+    ly_do: "Layer ống chữa cháy (PCCC)"
+  - pattern: 'ong ?nuoc|cap ?nuoc|thoat ?nuoc|plumb|(?<![a-z])(water|drain|sewer|waste)(?![a-z])'
+    type: ong_nuoc
+    conf: 0.85
+    ly_do: "Layer ống cấp / thoát nước"
 
   # --- 2. Chữ / nhãn (đặt trước cốt thép để TEXTTHEP là chữ, không phải thép) ---
   - pattern: 'text|ghi ?chu|chu ?thich|ky ?hieu|so ?hieu|tieu ?de|label|annot|ttlb|(?<![a-z])(tag|tags|note|notes)(?![a-z])|^chu(?![a-z])'

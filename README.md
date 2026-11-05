@@ -124,7 +124,10 @@ Dựng khung kết cấu 3D từ bản vẽ đang mở để kiểm tra nhanh. B
 
 - **Điều hướng:** chuột trái xoay, chuột phải dịch, lăn để zoom. Phím `1` góc 3D, `2` trên, `3` trước, `4` phải, `F` vừa khung.
 - **Chọn / ẩn / cô lập:** bấm một khối để xem tên, layer, kích thước, thể tích, cảnh báo. `H` ẩn, `I` chỉ hiện khối đó, `A` hiện lại tất cả. Nhấp đúp để bay tới.
-- **Khoét lỗ dầm cho ống gió (tự động):** nếu có layer Ống gió, app khoét lỗ thật trên dầm tại chỗ ống đi xuyên, đánh giá từng lỗ (đạt / lỗ lớn > 1/3 chiều cao dầm / lẹm mép / cắt đứt dầm), báo va chạm ống với cột và vách, và xuất danh sách lỗ ra CSV. Chỉnh được cao độ đỉnh ống và khe hở quanh ống. Ngưỡng chỉ để tham khảo, kỹ sư kết cấu quyết định.
+- **MEP và khoét lỗ tự động:** hiển thị ống gió, ống cấp thoát nước, ống PCCC, khay cáp. Gán layer cho loại *Ống nước / Ống PCCC / Khay cáp* (app đoán theo tên layer). Kích thước đọc từ tên layer (`P-WATER-D100`, `PCCC DN65`, `KHAY CAP 400x100`), không ghi thì lấy mặc định trong `config/mep.yaml` và sửa được ngay trong màn hình 3D.
+  - Khoét lỗ thật trên **dầm, sàn, vách** tại chỗ ống đi xuyên, đánh giá từng lỗ (đạt / lỗ lớn / lẹm mép / cắt đứt), chỉnh được cao độ từng hệ thống và khe hở quanh ống. Ngưỡng chỉ để tham khảo, kỹ sư kết cấu quyết định. Sàn / vách hình phức tạp chưa khoét được, app báo tên.
+  - Tự báo **va chạm** ống đụng cột, ống giao cắt ống khác, và **cao thông thủy** thấp nhất. Xuất danh sách lỗ và va chạm ra CSV.
+- **Hiện tên** cấu kiện (`L`), **xuất .glb** mở bằng SketchUp, Blender, Revit.
 - **Mặt cắt** (`C`) theo cao độ, **xuyên thấu** (`X`), **đo khoảng cách** (`M`), **chụp ảnh PNG**, **tự xoay** (`R`).
 
 ## 4. Bản vẽ cần như thế nào để bóc chính xác

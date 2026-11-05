@@ -22,7 +22,7 @@ def kiem_tra_gan_layer(ban_ve, loai_layer, ds_de_xuat):
         n = d.so_hinh if d else (len(ld.hinh_kin) if ld else 0)
         if loai in LOAI_TINH:
             n_loai, n_conf, n_lydo, n_nguon = config.phan_tich_ten(ten)
-            if n_nguon != "hồ sơ" and n_loai in ("bo_qua", "nhan", "ong_gio") and n_conf >= 0.8:
+            if n_nguon != "hồ sơ" and n_loai in ("bo_qua", "nhan") + tuple(config.LOAI_MEP) and n_conf >= 0.8:
                 kq.append({"muc": "canh_bao", "layer": ten,
                            "noi_dung": f"Layer '{ten}' đang gán là {TEN_LOAI[loai]} nhưng {n_lydo[0].lower() + n_lydo[1:]}. Dễ tính nhầm vào khối lượng."})
             elif config.chuan_hoa_ten(ten)[1] and n_nguon != "hồ sơ":

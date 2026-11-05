@@ -212,7 +212,7 @@ class _BoTinh:
         nhan = []
         for ten, ld in self.bv.layers.items():
             loai = self.loai_layer.get(ten, "bo_qua")
-            if loai in ("bo_qua", "ong_gio", "khung_dam", "o_dam", "coc"):
+            if loai in ("bo_qua", "khung_dam", "o_dam", "coc") or loai in config.LOAI_MEP:
                 continue
             for c in ld.chu:
                 n = doc_nhan(c.noi_dung)
@@ -337,7 +337,7 @@ class _BoTinh:
             return
         r = []
         for t, ld in self.bv.layers.items():
-            if self.loai_layer.get(t, "bo_qua") in ("bo_qua", "ong_gio", "khung_dam", "o_dam"):
+            if self.loai_layer.get(t, "bo_qua") in ("bo_qua", "khung_dam", "o_dam") or self.loai_layer.get(t, "bo_qua") in config.LOAI_MEP:
                 continue
             for c in ld.chu:
                 n = doc_nhan(c.noi_dung)
