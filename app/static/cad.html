@@ -2264,7 +2264,7 @@ $("t-3d").onclick = async () => {
       const ds = (await (await goi("/api/de-xuat-layer/" + f.id)).json()).ds || [];
       let n = 0;
       ds.forEach(x => { const l = f.layers.find(y => y.ten === x.ten);
-        if (l && x.hanh_dong === "tu_dien" && x.loai && KET_CAU.includes(x.loai) && l.loai !== x.loai) { l.loai = x.loai; n++; } });
+        if (l && (x.hanh_dong === "tu_dien" || (x.hanh_dong === "xac_nhan" && x.tin_cay >= 0.8)) && x.loai && KET_CAU.includes(x.loai) && l.loai !== x.loai) { l.loai = x.loai; n++; } });
       if (n) { ve_layer(); lenh(`Tự gán ${n} layer kết cấu theo đề xuất, đang dựng 3D ...`); d = await json("/api/tinh", yeuCauKL()); }
     }
     if (!d.cau_kien.length) return lenh("Chưa có cấu kiện kết cấu: gán layer cột/dầm/sàn/móng ở cột trái rồi thử lại.", "loi");
