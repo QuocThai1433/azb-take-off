@@ -387,3 +387,11 @@ def test_khong_co_khung_o_thi_suy_dam_tu_hinh_manh(tmp_path):
     dam = [n for n in kq["nhan"] if n["loai"] == "dam"]
     assert len(dam) == 4
     assert any("tự suy dầm từ 4 hình" in c for c in kq["canh_bao"])
+
+
+def test_layer_dam_da_gan_nhung_trong_vung_thi_van_tu_do(tmp_path):
+    """Layer 'S-Beam' gán Dầm theo tên nhưng không có hình trong vùng: trước đây bỏ qua tự dò → 0 nhãn."""
+    ban_ve = _tao(tmp_path)
+    kq = gan_nhan(ban_ve, {"KHUNG": "bo_qua", "S-Beam": "dam"}, VUNG)
+    assert any(n["loai"] == "dam" for n in kq["nhan"])
+    assert any("'S-Beam'" in c and "không có hình" in c for c in kq["canh_bao"])

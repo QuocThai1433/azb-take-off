@@ -128,8 +128,16 @@ def _dam_tu_hinh_manh(ban_ve):
 
 def _tim_dam(ban_ve, loai_layer, canh_bao):
     loai = dict(loai_layer)
-    co_dam = any(v == "dam" for v in loai.values())
-    co_khung_o = any(v == "khung_dam" for v in loai.values()) and any(v == "o_dam" for v in loai.values())
+    def _co_hinh(loai_can):  # layer đã gán loại này VÀ có hình kín trong vùng (gán rồi mà trống thì coi như chưa gán)
+        return any(v == loai_can and t in ban_ve.layers and any(h.geom.area >= 0.005 for h in ban_ve.layers[t].hinh_kin)
+                   for t, v in loai.items())
+    co_dam = _co_hinh("dam")
+    co_khung_o = _co_hinh("khung_dam") and _co_hinh("o_dam")
+    gan_ma_trong = [t for t, v in loai.items() if v in ("dam", "khung_dam", "o_dam")]
+    if gan_ma_trong and not co_dam and not co_khung_o:
+        canh_bao.append(f'Layer đã gán dầm ({", ".join(repr(t) for t in gan_ma_trong)}) không có hình nào trong vùng này nên bỏ qua, '
+                        'tự dò dầm theo hình vẽ. Sếp kiểm tra, hoặc gán lại layer Dầm đúng ở tab Layer.')
+        loai = {t: v for t, v in loai.items() if v not in ("dam", "khung_dam", "o_dam")}
     khung_tu_dong = False
     if not co_dam and not co_khung_o:
         ten = _tu_nhan_khung_o(ban_ve)
