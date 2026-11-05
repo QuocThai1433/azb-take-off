@@ -1854,6 +1854,7 @@ $("p-gn").addEventListener("click", async e => {
 document.querySelectorAll(".tab-phai div").forEach(d => d.onclick = () => {
   document.querySelectorAll(".tab-phai div").forEach(x => x.classList.toggle("act", x === d));
   ["cc", "dt", "tk", "gn", "ct", "tm", "ai", "kl", "gc"].forEach(k => $("p-" + k).hidden = k !== d.dataset.t);
+  $("ds-cc").hidden = d.dataset.t === "gn";  // đang gán nhãn: ẩn danh sách công cụ tính (không liên quan)
   if (d.dataset.t === "ct") ve_CT();
   if (d.dataset.t === "ai") veAI();
   if (d.dataset.t === "tm") veTM(false); else veLai();
