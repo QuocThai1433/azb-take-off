@@ -355,6 +355,12 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
 
     # Chướng ngại để né: dầm, cột, chữ có sẵn
     cot_hinh = [h.geom for t, v in loai_layer.items() if v == "cot" and t in trong.layers for h in trong.layers[t].hinh_kin]
+    if tc.get("nhan_cot", False) and not cot_hinh:  # chưa gán layer Cột: tự dò theo bảng kích thước cột ghi sẵn (40x60...)
+        tu_do = _do_layer_cot(trong, loai_layer)
+        if tu_do:
+            cot_hinh = [h.geom for t in tu_do for h in trong.layers[t].hinh_kin]
+            canh_bao.append(f'Chưa gán layer "Cột": tự dò các layer {", ".join(repr(t) for t in tu_do)} (hình chữ nhật đúng kích thước cột ghi trong bản vẽ). '
+                            'Sếp kiểm tra, hoặc gán layer Cột ở tab Layer.')
     vat_can = [d["geom"] for d in dam] + [g for g in cot_hinh if g.area >= 0.005]
     hop_cu = [_hop_chu(c.diem.x, c.diem.y, c.goc, c.cao or cao_chu, c.neo, len(c.noi_dung.splitlines()[0]) if c.noi_dung else 1)
               for c in _tat_ca_chu(trong)]
@@ -524,6 +530,37 @@ def _dat_nhan_dam(d, cao_chu, va_cham, them, chu, canh_bao):
     else:
         them("dam", chu, x0 - khe, cy, 90.0, cao_chu, "bc", ma=d["ma"])
     canh_bao.append(f"Nhãn {chu} không tìm được chỗ trống, đang đè lên nét khác. Sếp kéo nhãn sang chỗ thoáng trong CAD.")
+
+
+RE_KT_COT_CM = re.compile(r"^\s*(\d{2,3})\s*[xX×]\s*(\d{2,3})\s*$")
+
+
+def _do_layer_cot(trong, loai_layer):
+    """Layer chứa hình cột khi sếp chưa gán: bản vẽ mặt bằng cột hay ghi kích thước (cm) kiểu "40x60", "40x80".
+    Chọn các layer chưa gán loại khác có ít nhất 2 hình chữ nhật kín đúng một trong các kích thước đó (±5%)."""
+    kt = set()
+    for c in _tat_ca_chu(trong):
+        m = RE_KT_COT_CM.match(_nfc(c.noi_dung))
+        if m:
+            a, b = int(m.group(1)) * 10, int(m.group(2)) * 10
+            kt.add((max(a, b), min(a, b)))
+    if not kt:
+        return []
+    khong = {t for t, v in loai_layer.items() if v in ("mong", "dam", "san", "khung_dam", "o_dam", "coc")}
+    kq = []
+    for t, ld in trong.layers.items():
+        if t in khong:
+            continue
+        n = 0
+        for h in ld.hinh_kin:
+            if h.geom.area < 0.01 or h.geom.area > 4:
+                continue
+            a, b, dc = _hinh_chu_nhat(h.geom)
+            if dc >= 0.95 and any(abs(a * 1000 - ka) <= 0.05 * ka and abs(b * 1000 - kb) <= 0.05 * kb for ka, kb in kt):
+                n += 1
+        if n >= 2:
+            kq.append(t)
+    return kq
 
 
 def _nhan_cot(cot_hinh, cao_chu, va_cham, them, ghi_de=None, loai_cot=None):

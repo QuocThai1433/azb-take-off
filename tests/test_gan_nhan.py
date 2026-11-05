@@ -281,3 +281,22 @@ def test_san_sep_nhap_chieu_day_theo_bang(tmp_path):
     if kq["loai_san"]:  # fixture có ô sàn
         kq = gan_nhan(_tao(tmp_path), LOAI, VUNG, {**tc, "kt_mong": {"S1": {"t": 120}}})
         assert kq["loai_san"][0]["t"] == 120 and all(n["t"] == "S1 t=120" for n in kq["nhan"])
+
+
+def test_nhan_cot_tu_do_layer_theo_kich_thuoc_ghi_trong_ban_ve(tmp_path):
+    """Chưa gán layer Cột: lấy layer có hình chữ nhật đúng kích thước cột ghi sẵn ("40x60"), bỏ layer khác."""
+    doc = ezdxf.new("R2010")
+    doc.header["$INSUNITS"] = 4
+    for l in ("COT_LA", "KHAC", "CHU"):
+        doc.layers.add(l)
+    msp = doc.modelspace()
+    for x in (X0, X1):
+        _hcn(msp, "COT_LA", x - 200, Y0 - 300, x + 200, Y0 + 300)   # 400x600
+        _hcn(msp, "KHAC", x - 150, Y0 + 2000, x + 150, Y0 + 2300)   # 300x300: không có trong bảng
+    msp.add_text("40x60", dxfattribs={"layer": "CHU", "height": 150, "insert": (X0, Y0 + 900)})
+    f = tmp_path / "cot.dxf"
+    doc.saveas(f)
+    kq = gan_nhan(doc_ban_ve(f), {}, VUNG, {"nhan_dam": False, "nhan_truc": False, "nhan_mong": False, "nhan_coc": False,
+                                           "nhan_san": False, "nhan_cot": True, "ty_le": 50})
+    assert [n["t"] for n in kq["nhan"] if n["loai"] == "cot"] == ["C1-600X400"] * 2
+    assert any("COT_LA" in c and "tự dò" in c for c in kq["canh_bao"])
