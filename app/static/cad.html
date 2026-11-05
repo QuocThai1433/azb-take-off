@@ -354,6 +354,225 @@
   #bk-pop[hidden] { display:none; }
   #bk-pop button, #bk-pop select { width:100%; height:30px; text-align:left; }
   html[data-gd=toi] #bk-pop { background:#0F1726; border-color:#22304D; }
+  /* ===================================================================
+     GIAO DIỆN V2: gọn, thoáng, đồng nhất (ghi đè lớp CSS phía trên, không đổi DOM/JS)
+     - Tiêu đề 1 hàng · thanh công cụ dạng thẻ nhóm · cột trái dạng danh sách thoáng
+     - Tab bảng phải xuống dòng, không bị cắt chữ · bảng số liệu kẻ ngang, dễ đọc
+     =================================================================== */
+  :root {
+    --r-sm:6px; --r-md:8px; --r-lg:12px;
+    --sh-1:0 1px 2px rgba(16,40,80,.07); --sh-2:0 6px 20px rgba(16,40,80,.16);
+    --ring:0 0 0 3px rgba(0,76,151,.20);
+  }
+  html[data-gd=toi] { --ring:0 0 0 3px rgba(61,139,255,.28); --sh-1:0 1px 2px rgba(0,0,0,.4); --sh-2:0 10px 28px rgba(0,0,0,.55); }
+  html:root body { font-size:13px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+
+  /* Thanh cuộn mảnh */
+  html:root * { scrollbar-width:thin; scrollbar-color:var(--vien) transparent; }
+  ::-webkit-scrollbar { width:10px; height:10px; } ::-webkit-scrollbar-thumb { background:var(--vien); border-radius:6px; border:2px solid transparent; background-clip:content-box; }
+  ::-webkit-scrollbar-thumb:hover { background:var(--mo); background-clip:content-box; } ::-webkit-scrollbar-track { background:transparent; }
+
+  /* Nút & ô nhập chung */
+  html:root button, html:root select, html:root input { border-radius:var(--r-sm); }
+  html:root button { font-weight:500; letter-spacing:.1px; }
+  html:root button:focus-visible, html:root input:focus-visible, html:root select:focus-visible { outline:0; box-shadow:var(--ring); border-color:var(--xanh); }
+  html:root input[type=text], html:root input[type=search], html:root input[type=number], html:root select { height:30px; }
+  html:root input[type=checkbox] { height:auto; width:15px; }
+
+  /* ---------- Thanh tiêu đề ---------- */
+  html:root #tieu-de { padding:8px 18px; gap:8px 18px; border-bottom:0; box-shadow:0 2px 0 var(--cam), 0 6px 18px rgba(0,30,70,.25); position:relative; z-index:30; }
+  html:root img.logo { height:36px; }
+  html:root .ten-app { padding-left:14px; }
+  html:root .ten-app b { font-size:15.5px; letter-spacing:1.2px; }
+  html:root .ten-app span { font-size:11px; max-width:300px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  html:root #tieu-de .hien-an { background:rgba(255,255,255,.07); border-radius:8px; padding:2px; gap:2px; }
+  html:root #tieu-de .hien-an button { height:28px; padding:0 12px; margin:0; border:0 !important; border-radius:6px !important; background:transparent; color:rgba(255,255,255,.88); font-size:12.5px; white-space:nowrap; }
+  html:root #tieu-de .hien-an button:hover { background:rgba(255,255,255,.16); color:#fff; }
+  html:root #tieu-de .hien-an button.on { background:var(--cam); color:#fff; box-shadow:0 1px 4px rgba(0,0,0,.3); }
+  html:root #tieu-de #hien-t:not(.on), html:root #tieu-de #hien-p:not(.on) { color:rgba(255,255,255,.55); }
+  html:root #tieu-de input[type=text] { height:30px; width:min(240px, 24vw); border-radius:8px; background:rgba(255,255,255,.95); border:1px solid transparent; }
+  html:root #tieu-de input[type=text], html[data-gd=toi]:root #tieu-de input[type=text] { background:rgba(255,255,255,.12); color:#fff; border:1px solid rgba(255,255,255,.28); }
+  html:root #tieu-de input[type=text]::placeholder { color:rgba(255,255,255,.6); }
+  html:root #tieu-de input[type=text]:focus { background:rgba(255,255,255,.2); }
+  html:root #tieu-de input[type=text]:focus { box-shadow:0 0 0 3px rgba(244,122,32,.45); border-color:var(--cam); }
+  html:root .du-an-o { font-size:12.5px; gap:8px; color:rgba(255,255,255,.85); }
+  html:root #lb-tu-luu { font-size:12.5px; color:rgba(255,255,255,.88); }
+  html:root #bk-luu { background:rgba(255,255,255,.14) !important; color:#fff !important; font-weight:600; }
+  html:root #bk-luu:hover { background:rgba(255,255,255,.26) !important; }
+  html:root #bk-pop { border-radius:var(--r-md); box-shadow:var(--sh-2); top:calc(100% + 10px); }
+  html:root #bk-pop button, html:root #bk-pop select { background:var(--sf2); color:var(--chu); border:1px solid var(--vien); border-radius:6px !important; font-weight:500; }
+  html:root #bk-pop button:hover { background:var(--xanh-nhat); border-color:var(--xanh); }
+
+  /* ---------- Thanh công cụ (ribbon) ---------- */
+  html:root #ribbon { background:var(--sf); border-bottom:1px solid var(--vien); box-shadow:var(--sh-1); padding:8px 14px; gap:8px 10px; align-items:center; position:relative; z-index:20; }
+  html[data-gd=toi]:root #ribbon { background:#0B111D; border-bottom-color:#16213A; }
+  html:root #ribbon .nhom, html[data-gd=toi]:root #ribbon .nhom {
+    background:var(--sf2); border:1px solid var(--ln); border-left:1px solid var(--ln); border-radius:10px; box-shadow:none;
+    padding:4px 10px 4px 12px; gap:10px; flex-direction:row; align-items:center; }
+  html[data-gd=toi]:root #ribbon .nhom { background:#101828; border-color:#1C2943; }
+  html:root #ribbon .nhom:first-child { padding-left:10px; }
+  html:root #ribbon .nhom h6 { order:-1; font-size:10px; font-weight:700; letter-spacing:.9px; color:var(--mo); text-transform:uppercase; white-space:nowrap; padding-right:10px; border-right:1px solid var(--vien); line-height:26px; margin:0; }
+  html[data-gd=toi]:root #ribbon .nhom h6 { color:#7FA6D8; border-right-color:#22304D; }
+  html:root #ribbon .nhom h6[style*="none"] { display:none !important; }
+  html:root #ribbon .nut { gap:6px; }
+  html:root #ribbon .nut button, html:root #ribbon .nut select, html:root #ribbon .nut input, html:root #ribbon label.nut-file { height:30px; font-size:12.5px; }
+  html:root #ribbon .nut button { padding:0 12px; background:var(--sf); border-color:var(--vien); color:var(--chu); white-space:nowrap; }
+  html[data-gd=toi]:root #ribbon .nut button:not(.on) { background:#162238; border-color:#2A3A5C; color:#D6E4FF; }
+  html:root #ribbon .nut button:hover { border-color:var(--xanh); background:var(--xanh-nhat); color:var(--xanh); }
+  html[data-gd=toi]:root #ribbon .nut button:hover:not(.on) { background:#1E2F50; color:#fff; }
+  html:root #ribbon .nut button.on { background:var(--xanh); border-color:var(--xanh); color:#fff; box-shadow:0 1px 4px rgba(0,76,151,.35); }
+  html[data-gd=toi]:root #ribbon .nut button.on { background:#3D8BFF; border-color:#3D8BFF; }
+  html:root #ribbon .nut input[type=number] { width:62px; text-align:center; padding:0 4px; background:var(--sf); }
+  html:root #ribbon .nut input[type=number]::placeholder, html:root #ribbon .nut input[type=text]::placeholder { color:var(--mo); font-size:11.5px; opacity:.85; }
+  html:root #ribbon .nut input#ty-le-pdf { width:96px !important; }
+  html:root #ribbon .nut input#o-tim { width:176px !important; }
+  html[data-gd=toi]:root #ribbon .nut select, html[data-gd=toi]:root #ribbon .nut input { background:#0A101B; }
+  html:root label.nut-file { border-radius:var(--r-sm); background:var(--cam); box-shadow:0 1px 4px rgba(217,101,15,.4); font-size:12.5px; }
+  html:root #t-vung { border-radius:6px; } html:root #t-bo-vung { border-radius:6px; margin:0 6px 0 0; }
+  html:root #s-tim { min-width:0 !important; font-size:11.5px; }
+  html:root #s-tim:empty { display:none; }
+  html:root #t-tk { background:var(--xanh); border-color:var(--xanh); color:#fff; }
+  html:root #t-tk:hover { background:var(--xanh-hv); color:#fff !important; border-color:var(--xanh-hv); }
+  html:root #t-3d { border-color:var(--cam) !important; color:var(--cam-dam) !important; background:var(--cam-nhat) !important; }
+  html:root #t-3d:hover { background:var(--cam) !important; color:#fff !important; }
+  html[data-gd=toi]:root #t-3d { color:#FFB27A !important; background:#2B1D12 !important; }
+
+  /* ---------- Khung làm việc, thanh chia ---------- */
+  html:root .chia { background:transparent; width:4px; }
+  html:root .chia::after { content:""; position:absolute; inset:0 1px; background:var(--vien); transition:background .15s; }
+  html:root .chia:hover::after, html:root .chia.keo::after { background:var(--cam); inset:0 0; }
+  html:root .chia.chia-h::after { inset:1px 0; }
+
+  /* ---------- Cột trái ---------- */
+  html:root .cot { border-right:1px solid var(--vien); }
+  html:root .tieu { background:var(--sf); color:var(--mo); border:0; border-top:1px solid var(--ln); border-bottom:1px solid var(--ln); padding:9px 12px 8px; font-size:10.5px; font-weight:700; letter-spacing:.9px; text-transform:uppercase; }
+  html:root .tieu:first-child, html:root #pn-t > .tieu:first-child { border-top:0; }
+  html:root .tieu::before { content:""; display:inline-block; width:3px; height:10px; background:var(--cam); border-radius:2px; margin-right:7px; vertical-align:-1px; }
+  html:root .tieu:has(.grip)::before { display:none; }
+  html:root .tieu .grip { color:var(--mo); padding:0 6px 0 0; font-size:13px; }
+  html[data-gd=toi]:root .tieu { background:#0C1320; color:#7FA6D8; border-color:#16213A; }
+  html:root .dong-x { border-radius:6px; }
+  html:root .dong-x:hover { background:rgba(198,40,40,.12); color:var(--do); }
+
+  html:root .cc-item { margin:1px 6px; padding:7px 10px; border:0; border-radius:var(--r-sm); font-size:13px; align-items:center; }
+  html:root .cc-item .nho { font-size:10.5px; background:var(--sf3); border-radius:10px; padding:1px 8px; color:var(--mo); }
+  html:root .cc-item:hover { background:var(--hv); }
+  html:root .cc-item.act { background:var(--xanh-nhat); box-shadow:inset 3px 0 var(--cam); color:var(--xanh); font-weight:600; }
+  html:root .cc-item.act .nho { background:var(--sf); color:var(--xanh); }
+  html[data-gd=toi]:root .cc-item .nho { background:#162038; color:#8B97AD; }
+  html[data-gd=toi]:root .cc-item.act { color:#fff; }
+  html:root #ds-cc { padding:4px 0 8px; }
+
+  html:root .ds-file { margin:4px 8px; padding:8px 10px; border:1px solid var(--ln); border-radius:var(--r-md); background:var(--sf); box-shadow:var(--sh-1); gap:6px; }
+  html:root .ds-file:hover { border-color:var(--xanh-vien); background:var(--hv); }
+  html:root .ds-file.act { background:var(--xanh-nhat); border-color:var(--xanh); box-shadow:inset 3px 0 var(--xanh); }
+  html:root .ds-file .ten { font-weight:600; font-size:12.5px; }
+  html:root .ds-file select { height:28px; font-size:12px; }
+  html[data-gd=toi]:root .ds-file { background:#0F1829; border-color:#1B2740; }
+  html[data-gd=toi]:root .ds-file.act { background:linear-gradient(90deg,rgba(61,139,255,.22),rgba(61,139,255,.05)); border-color:#2A4A80; }
+  html:root .tv-dong { margin:1px 6px; padding:6px 8px; border:0; border-radius:var(--r-sm); }
+  html:root .tv-dong .ten { font-size:12.5px; }
+  html:root .tv-dong .nho { font-size:10.5px; }
+  html:root .tv-dong:hover { background:var(--hv); }
+  html:root .lay-tool { padding:8px 10px; gap:6px; background:var(--sf2); border-bottom:1px solid var(--ln); }
+  html:root .lay-tool input, html:root .lay-tool select { height:28px; font-size:12px; padding:2px 8px; }
+  html:root .lay-tool button { height:28px; font-size:11.5px; padding:0 8px; }
+  html[data-gd=toi]:root .lay-tool { background:#0A101B; }
+  html:root .lay { padding:4px 10px; border-bottom:1px solid var(--ln); font-size:12.5px; }
+  html:root .lay:hover { background:var(--hv); }
+  html:root .lay .mau { border-radius:3px; }
+  html:root .lay select { height:26px; font-size:11.5px; }
+
+  /* ---------- Vùng bản vẽ ---------- */
+  html:root #tab-file { gap:3px; padding:6px 8px 0; min-height:36px; border-bottom:2px solid var(--xanh); }
+  html:root #tab-file div { padding:5px 14px; border-radius:8px 8px 0 0; font-size:12.5px; background:var(--dk-nen2); border-color:transparent; transition:background .12s, color .12s; }
+  html:root #tab-file div:hover { background:color-mix(in srgb, var(--dk-nen2) 70%, var(--xanh) 30%); }
+  html:root #tab-file div.act { box-shadow:inset 0 2px var(--cam); font-weight:600; border-color:var(--dk-vien); }
+  html:root #trang-thai { padding:5px 14px; gap:3px 22px; font-size:12px; }
+  html:root #lenh { background:var(--dk-nen); }
+  html:root #lich-su { height:56px; padding:5px 14px; }
+  html:root #dong-lenh { padding:3px 14px 7px; border-top:1px solid var(--dk-vien); font-size:12px; }
+  html:root #dong-lenh span { font-weight:700; }
+  html:root #giua #dong-lenh input { height:26px; border-radius:0; box-shadow:none; padding:0 4px; font-family:Consolas, monospace; font-size:12px; }
+  html:root #giua #dong-lenh input:focus-visible { box-shadow:none; }
+  html:root #trong { font-size:14px; letter-spacing:.3px; }
+
+  /* ---------- Bảng bên phải ---------- */
+  html:root .cot.phai { background:var(--sf); }
+  html:root .tab-phai { align-items:flex-start; overflow:visible; padding:8px 8px 6px; gap:2px; background:var(--sf2); border-bottom:1px solid var(--vien); position:relative; }
+  html[data-gd=toi]:root .tab-phai { background:#0A101B; border-bottom-color:#16213A; }
+  html:root .tab-phai .tab-cuon { display:flex; flex-wrap:wrap; gap:4px; overflow:visible; padding:0; align-content:flex-start; }
+  html:root .tab-phai .grip { align-self:flex-start; margin:5px 0 0 0 !important; }
+  html:root .tab-phai .dong-x { margin:0 0 0 2px; align-self:flex-start; }
+  html:root .tab-phai div, html:root .tab-phai .tab-cuon > div { flex:0 0 auto; overflow:visible; text-overflow:clip; padding:5px 11px; border:1px solid transparent; border-radius:20px; font-size:12.5px; font-weight:500; color:var(--mo); box-shadow:none; transition:background .12s, color .12s; }
+  html:root .tab-phai div:hover { background:var(--sf); border-color:var(--vien); color:var(--xanh); }
+  html:root .tab-phai div.act { background:var(--xanh); border-color:var(--xanh); color:#fff; box-shadow:0 1px 4px rgba(0,76,151,.35); }
+  html[data-gd=toi]:root .tab-phai div { border-right-color:transparent; }
+  html[data-gd=toi]:root .tab-phai div:hover { background:#14213A; border-color:#2A3A5C; color:#CFE0FF; }
+  html[data-gd=toi]:root .tab-phai div.act { background:#3D8BFF; border-color:#3D8BFF; color:#fff; box-shadow:0 1px 6px rgba(61,139,255,.4); }
+
+  html:root .noi-dung { padding:14px 16px 24px; }
+  html:root .noi-dung h4 { margin:20px 0 8px; font-size:13px; font-weight:700; color:var(--chu); padding-left:0; border-left:0; display:flex; align-items:center; gap:8px; }
+  html:root .noi-dung h4:first-child { margin-top:0; }
+  html:root .noi-dung h4::before { content:""; width:4px; height:14px; border-radius:2px; background:var(--cam); flex:none; }
+  html[data-gd=toi]:root .noi-dung h4 { color:#E8EDF6; }
+  html:root .nho { color:var(--mo); }
+
+  /* Bảng số liệu: kẻ ngang, tiêu đề gọn, hàng xen kẽ */
+  html:root table:not(.nhom) { border-collapse:separate; border-spacing:0; font-size:12.5px; border:1px solid var(--ln); border-radius:var(--r-md); overflow:hidden; }
+  html:root table:not(.nhom) th, html:root table:not(.nhom) td { border:0; border-bottom:1px solid var(--ln); padding:6px 9px; }
+  html:root table:not(.nhom) th { background:var(--sf3); color:var(--mo); font-size:10.5px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; border-bottom:1px solid var(--vien); white-space:normal; }
+  html:root table:not(.nhom) tbody tr:last-child td { border-bottom:0; }
+  html:root table:not(.nhom) tbody tr:nth-child(even) td { background:color-mix(in srgb, var(--sf2) 70%, transparent); }
+  html:root table:not(.nhom) tbody tr:hover td { background:var(--xanh-nhat); }
+  html:root table.cc tbody { border-top:0; }
+  html:root tr.tong td { background:var(--xanh-nhat) !important; color:var(--xanh); }
+  html[data-gd=toi]:root table:not(.nhom) { border-color:#1B2740; }
+  html[data-gd=toi]:root table:not(.nhom) th { background:#101A2E; color:#7FA6D8; }
+  html[data-gd=toi]:root table:not(.nhom) td, html[data-gd=toi]:root table:not(.nhom) th { border-bottom-color:#1B2740; }
+  html[data-gd=toi]:root table:not(.nhom) tbody tr:nth-child(even) td { background:rgba(255,255,255,.02); }
+  html[data-gd=toi]:root table:not(.nhom) tbody tr:hover td { background:#121C30; }
+  html[data-gd=toi]:root tr.tong td { background:#13213B !important; color:#8EC0FF; }
+  html:root tr.sang td, html:root tbody.sang td { background:var(--sang) !important; }
+
+  /* Thẻ "Bóc theo nhóm" */
+  html:root table.nhom tr { border-radius:var(--r-md); background:var(--sf2); border-color:var(--ln); box-shadow:var(--sh-1); }
+  html[data-gd=toi]:root table.nhom tr { background:#0F1829; border-color:#1B2740; }
+  html:root table.nhom td::before { color:var(--mo); }
+
+  /* Ô nhập trong bảng/nội dung */
+  html:root .noi-dung input[type=text], html:root .noi-dung input[type=number], html:root .noi-dung select { height:28px; padding:0 8px; font-size:12.5px; }
+  html:root table.cc input[type=text], html:root table.cc input[type=number] { height:26px; padding:0 6px; }
+  html:root .noi-dung button { height:28px; padding:0 12px; }
+  html:root .buoc { gap:8px; margin:8px 0; }
+  html:root .buoc button { height:30px; padding:0 14px; border-radius:var(--r-sm); }
+  html:root .buoc button.cho { box-shadow:0 1px 4px rgba(217,101,15,.4); }
+  html:root .hang { gap:8px; }
+
+  /* Hộp hướng dẫn, cảnh báo */
+  html:root .huong-dan { border-radius:var(--r-md); padding:8px 12px; margin:8px 0; font-size:12.5px; line-height:1.5; border-width:1px; border-left-width:4px; }
+  html:root .cb { background:rgba(244,122,32,.08); border-left:3px solid var(--cam); border-radius:0 6px 6px 0; padding:5px 10px; margin:5px 0; font-size:12px; line-height:1.5; }
+  html[data-gd=toi]:root .cb { background:rgba(255,180,84,.07); }
+  html:root details.ct-sua { border-radius:var(--r-md); padding:6px 10px; background:var(--sf2); }
+  html:root .chip { border-radius:12px; padding:1px 10px; }
+  html:root .khop, html:root .lech, html:root .chua { font-weight:500; }
+
+  /* Hộp thoại */
+  html:root #hop { border-radius:var(--r-lg); box-shadow:0 20px 50px rgba(0,0,0,.45); }
+  html:root #hop-nen { backdrop-filter:blur(3px); }
+
+  /* ---------- Co giãn theo màn hình ---------- */
+  @media (max-width:1400px) { html:root .ten-app span { display:none; } }
+  @media (max-width:1180px) {
+    html:root #tieu-de { padding:6px 12px; gap:6px 12px; }
+    html:root #tieu-de input[type=text] { width:180px; }
+    html:root #ribbon .nhom { padding:3px 8px; }
+  }
+  @media (max-width:700px) {
+    html:root #ribbon .nhom { width:100%; flex-wrap:wrap; }
+    html:root #ribbon .nhom h6 { border-right:0; padding-right:0; width:100%; }
+    html:root .tab-phai { position:sticky; top:0; z-index:3; }
+  }
 </style>
 </head>
 <body>
