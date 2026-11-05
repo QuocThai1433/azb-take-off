@@ -24,6 +24,7 @@ from dataclasses import replace
 from shapely.affinity import rotate, translate
 from shapely.geometry import Polygon, box
 from shapely.ops import unary_union
+from shapely.strtree import STRtree
 
 from .dam_suy_ra import suy_dam
 from .dxf_reader import HinhKin, LayerData, cat_vung
@@ -1073,6 +1074,20 @@ def _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao, toi_da=0.8, ghi_d
     return so
 
 
+def _cay_net_ve(trong, bo_layer):
+    """Cây tìm nhanh các nét vẽ trong vùng (nét hở + cạnh hình kín) ở mọi layer đang bật, trừ layer cọc và khung tên/chú thích.
+    None nếu không có nét nào."""
+    ds = []
+    for t, ld in trong.layers.items():
+        if ld.tat or t in bo_layer or RE_LAYER_KHONG_PHAI_DAM.search(t):
+            continue
+        ds.extend(n for n in ld.net_ho if n.length > 0)
+        for h in ld.hinh_kin:
+            if h.nguon != "CIRCLE" and h.geom.area < 2000:  # bỏ khung bao lớn; hình tròn (cọc/bong bóng) không tính
+                ds.append(h.geom.exterior if h.geom.geom_type == "Polygon" else h.geom.boundary)
+    return STRtree(ds) if ds else None
+
+
 RE_LAYER_COC = re.compile(r"pile|c[oọ]c", re.I)
 
 
@@ -1098,6 +1113,10 @@ def _nhan_coc_khong_ten(trong, tron, dk_bang, dai_bang, ghi_de, cao_chu, va_cham
     dk = int(gd.get("d") or dk0)
     dai = float(gd.get("l") or 0) or dai_bang
     da, so, chong, nho, khong_cho = set(), 0, 0, 0, []
+    cay_net = _cay_net_ve(trong, {t for t, _, _ in ds})  # nét vẽ (kích thước, trục, khung...) để nhãn né
+
+    def vuong_net(hop):
+        return cay_net is not None and len(cay_net.query(hop, predicate="intersects")) > 0
     chu = f"D{dk}" + (f" L={dai:g}m" if dai else "")
     for t, g, d in ds:
         if abs(d * 1000 - dk0) > 0.05 * dk0:
@@ -1109,15 +1128,26 @@ def _nhan_coc_khong_ten(trong, tron, dk_bang, dai_bang, ghi_de, cao_chu, va_cham
         da.add(khoa)
         cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
         dat = False
-        for he_so in (1.0, 0.7, 0.5, 0.35, 0.25, 0.18):  # cọc dày: thu nhỏ chữ dần cho vừa chỗ thay vì chồng lên nhau
-            cao = round(cao_chu * he_so, 4)
-            khe = KHE_NHAN * cao
-            for ox, oy, neo in ((x1 + khe, cy, "ml"), (x0 - khe, cy, "mr"), (cx, y0 - khe, "tc"), (cx, y1 + khe, "bc")):
-                if not va_cham(_hop_chu(ox, oy, 0.0, cao, neo, len(chu) + 1)):  # +1 ký tự dự phòng: chữ in rộng hơn ước lượng
-                    them("coc", chu, ox, oy, 0.0, cao, neo)
-                    so += 1
-                    nho += he_so < 1.0
-                    dat = True
+        # Lượt 1: chữ không đè nét vẽ (thu nhỏ đến 35%); lượt 2: chấp nhận đè nét, thu nhỏ dần đến 18% cho khỏi chồng nhãn khác
+        for ne_net, cac_he_so in ((True, (1.0, 0.7, 0.5, 0.35)), (False, (1.0, 0.7, 0.5, 0.35, 0.25, 0.18))):
+            for he_so in cac_he_so:
+                cao = round(cao_chu * he_so, 4)
+                khe = KHE_NHAN * cao
+                vi_tri = [(x1 + khe, cy, "ml"), (x0 - khe, cy, "mr"), (cx, y0 - khe, "tc"), (cx, y1 + khe, "bc")]
+                if ne_net:  # tìm khe trống giữa các nét: thêm 4 góc chéo và vòng xa hơn
+                    k2 = 4 * khe
+                    vi_tri += [(x1 + khe, y1 + khe, "bl"), (x0 - khe, y1 + khe, "br"), (x1 + khe, y0 - khe, "tl"), (x0 - khe, y0 - khe, "tr"),
+                               (x1 + k2, cy, "ml"), (x0 - k2, cy, "mr"), (cx, y0 - k2, "tc"), (cx, y1 + k2, "bc"),
+                               (x1 + k2, y1 + k2, "bl"), (x0 - k2, y1 + k2, "br"), (x1 + k2, y0 - k2, "tl"), (x0 - k2, y0 - k2, "tr")]
+                for ox, oy, neo in vi_tri:
+                    hop = _hop_chu(ox, oy, 0.0, cao, neo, len(chu) + 1)  # +1 ký tự dự phòng: chữ in rộng hơn ước lượng
+                    if not va_cham(hop) and not (ne_net and vuong_net(hop)):
+                        them("coc", chu, ox, oy, 0.0, cao, neo)
+                        so += 1
+                        nho += he_so < 1.0
+                        dat = True
+                        break
+                if dat:
                     break
             if dat:
                 break
