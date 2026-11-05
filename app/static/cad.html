@@ -860,7 +860,7 @@ function ve() {
           const cao = (t.h > 0 ? t.h : 0.25) * s;  // chữ không rõ chiều cao: tạm lấy 250mm
           if (t.x < xmin - 5 || t.x > xmax + 5 || t.y < ymin - 5 || t.y > ymax + 5) continue;
           if (cao < 3) {  // nhãn mới dán mà zoom xa quá: vẽ chấm đỏ để biết nhãn nằm đâu (zoom gần sẽ thấy chữ)
-            if (l.ten === TEN_NHAN) ctx.fillRect(sx(t.x) - 1.5, sy(t.y) - 1.5, 3, 3);
+            if (l.ten === TEN_NHAN) ctx.fillRect(sx(t.x) - 2, sy(t.y) - 2, 4, 4);
             continue;
           }
           const dong = t.t.split(/\r?\n|\\P/), a = t.a || "bl", r = -(t.r || 0) * Math.PI / 180;
@@ -1802,7 +1802,7 @@ function veNhanLenHinh(f) {  // nhãn của mọi mặt bằng thành một laye
   const chu = kqs.flatMap(k => k.nhan).map(n => ({t:n.t, x:n.x, y:n.y, h:n.cao, r:n.goc, a:n.neo, w:1}));
   const hinh = kqs.flatMap(k => k.bong).map(b => Array.from({length:49}, (_, i) => [+(b.x + b.r * Math.cos(i / 48 * 2 * Math.PI)).toFixed(3), +(b.y + b.r * Math.sin(i / 48 * 2 * Math.PI)).toFixed(3)]));
   f.hinh.layers[TEN_NHAN] = {hinh, hi:hinh.map(() => ({a:0, c:0, n:"AZB", h:"", lo:0})), net:[], ni:[], chu, tat:false};
-  const l = {ten:TEN_NHAN, loai:"bo_qua", hien:true, mau:"#ff453a", sl:hinh.length, so_chu:chu.length, khoa:true};
+  const l = {ten:TEN_NHAN, loai:"bo_qua", hien:true, mau:"#ff2bd6", sl:hinh.length, so_chu:chu.length, khoa:true};
   const i = f.layers.findIndex(x => x.ten === TEN_NHAN);
   if (i < 0) f.layers.push(l); else f.layers[i] = {...l, hien:f.layers[i].hien};
   ve_layer(); veLai();

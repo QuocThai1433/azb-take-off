@@ -849,6 +849,8 @@ def _nhan_san(ban_ve, dam, tang, cao_chu, va_cham, them, canh_bao):
     cum = [cum] if cum.geom_type == "Polygon" else list(cum.geoms)
     o = [Polygon(ring) for c in cum for ring in c.interiors if Polygon(ring).area >= 0.3]
     if not o:
+        canh_bao.append("Sàn: không thấy ô sàn nào (lỗ kín ≥ 0,3 m² nằm giữa các dầm) nên không dán nhãn sàn. "
+                        "Mặt bằng móng thường không có sàn; mặt bằng sàn thì kiểm tra layer dầm đã gán đúng chưa.")
         return 0
     t_mm, _ = _day_san(ban_ve, tang)
     if not t_mm:
@@ -870,7 +872,7 @@ def _nhan_san(ban_ve, dam, tang, cao_chu, va_cham, them, canh_bao):
 
 
 # ---------- Xuất DXF có nhãn ----------
-def ve_nhan_vao_dxf(doc, he_so, ket_qua, mau=1):
+def ve_nhan_vao_dxf(doc, he_so, ket_qua, mau=6):
     """Thêm nhãn (TEXT) và bong bóng trục (CIRCLE) vào bản vẽ ezdxf, trên layer AZB-NHAN. Toạ độ đổi từ mét về đơn vị bản vẽ."""
     from ezdxf.enums import TextEntityAlignment as A
     neo_map = {"bl": A.BOTTOM_LEFT, "bc": A.BOTTOM_CENTER, "br": A.BOTTOM_RIGHT, "ml": A.MIDDLE_LEFT, "mc": A.MIDDLE_CENTER,
