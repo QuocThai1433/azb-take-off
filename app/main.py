@@ -10,6 +10,7 @@ import uuid
 import zipfile
 from pathlib import Path
 
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -45,6 +46,7 @@ async def _vong_doi(_app):
 
 
 app = FastAPI(title="AZB - Bóc khối lượng", lifespan=_vong_doi)
+app.add_middleware(GZipMiddleware, minimum_size=1024)  # JSON hình học của bản vẽ nặng rất lớn, nén lại cho tải nhanh (nhất là qua tunnel)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 

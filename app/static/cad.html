@@ -1041,7 +1041,25 @@ function lamMoiKT() {
 const loaiLayer = f => Object.fromEntries(f.layers.map(l => [l.ten, l.loai]));
 
 // ---------- Khung xem (canvas) ----------
-const cv = $("cv"), ctx = cv.getContext("2d");
+const cv = $("cv"), ctxChinh = cv.getContext("2d");
+let ctx = ctxChinh;  // nơi đang vẽ: cảnh nền vẽ vào canvas ẩn, lớp phủ vẽ vào canvas chính
+// Bản vẽ nặng: cảnh nền (hình, đường, chữ) chỉ vẽ lại khi khung nhìn hoặc dữ liệu đổi; rê chuột/hover chỉ chép lại ảnh đã vẽ
+const canh = {cv: document.createElement("canvas"), khoa: null}; canh.ctx = canh.cv.getContext("2d");
+const NANG = 15000;  // từ ngần này đối tượng trở lên coi là bản vẽ nặng: kéo/zoom thì vẽ bản nhanh, dừng tay mới vẽ đủ
+let tZoom = 0, hoverCho = null, hoverRaf = 0;
+function dangTuongTac() {
+  const f = F(); return !!f && f.soDT >= NANG && ((S.keo && S.keo.kieu === "pan") || performance.now() - tZoom < 180);
+}
+function khoaCanh(f) {
+  let n = 0, k = f.id + "|" + W + "x" + H + "@" + dpr + "|" + S.v.cx + "," + S.v.cy + "," + S.v.s;
+  for (const l of f.layers) {
+    const g = f.hinh.layers[l.ten]; if (!g) continue;
+    n += g.hinh.length + g.net.length;
+    k += "|" + l.ten + (l.hien ? 1 : 0) + l.mau + ":" + g.hinh.length + "," + g.net.length + "," + (g.chu || []).length;
+    if (l.ten === TEN_NHAN) k += (g.chu || []).map(t => t.t + t.x + t.y + t.h).join(";");
+  }
+  f.soDT = n; return k + (dangTuongTac() ? "|nhanh" : "");
+}
 let W = 0, H = 0, dpr = 1, cho = false;
 function coKhung() {
   dpr = window.devicePixelRatio || 1;
@@ -1066,11 +1084,10 @@ function zoomVung() {
 }
 function veLai() { if (cho) return; cho = true; requestAnimationFrame(() => { cho = false; ve(); }); }
 
-function ve() {
+function veCanh(f) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
-  const f = F();
   if (f) {
-    const xmin = wx(0), xmax = wx(W), ymin = wy(H), ymax = wy(0), s = S.v.s;
+    const xmin = wx(0), xmax = wx(W), ymin = wy(H), ymax = wy(0), s = S.v.s, nhanh = dangTuongTac(), nho = nhanh ? 2.5 : 0.6;
     ctx.lineWidth = 1; ctx.lineJoin = "round";
     for (const l of f.layers) {
       if (!l.hien) continue;
@@ -1080,13 +1097,18 @@ function ve() {
         let a = p[0][0], b = p[0][0], c = p[0][1], d = p[0][1];
         if (!p.bb) { for (const q of p) { if (q[0] < a) a = q[0]; if (q[0] > b) b = q[0]; if (q[1] < c) c = q[1]; if (q[1] > d) d = q[1]; } p.bb = [a, b, c, d]; }
         const bb = p.bb; if (bb[1] < xmin || bb[0] > xmax || bb[3] < ymin || bb[2] > ymax) continue;
-        if ((bb[1] - bb[0]) * s < 0.6 && (bb[3] - bb[2]) * s < 0.6) { ctx.moveTo(sx(bb[0]), sy(bb[2])); ctx.lineTo(sx(bb[0]) + 0.6, sy(bb[2])); continue; }
-        ctx.moveTo(sx(p[0][0]), sy(p[0][1]));
-        for (let i = 1; i < p.length; i++) ctx.lineTo(sx(p[i][0]), sy(p[i][1]));
+        if ((bb[1] - bb[0]) * s < nho && (bb[3] - bb[2]) * s < nho) { ctx.moveTo(sx(bb[0]), sy(bb[2])); ctx.lineTo(sx(bb[0]) + 0.6, sy(bb[2])); continue; }
+        let px = sx(p[0][0]), py = sy(p[0][1]); ctx.moveTo(px, py);
+        const cuoi = p.length - 1;  // bỏ điểm cách điểm vừa vẽ chưa tới 1px (mắt không thấy, đường cong dày điểm đỡ nặng)
+        for (let i = 1; i <= cuoi; i++) {
+          const qx = sx(p[i][0]), qy = sy(p[i][1]);
+          if (i < cuoi && Math.abs(qx - px) + Math.abs(qy - py) < 1) continue;
+          ctx.lineTo(qx, qy); px = qx; py = qy;
+        }
       }
       ctx.stroke();
     }
-    {  // chữ vẽ theo đúng chiều cao, góc xoay, điểm neo như trong CAD; quá nhỏ (<3px) thì bỏ qua cho đỡ rối
+    if (!nhanh) {  // chữ vẽ theo đúng chiều cao, góc xoay, điểm neo như trong CAD; quá nhỏ (<3px) thì bỏ qua cho đỡ rối
       let n = 0; ctx.textAlign = "left";
       const NEN = {t:"top", m:"middle", b:"alphabetic"}, COT = {l:"left", c:"center", r:"right"};
       for (const l of f.layers) {
@@ -1109,6 +1131,23 @@ function ve() {
       }
       ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
     }
+  }
+}
+
+function ve() {
+  const f = F();
+  const khoa = f ? khoaCanh(f) : "-" + W + "x" + H + "@" + dpr;
+  if (khoa !== canh.khoa) {
+    if (canh.cv.width !== cv.width || canh.cv.height !== cv.height) { canh.cv.width = cv.width; canh.cv.height = cv.height; }
+    ctx = canh.ctx; try { veCanh(f); } finally { ctx = ctxChinh; }
+    canh.khoa = khoa;
+    if (dangTuongTac()) setTimeout(veLai, 220);  // vừa vẽ bản nhanh khi kéo/zoom; dừng tay thì vẽ lại đủ chi tiết
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(canh.cv, 0, 0);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.lineWidth = 1; ctx.lineJoin = "round"; ctx.setLineDash([]);
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  if (f) {
+    const s = S.v.s;
     veNhanCC(f);
     veDoiTuong(f);
     veTim(f);
@@ -1147,7 +1186,10 @@ function chuotToa(e) { const r = cv.getBoundingClientRect(); return {x:e.clientX
 cv.addEventListener("mousemove", e => {
   const m = chuotToa(e); S.mouse = m;
   $("s-x").textContent = wx(m.x).toFixed(3); $("s-y").textContent = wy(m.y).toFixed(3);
-  if (S.tool === "pick" && !S.keo) capNhatHover(m);
+  if (S.tool === "pick" && !S.keo) {  // hover tìm đối tượng đắt trên bản vẽ nặng: mỗi khung hình chỉ làm một lần
+    hoverCho = m;
+    if (!hoverRaf) hoverRaf = requestAnimationFrame(() => { hoverRaf = 0; if (hoverCho && !S.keo && S.tool === "pick") capNhatHover(hoverCho); hoverCho = null; });
+  }
   if (S.keo) {
     if (Math.hypot(m.x - S.keo.px, m.y - S.keo.py) > 4) S.keo.moved = true;
     if (S.keo.kieu === "pan") { S.v.cx = S.keo.cx - (m.x - S.keo.px) / S.v.s; S.v.cy = S.keo.cy + (m.y - S.keo.py) / S.v.s; }
@@ -1156,7 +1198,7 @@ cv.addEventListener("mousemove", e => {
   }
   veLai();
 });
-cv.addEventListener("mouseleave", () => { S.mouse = null; S.hover = null; $("tip").hidden = true; veLai(); });
+cv.addEventListener("mouseleave", () => { hoverCho = null; S.mouse = null; S.hover = null; $("tip").hidden = true; veLai(); });
 cv.addEventListener("mousedown", e => {
   if (!F()) return; const m = chuotToa(e);
   if (e.button === 1 || (e.button === 0 && S.tool === "pan")) {
@@ -1187,7 +1229,7 @@ window.addEventListener("mouseup", e => {
   S.keo = null; veLai();
 });
 cv.addEventListener("wheel", e => {
-  e.preventDefault(); const m = chuotToa(e), k = e.deltaY > 0 ? 1 / 1.25 : 1.25, x = wx(m.x), y = wy(m.y);
+  e.preventDefault(); tZoom = performance.now(); const m = chuotToa(e), k = e.deltaY > 0 ? 1 / 1.25 : 1.25, x = wx(m.x), y = wy(m.y);
   S.v.s *= k; S.v.cx = x - (m.x - W / 2) / S.v.s; S.v.cy = y + (m.y - H / 2) / S.v.s; veLai();
 }, {passive:false});
 cv.addEventListener("auxclick", e => e.preventDefault());
