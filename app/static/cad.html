@@ -1015,6 +1015,12 @@ function giaoHop(p, b) {  // có đoạn nào của p cắt hoặc nằm trong h
   return false;
 }
 const hieuLuc = () => S.chon.filter(o => !S.loaiTru.has(o.ten));
+window.addEventListener("keydown", e => {  // Esc: bỏ chọn tất cả đối tượng đang chọn (không đụng khi đang gõ vào ô nhập hay đang có hộp thoại)
+  if (e.key !== "Escape" || e.defaultPrevented || !S.chon.length || document.getElementById("hop")) return;
+  if (e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
+  if (S.buoc || S.ctCho || S.gnCho || LAY.hoi) return;  // Esc đang dành để hủy các chế độ đó
+  const n = S.chon.length; S.chon = []; S.loaiTru = new Set(); veDT(); veLai(); lenh(`Đã bỏ chọn ${n} đối tượng (Esc).`, "ok");
+});
 const trung = (a, b) => a.ten === b.ten && a.k === b.k && a.i === b.i;
 
 function timDoiTuong(m, boQuaKhoa) {
