@@ -369,3 +369,21 @@ def test_nhan_dam_tu_cap_net_song_song_khi_chua_gan_layer(tmp_path):
 def test_mot_net_le_khong_thanh_dam(tmp_path):
     kq = gan_nhan(_tao_net_dam(tmp_path, ve_dam=False), LOAI, VUNG, {"nhan_truc": False, "nhan_san": False, "nhan_mong": False, "nhan_coc": False})
     assert kq["loai_dam"] == [] and any("Không tìm thấy dầm" in c for c in kq["canh_bao"])
+
+def test_khong_co_khung_o_thi_suy_dam_tu_hinh_manh(tmp_path):
+    """Dầm vẽ thành các hình dài mảnh rời (không có khung bao ô trống): vẫn nhận dầm, cột vuông không bị nhận."""
+    doc = ezdxf.new("R2010")
+    doc.header["$INSUNITS"] = 4
+    doc.layers.add("G-ANNO-TTLB")
+    msp = doc.modelspace()
+    for y in (Y0, Y1):  # 2 dầm X dài 4 m, rộng 200
+        _hcn(msp, "G-ANNO-TTLB", X0, y - 100, X1, y + 100)
+    for x in (X0, X1):  # 2 dầm Y dài 4 m, rộng 200
+        _hcn(msp, "G-ANNO-TTLB", x - 100, Y0, x + 100, Y1)
+    _hcn(msp, "G-ANNO-TTLB", X0 + 1000, Y0 + 1000, X0 + 1400, Y0 + 1400)  # cột 400x400: không phải dầm
+    f = tmp_path / "manh.dxf"
+    doc.saveas(f)
+    kq = gan_nhan(doc_ban_ve(f), {}, VUNG)
+    dam = [n for n in kq["nhan"] if n["loai"] == "dam"]
+    assert len(dam) == 4
+    assert any("tự suy dầm từ 4 hình" in c for c in kq["canh_bao"])

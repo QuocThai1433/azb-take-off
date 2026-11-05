@@ -103,10 +103,34 @@ def _co_khung_o(hs):
                for k in hs)
 
 
+def _dam_tu_hinh_manh(ban_ve):
+    """Dự phòng khi bản vẽ không có khung chứa ô trống: lấy các hình dài, mảnh (dầm vẽ nét hở đã ghép thành
+    hình) làm dầm. Bề rộng 100–1000 mm, dài ≥ 1 m và ≥ 3 lần bề rộng, dài ≤ 40 m. Trả danh sách hình."""
+    cand = []
+    for ld in ban_ve.layers.values():
+        if ld.tat:
+            continue
+        for h in ld.hinh_kin:
+            if h.nguon == "CIRCLE" or h.geom.area < 0.05:
+                continue
+            d = _do_dam(h.geom)
+            if not d:
+                continue
+            b, dai = d[2], d[3]
+            if BE_RONG_DAM[0] <= b <= BE_RONG_DAM[1] and 1.0 <= dai <= 40 and dai >= 3 * b:
+                cand.append(h.geom)
+    duy_nhat = []
+    for g in sorted(cand, key=lambda g: -g.area):  # bỏ hình trùng (hatch + polyline)
+        if not any(g.intersection(u).area > 0.95 * g.area for u in duy_nhat):
+            duy_nhat.append(g)
+    return duy_nhat
+
+
 def _tim_dam(ban_ve, loai_layer, canh_bao):
     loai = dict(loai_layer)
     co_dam = any(v == "dam" for v in loai.values())
     co_khung_o = any(v == "khung_dam" for v in loai.values()) and any(v == "o_dam" for v in loai.values())
+    khung_tu_dong = False
     if not co_dam and not co_khung_o:
         ten = _tu_nhan_khung_o(ban_ve)
         hs = ban_ve.layers[ten].hinh_kin if ten else None
@@ -120,6 +144,7 @@ def _tim_dam(ban_ve, loai_layer, canh_bao):
             layers["_TD_O"] = LayerData(ten="_TD_O", hinh_kin=list(hs))
             ban_ve = replace(ban_ve, layers=layers)
             loai["_TD_KHUNG"], loai["_TD_O"] = "khung_dam", "o_dam"
+            khung_tu_dong = True
             canh_bao.append(f'Chưa gán layer dầm: tự dò layer "{ten}" (khung chứa các ô trống) để suy ra dầm. Sếp kiểm tra.')
     if not co_dam and not co_khung_o:
         da_ghi = sum(1 for c in _tat_ca_chu(ban_ve) for dong in _nfc(c.noi_dung).splitlines() if RE_TIET_DIEN_DAM.search(dong))
@@ -147,6 +172,12 @@ def _tim_dam(ban_ve, loai_layer, canh_bao):
     if len(hop_ly) < len(duy_nhat):
         canh_bao.append(f"Dầm: bỏ {len(duy_nhat) - len(hop_ly)} hình không giống dầm (bề rộng ngoài {BE_RONG_DAM[0] * 1000:.0f}-{BE_RONG_DAM[1] * 1000:.0f} mm hoặc quá ngắn). "
                         "Nếu thiếu dầm, gán đúng layer 'Dầm' ở tab Layer.")
+    if not hop_ly and not co_dam and not co_khung_o and not khung_tu_dong:
+        manh = _dam_tu_hinh_manh(ban_ve)
+        if manh:
+            canh_bao.append(f"Không có khung chứa ô trống nên tự suy dầm từ {len(manh)} hình dài, mảnh (nét dầm hở đã ghép). "
+                            "Có thể lẫn chi tiết khác, Sếp kiểm tra; nếu sai thì gán layer 'Dầm' ở tab Layer.")
+            return manh
     return hop_ly
 
 
