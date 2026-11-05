@@ -2258,7 +2258,15 @@ function veGhiChu(d) {
 $("t-tk").onclick = capNhatThongKe;
 $("t-3d").onclick = async () => {
   const f = F(); if (!f) return lenh("Chưa mở bản vẽ.", "loi");
-  try { lenh("Đang dựng 3D ..."); const d = await json("/api/tinh", yeuCauKL());
+  try { lenh("Đang dựng 3D ..."); let d = await json("/api/tinh", yeuCauKL());
+    if (!d.cau_kien.length) {
+      // Chưa gán layer kết cấu: tự áp dụng các đề xuất tin cậy cao rồi tính lại
+      const ds = (await (await goi("/api/de-xuat-layer/" + f.id)).json()).ds || [];
+      let n = 0;
+      ds.forEach(x => { const l = f.layers.find(y => y.ten === x.ten);
+        if (l && x.hanh_dong === "tu_dien" && x.loai && KET_CAU.includes(x.loai) && l.loai !== x.loai) { l.loai = x.loai; n++; } });
+      if (n) { ve_layer(); lenh(`Tự gán ${n} layer kết cấu theo đề xuất, đang dựng 3D ...`); d = await json("/api/tinh", yeuCauKL()); }
+    }
     if (!d.cau_kien.length) return lenh("Chưa có cấu kiện kết cấu: gán layer cột/dầm/sàn/móng ở cột trái rồi thử lại.", "loi");
     window.xem3D(d); } catch (e) { lenh(e.message, "loi"); }
 };
