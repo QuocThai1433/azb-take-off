@@ -1097,7 +1097,7 @@ def _nhan_coc_khong_ten(trong, tron, dk_bang, dai_bang, ghi_de, cao_chu, va_cham
     gd = ghi_de.get("P") or {}
     dk = int(gd.get("d") or dk0)
     dai = float(gd.get("l") or 0) or dai_bang
-    da, so, chong, nho = set(), 0, 0, 0
+    da, so, chong, nho, khong_cho = set(), 0, 0, 0, []
     chu = f"D{dk}" + (f" L={dai:g}m" if dai else "")
     for t, g, d in ds:
         if abs(d * 1000 - dk0) > 0.05 * dk0:
@@ -1123,6 +1123,7 @@ def _nhan_coc_khong_ten(trong, tron, dk_bang, dai_bang, ghi_de, cao_chu, va_cham
                 break
         if not dat:
             chong += 1
+            khong_cho.append((cx, cy))
     if so:
         thong_ke.setdefault("P", Counter())[(dk, dai)] = so
         canh_bao.append(f"Cọc: bản vẽ không ghi tên cọc (P1...), đã dán nhãn \"{chu}\" cho {so} cọc ở layer {', '.join(sorted({t for t, _, _ in ds}))}. "
@@ -1132,7 +1133,9 @@ def _nhan_coc_khong_ten(trong, tron, dk_bang, dai_bang, ghi_de, cao_chu, va_cham
     if nho:
         canh_bao.append(f"Cọc: {nho} nhãn cọc dày nên đã thu nhỏ chữ cho vừa chỗ (không chồng lên nhau).")
     if chong:
-        canh_bao.append(f"Cọc: {chong} cọc không còn chỗ trống để đặt nhãn (dày quá). Thử nhập Tỷ lệ 1/ nhỏ hơn rồi dán lại.")
+        vi_tri = "; ".join(f"({x:.1f}; {y:.1f})" for x, y in khong_cho[:8]) + ("; …" if len(khong_cho) > 8 else "")
+        canh_bao.append(f"Cọc: {chong} cọc không còn chỗ trống để đặt nhãn (dày quá), tại toạ độ {vi_tri}. "
+                        "Thử nhập Tỷ lệ 1/ nhỏ hơn rồi dán lại, hoặc thêm nhãn tay.")
     return so
 
 
