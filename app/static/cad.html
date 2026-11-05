@@ -124,6 +124,8 @@
   #hop button { min-width:76px; height:32px; padding:0 16px; border-radius:6px; font-weight:600; cursor:pointer; }
   #hop .huy { background:transparent; color:var(--chu); border:1px solid var(--vien); }
   #hop .dong-y { background:var(--mh); color:#fff; border:1px solid var(--mh); }
+  #hop .o-chu { width:100%; box-sizing:border-box; margin-top:10px; height:34px; padding:0 10px; font-size:14px; background:var(--sf2); color:var(--chu); border:1px solid var(--vien); border-radius:6px; }
+  #hop .o-chu:focus { outline:none; border-color:var(--mh); box-shadow:var(--ring); }
   #hop button:focus-visible { outline:2px solid var(--mh); outline-offset:2px; }
   .lay-tool { padding:4px 8px 6px; border-bottom:1px solid var(--ln); display:grid; gap:4px; }
   .lay-tool input[type=search], .lay-tool select { width:100%; font-size:11px; padding:2px 4px; }
@@ -900,6 +902,29 @@ function hoi({tieu, nd, ghi = "", dongY = "Đồng ý", huy = "Hủy", nguy = fa
     nen.addEventListener("mousedown", e => { if (e.target === nen) dong(false); });
     document.body.appendChild(nen);
     nen.querySelector(".dong-y").focus();
+  });
+}
+// Hộp nhập chữ dùng chung (thay prompt của trình duyệt): Enter = OK, Esc = hủy. Trả về Promise<string|null> (null = hủy).
+function hoiChu({tieu, nd = "", ghi = "", giaTri = "", goiY = "", dongY = "OK", huy = "Hủy"}) {
+  return new Promise(xong => {
+    const nen = document.createElement("div"); nen.id = "hop-nen";
+    nen.innerHTML = `<div id="hop" role="dialog" aria-modal="true" aria-labelledby="hop-t">
+      <h3 id="hop-t">${esc(tieu)}</h3>${nd ? `<div class="nd">${nd}</div>` : ""}
+      <input type="text" class="o-chu" value="${esc(giaTri)}" placeholder="${esc(goiY)}" autocomplete="off" spellcheck="false">
+      ${ghi ? `<div class="ghi">${esc(ghi)}</div>` : ""}
+      <div class="nut-hang"><button type="button" class="huy">${esc(huy)}</button><button type="button" class="dong-y">${esc(dongY)}</button></div></div>`;
+    const o = nen.querySelector(".o-chu"), truoc = document.activeElement;
+    const dong = kq => { removeEventListener("keydown", phim, true); nen.remove(); if (truoc && truoc.focus) truoc.focus(); xong(kq); };
+    const phim = e => {
+      if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); dong(o.value); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); dong(null); }
+    };
+    addEventListener("keydown", phim, true);
+    nen.querySelector(".dong-y").onclick = () => dong(o.value);
+    nen.querySelector(".huy").onclick = () => dong(null);
+    nen.addEventListener("mousedown", e => { if (e.target === nen) dong(null); });
+    document.body.appendChild(nen);
+    o.focus(); o.select();
   });
 }
 async function xoaHan(id, ten) {
@@ -2155,9 +2180,9 @@ function xoaNhanLe(i) {
   if (n.loai === "tay") s.them = s.them.filter(m => khoaNhan(m) !== k); else { s.xoa.push(k); delete s.doi[k]; }
   p.kq.nhan.splice(i, 1); capNhatNhanSua(f); lenh(`Đã xóa nhãn "${n.t}".`, "ok");
 }
-function themNhanTai(x, y) {
+async function themNhanTai(x, y) {
   const p = mbHienTai(); if (!p || !p.kq) return;
-  const chu = (prompt("Nội dung nhãn mới:", "") || "").trim(); if (!chu) return lenh("Chưa nhập nội dung, không thêm nhãn.");
+  const chu = ((await hoiChu({tieu:"Thêm nhãn", nd:"Nội dung nhãn mới:", goiY:"vd M7, DX1-200X400", ghi:"Nhãn đặt tại điểm vừa bấm. Enter để thêm, Esc để hủy."})) || "").trim(); if (!chu) return lenh("Chưa nhập nội dung, không thêm nhãn.");
   const m = {t:chu, x:+x.toFixed(4), y:+y.toFixed(4), goc:0, neo:"mc"}; suaGN(p).them.push(m);
   p.kq.nhan.push({loai:"tay", t:chu, x:m.x, y:m.y, goc:0, cao:p.kq.cao_chu, neo:"mc", sua:true});
   capNhatNhanSua(F()); lenh(`Đã thêm nhãn "${chu}". Bấm lên bản vẽ để thêm tiếp, Esc để thoát.`, "ok");
@@ -2168,9 +2193,10 @@ function nhanGanDiem(x, y) {  // chỉ số nhãn (vùng đang chọn) gần đi
   p.kq.nhan.forEach((n, i) => { const rong = 0.31 * n.cao * n.t.length, d = Math.hypot(n.x - x, n.y - y); if (d < dm && d <= Math.max(gioiHan, rong + n.cao)) { dm = d; tot = i; } });
   return tot;
 }
-function suaNhanTaiDiem(x, y) {
+async function suaNhanTaiDiem(x, y) {
   const i = nhanGanDiem(x, y); if (i < 0) return lenh("Không có nhãn nào ở chỗ bấm (zoom gần hơn rồi bấm vào chữ nhãn).", "loi");
-  const n = mbHienTai().kq.nhan[i], chu = prompt("Sửa nhãn (để trống = xóa nhãn):", n.t);
+  const n = mbHienTai().kq.nhan[i];
+  const chu = await hoiChu({tieu:"Sửa nhãn", nd:"Nội dung nhãn:", giaTri:n.t, ghi:"Để trống rồi OK = xóa nhãn. Enter để lưu, Esc để hủy."});
   if (chu !== null) doiNhan(i, chu);
 }
 function danhSachNhanGN(p) {  // bảng sửa từng nhãn: lọc theo chữ, sửa trực tiếp, xóa, tới nhãn
