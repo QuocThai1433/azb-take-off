@@ -1078,7 +1078,7 @@ def _nhan_coc_khong_ten(trong, tron, dk_bang, dai_bang, ghi_de, cao_chu, va_cham
     gd = ghi_de.get("P") or {}
     dk = int(gd.get("d") or dk0)
     dai = float(gd.get("l") or 0) or dai_bang
-    da, so, chong = set(), 0, 0
+    da, so, chong, nho = set(), 0, 0, 0
     chu = f"D{dk}" + (f" L={dai:g}m" if dai else "")
     for t, g, d in ds:
         if abs(d * 1000 - dk0) > 0.05 * dk0:
@@ -1088,13 +1088,21 @@ def _nhan_coc_khong_ten(trong, tron, dk_bang, dai_bang, ghi_de, cao_chu, va_cham
         if khoa in da:
             continue
         da.add(khoa)
-        khe, cx, cy = KHE_NHAN * cao_chu, (x0 + x1) / 2, (y0 + y1) / 2
-        for ox, oy, neo in ((x1 + khe, cy, "ml"), (x0 - khe, cy, "mr"), (cx, y0 - khe, "tc"), (cx, y1 + khe, "bc")):
-            if not va_cham(_hop_chu(ox, oy, 0.0, cao_chu, neo, len(chu))):
-                them("coc", chu, ox, oy, 0.0, cao_chu, neo)
-                so += 1
+        cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        dat = False
+        for he_so in (1.0, 0.7, 0.5, 0.35):  # cọc dày: thu nhỏ chữ dần cho vừa chỗ thay vì chồng lên nhau
+            cao = round(cao_chu * he_so, 4)
+            khe = KHE_NHAN * cao
+            for ox, oy, neo in ((x1 + khe, cy, "ml"), (x0 - khe, cy, "mr"), (cx, y0 - khe, "tc"), (cx, y1 + khe, "bc")):
+                if not va_cham(_hop_chu(ox, oy, 0.0, cao, neo, len(chu) + 1)):  # +1 ký tự dự phòng: chữ in rộng hơn ước lượng
+                    them("coc", chu, ox, oy, 0.0, cao, neo)
+                    so += 1
+                    nho += he_so < 1.0
+                    dat = True
+                    break
+            if dat:
                 break
-        else:
+        if not dat:
             chong += 1
     if so:
         thong_ke.setdefault("P", Counter())[(dk, dai)] = so
@@ -1102,6 +1110,8 @@ def _nhan_coc_khong_ten(trong, tron, dk_bang, dai_bang, ghi_de, cao_chu, va_cham
                         "Sếp kiểm tra layer và đường kính; sửa D, L ở bảng loại cọc.")
         if not dai:
             canh_bao.append("Cọc: chưa biết chiều dài L (không có trong bảng thống kê cọc/ghi chú). Nhập L ở bảng loại cọc.")
+    if nho:
+        canh_bao.append(f"Cọc: {nho} nhãn cọc dày nên đã thu nhỏ chữ cho vừa chỗ (không chồng lên nhau).")
     if chong:
         canh_bao.append(f"Cọc: {chong} cọc không còn chỗ trống để đặt nhãn (dày quá). Thử nhập Tỷ lệ 1/ nhỏ hơn rồi dán lại.")
     return so
