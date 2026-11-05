@@ -46,7 +46,7 @@ async def _vong_doi(_app):
 
 
 app = FastAPI(title="AZB - Bóc khối lượng", lifespan=_vong_doi)
-app.add_middleware(GZipMiddleware, minimum_size=1024)  # JSON hình học của bản vẽ nặng rất lớn, nén lại cho tải nhanh (nhất là qua tunnel)
+app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=3)  # JSON hình học của bản vẽ nặng rất lớn, nén lại cho tải nhanh (nhất là qua tunnel)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
@@ -624,7 +624,12 @@ def boc_chon_api(yc: YeuCauChon):
 
 @app.get("/api/hinh")
 def hinh_ban_ve(id: str):
-    return hinh_xem(_phien(id)["ban_ve"])
+    # Bản vẽ nặng: dựng và mã hóa JSON hình học mất vài giây, nên giữ lại bản đã mã hóa cho các lần mở/tải lại sau
+    p = _phien(id); bv = p["ban_ve"]
+    cu = p.get("hinh_json")
+    if not cu or cu[0] is not bv:
+        cu = p["hinh_json"] = (bv, json.dumps(hinh_xem(bv), ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    return Response(cu[1], media_type="application/json")
 
 
 @app.get("/api/tong-quan")
