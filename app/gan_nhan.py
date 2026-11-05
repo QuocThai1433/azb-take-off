@@ -469,7 +469,9 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
     da_co = sum(1 for c in _tat_ca_chu(trong) for dong in _nfc(c.noi_dung).splitlines() if RE_DAM_CHU.match(dong))
 
     can_dam = tc.get("nhan_dam", True) or tc.get("nhan_truc", True) or tc.get("nhan_san", True)  # sàn cũng dựa vào dầm
+    n_cb0 = len(canh_bao)
     dam = _phan_loai_dam(_tim_dam(trong, loai_layer, canh_bao), canh_bao) if can_dam else []
+    cb_dam = canh_bao[n_cb0:]  # cảnh báo của riêng khâu tìm dầm
     if not dam and can_dam:
         canh_bao.append("Không tìm thấy dầm trong vùng. Gán layer 'Dầm' (hoặc 'Khung dầm' + 'Ô trống giữa dầm') rồi thử lại.")
 
@@ -554,8 +556,12 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
                 canh_bao.append("Có hình cột nhưng không tìm được chỗ trống để đặt nhãn (đều vướng dầm/chữ khác).")
 
     # ----- Sàn -----
-    if tc.get("nhan_san", True) and dam:
-        _nhan_san(ban_ve, dam, tang, cao_chu, va_cham, them, canh_bao, ghi_de, loai_san)
+    if tc.get("nhan_san", True):
+        n_truoc = len(canh_bao)
+        _nhan_san(ban_ve, dam, tang, cao_chu, va_cham, them, canh_bao, ghi_de, loai_san, trong=trong)
+        if (not tc.get("nhan_dam", True) and not tc.get("nhan_truc", True) and loai_san
+                and any("ô chữ nhật kín" in c for c in canh_bao[n_truoc:])):
+            canh_bao[n_cb0:n_cb0 + len(cb_dam)] = []  # chỉ dán sàn theo lưới ô: bỏ cảnh báo dầm không liên quan
 
     # ----- Móng -----
     loai_mong = []
@@ -1123,11 +1129,39 @@ def _day_san(ban_ve, tang):
     return None, ""
 
 
-def _nhan_san(ban_ve, dam, tang, cao_chu, va_cham, them, canh_bao, ghi_de=None, loai_san=None):
-    """Ô sàn = lỗ hổng bên trong cụm dầm. Mỗi ô ghi "S1 t={mm}"."""
-    cum = unary_union([d["geom"].buffer(0.01) for d in dam])
-    cum = [cum] if cum.geom_type == "Polygon" else list(cum.geoms)
-    o = [Polygon(ring) for c in cum for ring in c.interiors if Polygon(ring).area >= 0.3]
+def _o_san_tu_luoi(trong):
+    """Mặt bằng sàn/nền vẽ thành lưới ô chữ nhật kín (không có dầm): lấy layer có nhiều ô chữ nhật cỡ 1-60 m² nhất
+    (>= 6 ô), bỏ khung bao quanh các ô khác. Trả (danh sách ô, tên layer) hoặc ([], None)."""
+    tot, ds_tot = None, []
+    for t, ld in trong.layers.items():
+        if ld.tat or RE_LAYER_KHONG_PHAI_DAM.search(t):
+            continue
+        ds = [h.geom for h in ld.hinh_kin
+              if h.nguon != "CIRCLE" and 1.0 <= h.geom.area <= 60 and _hinh_chu_nhat(h.geom)[2] >= 0.95]
+        if len(ds) > len(ds_tot):
+            tot, ds_tot = t, ds
+    if len(ds_tot) < 6:
+        return [], None
+    tam = [g.representative_point() for g in ds_tot]
+    ds_tot = [g for g in ds_tot if sum(1 for p in tam if g.contains(p)) <= 1]  # chỉ chứa chính nó
+    duy_nhat = {}
+    for g in ds_tot:  # bỏ ô trùng (hatch + polyline)
+        duy_nhat.setdefault((round(g.centroid.x, 1), round(g.centroid.y, 1), round(g.area, 0)), g)
+    return list(duy_nhat.values()), tot
+
+
+def _nhan_san(ban_ve, dam, tang, cao_chu, va_cham, them, canh_bao, ghi_de=None, loai_san=None, trong=None):
+    """Ô sàn = lỗ hổng bên trong cụm dầm; không có thì lấy lưới ô chữ nhật kín. Mỗi ô ghi "S1 t={mm}"."""
+    o = []
+    if dam:
+        cum = unary_union([d["geom"].buffer(0.01) for d in dam])
+        cum = [cum] if cum.geom_type == "Polygon" else list(cum.geoms)
+        o = [Polygon(ring) for c in cum for ring in c.interiors if Polygon(ring).area >= 0.3]
+    if not o and trong is not None:
+        o, ten_layer = _o_san_tu_luoi(trong)
+        if o:
+            canh_bao.append(f'Sàn: không có ô giữa các dầm nên lấy {len(o)} ô chữ nhật kín của layer "{ten_layer}" làm ô sàn. '
+                            "Sếp kiểm tra; nếu lẫn ô khác thì bỏ bớt nhãn ở danh sách Sửa từng nhãn.")
     if not o:
         canh_bao.append("Sàn: không thấy ô sàn nào (lỗ kín ≥ 0,3 m² nằm giữa các dầm) nên không dán nhãn sàn. "
                         "Mặt bằng móng thường không có sàn; mặt bằng sàn thì kiểm tra layer dầm đã gán đúng chưa.")

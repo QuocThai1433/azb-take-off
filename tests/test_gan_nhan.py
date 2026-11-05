@@ -395,3 +395,19 @@ def test_layer_dam_da_gan_nhung_trong_vung_thi_van_tu_do(tmp_path):
     kq = gan_nhan(ban_ve, {"KHUNG": "bo_qua", "S-Beam": "dam"}, VUNG)
     assert any(n["loai"] == "dam" for n in kq["nhan"])
     assert any("'S-Beam'" in c and "không có hình" in c for c in kq["canh_bao"])
+
+
+def test_san_la_luoi_o_chu_nhat_khong_co_dam(tmp_path):
+    """Mặt bằng nền vẽ thành lưới ô kín, không có dầm: mỗi ô nhận một nhãn sàn."""
+    doc = ezdxf.new("R2010")
+    doc.header["$INSUNITS"] = 4
+    doc.layers.add("LUOI")
+    msp = doc.modelspace()
+    for i in range(4):
+        for j in range(3):
+            _hcn(msp, "LUOI", 10000 + i * 3000, 20000 + j * 3000, 12900 + i * 3000, 22900 + j * 3000)
+    f = tmp_path / "luoi.dxf"
+    doc.saveas(f)
+    kq = gan_nhan(doc_ban_ve(f), {}, [9, 19, 25, 31], {"nhan_dam": False, "nhan_truc": False, "nhan_mong": False, "nhan_coc": False})
+    assert len([n for n in kq["nhan"] if n["loai"] == "san"]) == 12
+    assert any("ô chữ nhật kín" in c for c in kq["canh_bao"])
