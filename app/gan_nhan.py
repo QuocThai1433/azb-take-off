@@ -936,6 +936,23 @@ def _so_ben_phai(ban_ve, c, toi_da_ky_tu=60):
     return tot[1] if tot else None
 
 
+def _dai_tu_bang_coc(ban_ve):
+    """Chiều dài cọc (m) từ bảng "BẢNG THỐNG KÊ CỌC": tìm chữ "(m)" ở hàng tiêu đề rồi lấy số nằm ngay dưới nó (cùng cột)."""
+    chu = _tat_ca_chu(ban_ve)
+    for tieu in chu:
+        if "THONG KE COC" not in _khong_dau(tieu.noi_dung):
+            continue
+        gan = [c for c in chu if abs(c.diem.x - tieu.diem.x) <= 8 and -6 <= c.diem.y - tieu.diem.y <= 0.3]
+        for h in (c for c in gan if _khong_dau(c.noi_dung).strip() == "(M)"):
+            so = [(h.diem.y - c.diem.y, c) for c in gan
+                  if RE_SO.match(_nfc(c.noi_dung)) and 0.05 < h.diem.y - c.diem.y <= 2.0 and abs(c.diem.x - h.diem.x) <= 0.5]
+            if so:
+                v = float(RE_SO.match(_nfc(min(so, key=lambda u: u[0])[1].noi_dung)).group(1).replace(",", "."))
+                if 3 <= v <= 100:
+                    return v
+    return None
+
+
 def _bang_coc(ban_ve):
     """Từ bảng "THỐNG KÊ CỌC": (đường kính mm, chiều dài m); mục không có thì None."""
     dk = dai = None
@@ -946,6 +963,8 @@ def _bang_coc(ban_ve):
             dk = int(v) if v else None
         elif dai is None and "CHIEU DAI COC" in t:
             dai = _so_ben_phai(ban_ve, c)
+    if dai is None:  # bảng kiểu "LOẠI CỌC | P | L CỌC (m) | LỰC ÉP..." tiêu đề cột tách thành nhiều chữ rời
+        dai = _dai_tu_bang_coc(ban_ve)
     if dk is None or dai is None:  # không có bảng → đọc từ ghi chú kiểu "COC D300 ... -L=22m, Lmax=22m"
         dk_gc, dai_gc = _ghi_chu_coc(ban_ve)
         dk = dk or dk_gc
@@ -1090,7 +1109,7 @@ def _nhan_coc_khong_ten(trong, tron, dk_bang, dai_bang, ghi_de, cao_chu, va_cham
         da.add(khoa)
         cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
         dat = False
-        for he_so in (1.0, 0.7, 0.5, 0.35):  # cọc dày: thu nhỏ chữ dần cho vừa chỗ thay vì chồng lên nhau
+        for he_so in (1.0, 0.7, 0.5, 0.35, 0.25, 0.18):  # cọc dày: thu nhỏ chữ dần cho vừa chỗ thay vì chồng lên nhau
             cao = round(cao_chu * he_so, 4)
             khe = KHE_NHAN * cao
             for ox, oy, neo in ((x1 + khe, cy, "ml"), (x0 - khe, cy, "mr"), (cx, y0 - khe, "tc"), (cx, y1 + khe, "bc")):

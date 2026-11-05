@@ -411,3 +411,16 @@ def test_san_la_luoi_o_chu_nhat_khong_co_dam(tmp_path):
     kq = gan_nhan(doc_ban_ve(f), {}, [9, 19, 25, 31], {"nhan_dam": False, "nhan_truc": False, "nhan_mong": False, "nhan_coc": False})
     assert len([n for n in kq["nhan"] if n["loai"] == "san"]) == 12
     assert any("ô chữ nhật kín" in c for c in kq["canh_bao"])
+
+
+def test_chieu_dai_coc_doc_tu_bang_thong_ke_tieu_de_tach_roi(tmp_path):
+    from app.gan_nhan import _bang_coc
+    doc = ezdxf.new("R2010")
+    doc.header["$INSUNITS"] = 6
+    msp = doc.modelspace()
+    for t, x, y in (("BẢNG THỐNG KÊ CỌC", 0, 0), ("L", -0.3, -0.3), ("CỌC", -0.3, -0.4), ("(m)", -0.3, -0.5),
+                    ("P", 0, -0.3), ("8", -0.3, -0.8), ("35", 0.1, -0.8)):
+        msp.add_text(t, dxfattribs={"height": 0.1, "insert": (x, y)})
+    f = tmp_path / "bang.dxf"
+    doc.saveas(f)
+    assert _bang_coc(doc_ban_ve(f))[1] == 8.0
