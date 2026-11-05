@@ -37,6 +37,9 @@ BONG_TRUC_TY_LE = 1.45     # bán kính bong bóng trục / chiều cao chữ tr
 
 RE_TL = re.compile(r"(?:\bTL|T[ỶỈ]\s*L[ỆE]|SCALE)\s*[:=]?\s*1\s*[/:]\s*(\d{1,4})", re.I)
 RE_TANG = re.compile(r"T[ẦA]NG\s*(\d+|M[ÁA]I|H[ẦA]M|TR[ỆE]T|L[ỬU]NG)", re.I)
+RE_LAYER_KHONG_PHAI_DAM = re.compile(r"TTLB|ANNO|BORDER|TITLE|FRAME|KHUNG\s*(TEN|BV)|DEFPOINT|DIM", re.I)  # khung tên, chú thích, kích thước
+RE_TIET_DIEN_DAM = re.compile(r"\(\s*\d{2,3}\s*[xX×]\s*\d{2,3}")
+BE_RONG_DAM = (0.10, 1.0)  # bề rộng dầm hợp lý (m); ngoài khoảng này là nét khác bị nhận nhầm
 RE_LAYER_TRUC = re.compile(r"tr[uụ]c|grid|axis|l[uư][oơ]i", re.I)
 # Chữ ghi tiết diện dầm có sẵn: "1.DX1-200X400", "DX1 200x400", "D1 220x500"
 RE_DAM_CHU = re.compile(r"^\s*(?:(\w+)\s*\.\s*)?(D[A-Z]*\d+[A-Z]?)\s*[-–: ]\s*(\d{2,4})\s*[xX×]\s*(\d{2,4})\s*$")
@@ -78,9 +81,9 @@ def _tu_nhan_khung_o(ban_ve):
     """Dò layer nào có khung chứa các ô trống (mặt bằng dầm vẽ kiểu khung trừ ô). Trả tên layer hoặc None."""
     tot, diem_tot = None, 0
     for ld in ban_ve.layers.values():
-        if ld.tat:
+        if ld.tat or RE_LAYER_KHONG_PHAI_DAM.search(ld.ten):
             continue
-        hs = [h.geom for h in ld.hinh_kin if h.geom.area >= 0.01]
+        hs = [h.geom for h in ld.hinh_kin if 0.01 <= h.geom.area <= 5000]
         if len(hs) < 2:
             continue
         diem = 0
@@ -117,6 +120,11 @@ def _tim_dam(ban_ve, loai_layer, canh_bao):
             ban_ve = replace(ban_ve, layers=layers)
             loai["_TD_KHUNG"], loai["_TD_O"] = "khung_dam", "o_dam"
             canh_bao.append(f'Chưa gán layer dầm: tự dò layer "{ten}" (khung chứa các ô trống) để suy ra dầm. Sếp kiểm tra.')
+    if not co_dam and not co_khung_o:
+        da_ghi = sum(1 for c in _tat_ca_chu(ban_ve) for dong in _nfc(c.noi_dung).splitlines() if RE_TIET_DIEN_DAM.search(dong))
+        if da_ghi >= 5:
+            canh_bao.append(f"Mặt bằng này đã ghi sẵn {da_ghi} tiết diện dầm (kiểu '(25x40)', 'DS1 (30x70)'). Dầm thường vẽ bằng nét hở nên công cụ khó tự "
+                            "nhận đủ; kết quả dầm dưới đây chỉ để tham khảo, nên đối chiếu với nhãn có sẵn.")
     n_cu = len(ban_ve.canh_bao)
     bv2, loai2 = suy_dam(ban_ve, loai)
     canh_bao.extend(bv2.canh_bao[n_cu:])
@@ -128,7 +136,11 @@ def _tim_dam(ban_ve, loai_layer, canh_bao):
     for g in sorted(hinh, key=lambda g: -g.area):  # bỏ hình trùng (hatch + polyline)
         if not any(g.intersection(u).area > 0.95 * g.area for u in duy_nhat):
             duy_nhat.append(g)
-    return duy_nhat
+    hop_ly = [g for g in duy_nhat if (d := _do_dam(g)) and BE_RONG_DAM[0] <= d[2] <= BE_RONG_DAM[1] and d[3] >= 2 * d[2]]
+    if len(hop_ly) < len(duy_nhat):
+        canh_bao.append(f"Dầm: bỏ {len(duy_nhat) - len(hop_ly)} hình không giống dầm (bề rộng ngoài {BE_RONG_DAM[0] * 1000:.0f}-{BE_RONG_DAM[1] * 1000:.0f} mm hoặc quá ngắn). "
+                        "Nếu thiếu dầm, gán đúng layer 'Dầm' ở tab Layer.")
+    return hop_ly
 
 
 def _do_dam(g):
@@ -447,7 +459,7 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
 
     # ----- Cọc -----
     if tc.get("nhan_coc", True):
-        _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao, ghi_de=ghi_de, loai_coc=loai_coc)  # tự báo lý do khi không dán được cọc nào
+        _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao, ghi_de=ghi_de, loai_coc=loai_coc, loai_layer=loai_layer)  # tự báo lý do khi không dán được cọc nào
 
     # ----- Trục -----
     bong = []
@@ -817,7 +829,7 @@ def _ghi_chu_coc(ban_ve):
     return (dks.pop() if len(dks) == 1 else None), (dais.pop() if len(dais) == 1 else None)
 
 
-def _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao, toi_da=0.8, ghi_de=None, loai_coc=None):
+def _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao, toi_da=0.8, ghi_de=None, loai_coc=None, loai_layer=None):
     dk_bang, dai_bang = _bang_coc(ban_ve)
     tron = []
     for ld in trong.layers.values():
@@ -867,6 +879,8 @@ def _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao, toi_da=0.8, ghi_d
         so += 1
     if so and not dk_bang:
         canh_bao.append("Cọc: không đọc được đường kính từ bảng thống kê cọc, nhãn dùng số đo từ hình vẽ.")
+    if not ten_coc and tron:  # không có chữ P1...: dán "D300 L=.." cho hình tròn đúng đường kính cọc ở layer cọc
+        so = _nhan_coc_khong_ten(trong, tron, dk_bang, dai_bang, ghi_de, cao_chu, va_cham, them, canh_bao, loai_layer or {}, thong_ke)
     if loai_coc is not None:
         for ten, dem in sorted(thong_ke.items(), key=lambda kv: (len(kv[0]), kv[0])):
             (dk, dai), _ = dem.most_common(1)[0]
@@ -887,6 +901,59 @@ def _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao, toi_da=0.8, ghi_d
             canh_bao.append(f"Cọc: thấy {so_tron} hình tròn cọc nhưng không có chữ tên cọc (P1...) trong vùng, nên không dán nhãn cọc.")
         else:
             canh_bao.append("Cọc: không thấy hình tròn cọc cũng không thấy chữ tên cọc (P1...) trong vùng.")
+    return so
+
+
+RE_LAYER_COC = re.compile(r"pile|c[oọ]c", re.I)
+
+
+def _nhan_coc_khong_ten(trong, tron, dk_bang, dai_bang, ghi_de, cao_chu, va_cham, them, canh_bao, loai_layer, thong_ke):
+    """Bản vẽ chỉ vẽ hình tròn cọc, không ghi tên P1...: chọn layer cọc (đã gán "Cọc" hoặc tên có pile/cọc, nhiều hình tròn nhất),
+    mỗi hình tròn đúng đường kính cọc nhận nhãn "D300 L=22m". Khoá bảng sửa số là "P"."""
+    ten_layer = {t for t, v in loai_layer.items() if v == "coc"}
+    dem = Counter()
+    ds = []
+    for t, ld in trong.layers.items():
+        if t not in ten_layer and not RE_LAYER_COC.search(t):
+            continue
+        for h in ld.hinh_kin:
+            x0, y0, x1, y1 = h.geom.bounds
+            d = max(x1 - x0, y1 - y0)
+            if 0.05 <= d <= 3.0 and h.geom.area / (math.pi * (d / 2) ** 2) >= 0.9:
+                ds.append((t, h.geom, d))
+                dem[_lam_tron_mm(d, 10)] += 1
+    if not ds:
+        return 0
+    dk0 = dk_bang or dem.most_common(1)[0][0]
+    gd = ghi_de.get("P") or {}
+    dk = int(gd.get("d") or dk0)
+    dai = float(gd.get("l") or 0) or dai_bang
+    da, so, chong = set(), 0, 0
+    chu = f"D{dk}" + (f" L={dai:g}m" if dai else "")
+    for t, g, d in ds:
+        if abs(d * 1000 - dk0) > 0.05 * dk0:
+            continue
+        x0, y0, x1, y1 = g.bounds
+        khoa = (round((x0 + x1) / 2, 2), round((y0 + y1) / 2, 2))
+        if khoa in da:
+            continue
+        da.add(khoa)
+        khe, cx, cy = KHE_NHAN * cao_chu, (x0 + x1) / 2, (y0 + y1) / 2
+        for ox, oy, neo in ((x1 + khe, cy, "ml"), (x0 - khe, cy, "mr"), (cx, y0 - khe, "tc"), (cx, y1 + khe, "bc")):
+            if not va_cham(_hop_chu(ox, oy, 0.0, cao_chu, neo, len(chu))):
+                them("coc", chu, ox, oy, 0.0, cao_chu, neo)
+                so += 1
+                break
+        else:
+            chong += 1
+    if so:
+        thong_ke.setdefault("P", Counter())[(dk, dai)] = so
+        canh_bao.append(f"Cọc: bản vẽ không ghi tên cọc (P1...), đã dán nhãn \"{chu}\" cho {so} cọc ở layer {', '.join(sorted({t for t, _, _ in ds}))}. "
+                        "Sếp kiểm tra layer và đường kính; sửa D, L ở bảng loại cọc.")
+        if not dai:
+            canh_bao.append("Cọc: chưa biết chiều dài L (không có trong bảng thống kê cọc/ghi chú). Nhập L ở bảng loại cọc.")
+    if chong:
+        canh_bao.append(f"Cọc: {chong} cọc không còn chỗ trống để đặt nhãn (dày quá). Thử nhập Tỷ lệ 1/ nhỏ hơn rồi dán lại.")
     return so
 
 

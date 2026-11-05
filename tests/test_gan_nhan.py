@@ -216,9 +216,9 @@ def test_coc_dan_nhan_dung_duong_kinh_bang(tmp_path):
     assert not any("không khớp" in c or "không thấy" in c or "không đọc được đường kính" in c for c in kq["canh_bao"])
 
 
-def test_coc_khong_co_chu_ten_thi_bao_ly_do(tmp_path):
+def test_coc_khong_co_chu_ten_van_dan_theo_layer_coc(tmp_path):
     kq = gan_nhan(_tao_coc(tmp_path, False, 300, dk_bang=300), LOAI, VUNG, COC_CHON)
-    assert kq["nhan"] == [] and any("không thấy chữ tên cọc" in c or "chữ tên cọc" in c for c in kq["canh_bao"])
+    assert [n["t"] for n in kq["nhan"]] == ["D300"] * 4 and any("không ghi tên cọc" in c for c in kq["canh_bao"])
 
 
 def test_coc_duong_kinh_khong_khop_bang_van_dan_va_bao(tmp_path):
@@ -300,3 +300,25 @@ def test_nhan_cot_tu_do_layer_theo_kich_thuoc_ghi_trong_ban_ve(tmp_path):
                                            "nhan_san": False, "nhan_cot": True, "ty_le": 50})
     assert [n["t"] for n in kq["nhan"] if n["loai"] == "cot"] == ["C1-600X400"] * 2
     assert any("COT_LA" in c and "tự dò" in c for c in kq["canh_bao"])
+
+
+def test_coc_khong_ten_dan_theo_duong_kinh_o_layer_pile(tmp_path):
+    """Chỉ vẽ hình tròn cọc ở layer PILE, không có chữ P1: vẫn dán "D300" và có bảng loại cọc khoá "P"."""
+    doc = ezdxf.new("R2010")
+    doc.header["$INSUNITS"] = 4
+    for l in ("PILE", "KHAC", "CHU"):
+        doc.layers.add(l)
+    msp = doc.modelspace()
+    for x in (X0, X1):
+        msp.add_circle((x, Y0), 150, dxfattribs={"layer": "PILE"})
+        msp.add_circle((x, Y0 + 2000), 500, dxfattribs={"layer": "KHAC"})  # tròn khác, không phải cọc
+    msp.add_text("DUONG KINH COC", dxfattribs={"layer": "CHU", "height": 150, "insert": (X0, Y0 - 3000)})
+    msp.add_text("300", dxfattribs={"layer": "CHU", "height": 150, "insert": (X0 + 3000, Y0 - 3000)})
+    f = tmp_path / "pile.dxf"
+    doc.saveas(f)
+    bv = doc_ban_ve(f)
+    kq = gan_nhan(bv, {}, VUNG, {**COC_CHON, "ty_le": 50})
+    assert [n["t"] for n in kq["nhan"]] == ["D300", "D300"]
+    assert kq["loai_coc"][0]["ten"] == "P" and kq["loai_coc"][0]["so_luong"] == 2
+    kq = gan_nhan(bv, {}, VUNG, {**COC_CHON, "ty_le": 50, "kt_mong": {"P": {"d": 350, "l": 20}}})
+    assert {n["t"] for n in kq["nhan"]} == {"D350 L=20m"}
