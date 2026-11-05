@@ -698,7 +698,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-<script src="/static/xem3d.js?v=5"></script>
+<script src="/static/xem3d.js?v=6"></script>
 <script>
 const LOAI = {cot:"Cột", dam:"Dầm", san:"Sàn", lo_san:"Lỗ mở sàn", mong:"Móng", coc:"Cọc", vach:"Vách/lõi", khung_dam:"Khung dầm (bao ngoài)",
   o_dam:"Ô trống giữa dầm", nhan:"Nhãn chữ", ong_gio:"Ống gió (MLINE+block)", ong_nuoc:"Ống nước (chỉ dựng 3D)", ong_pccc:"Ống PCCC (chỉ dựng 3D)", khay_cap:"Khay cáp (chỉ dựng 3D)", bo_qua:"Bỏ qua"};
@@ -2512,15 +2512,26 @@ $("t-3d").onclick = async () => {
         if (l && (x.hanh_dong === "tu_dien" || (x.hanh_dong === "xac_nhan" && x.tin_cay >= 0.8)) && x.loai && KET_CAU.includes(x.loai) && l.loai !== x.loai) { l.loai = x.loai; n++; } });
       if (n) { ve_layer(); lenh(`Tự gán ${n} layer kết cấu theo đề xuất, đang dựng 3D ...`); d = await json("/api/tinh", yeuCauKL()); }
     }
-    let og = [];
-    if (Object.values(loaiLayer(f)).includes("ong_gio")) {
-      try { og = (await json("/api/ong-gio", yeuCauKL())).hinh_3d || []; } catch (e) { if (!d.cau_kien.length) throw e; }
+    let og = [], cd = [];
+    const gl = loaiLayer(f), dsLoai = k => Object.keys(gl).filter(l => gl[l] === k);
+    if (dsLoai("ong_gio").length) {
+      try { const r = await json("/api/ong-gio", yeuCauKL()); og = r.hinh_3d || []; (r.canh_bao || []).forEach(c => cd.push(c));
+        if (!og.length) cd.push(`Ống gió: layer ${dsLoai("ong_gio").join(", ")} không có MLINE nào để dựng 3D (ống vẽ bằng LINE / POLYLINE chưa được hỗ trợ).`); }
+      catch (e) { if (!d.cau_kien.length) throw e; cd.push("Ống gió: " + e.message); }
     }
     let mep = [];
-    if (Object.values(loaiLayer(f)).some(l => ["ong_nuoc", "ong_pccc", "khay_cap"].includes(l))) {
-      try { const m = await json("/api/mep-3d", yeuCauKL()); mep = m.duong || []; d.mep_mac_dinh = m.mac_dinh; (m.canh_bao || []).forEach(c => lenh(c, "loi")); }
-      catch (e) { lenh("MEP: " + e.message, "loi"); }
+    const loaiMep = ["ong_nuoc", "ong_pccc", "khay_cap"];
+    if (Object.values(gl).some(l => loaiMep.includes(l))) {
+      try { const m = await json("/api/mep-3d", yeuCauKL()); mep = m.duong || []; d.mep_mac_dinh = m.mac_dinh; (m.canh_bao || []).forEach(c => cd.push(c)); }
+      catch (e) { cd.push("MEP: " + e.message); }
     }
+    if (!og.length && !mep.length) {
+      const nghi = f.layers.map(l => l.ten).filter(n => /ong|gio|duct|hvac|nuoc|water|pccc|khay|pipe|drain|sprinkler|cap ?nuoc/i.test(n.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/gi, "d")) && !["ong_gio", ...loaiMep].includes(gl[n]));
+      cd.push(nghi.length ? `Chưa có ống nào được dựng. Các layer có vẻ là MEP nhưng chưa gán loại: ${nghi.slice(0, 6).join(", ")}. Gán ở cột trái (Ống gió / Ống nước / Ống PCCC / Khay cáp) rồi bấm Xem 3D lại.`
+        : "Chưa có ống nào được dựng: bản vẽ đang mở chưa có layer nào gán loại Ống gió / Ống nước / Ống PCCC / Khay cáp. Nếu ống nằm ở bản vẽ khác thì cần đưa vào cùng file.");
+    }
+    cd.forEach(c => lenh(c, "loi"));
+    d.chan_doan = cd;
     if (!d.cau_kien.length && !og.length && !mep.length) return lenh("Chưa có cấu kiện để dựng 3D: gán layer cột/dầm/sàn/móng, Ống gió hoặc ống nước / PCCC / khay cáp ở cột trái rồi thử lại.", "loi");
     d.ong_gio = og; d.mep = mep;
     window.xem3D(d); } catch (e) { lenh(e.message, "loi"); }
