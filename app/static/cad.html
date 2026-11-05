@@ -131,6 +131,7 @@
   .lay-tool input[type=search], .lay-tool select { width:100%; font-size:11px; padding:2px 4px; }
   .lay-tool .hang { display:flex; gap:4px; flex-wrap:wrap; } .lay-tool button { font-size:11px; padding:2px 6px; }
   .lay-tool .dem { font-size:11px; color:var(--mo); }
+  .lay-tool { position:sticky; top:0; z-index:6; background:var(--sf); box-shadow:0 2px 6px rgba(0,0,0,.25); }  /* ô tìm/sắp xếp luôn hiện khi cuộn danh sách layer dài */
   .lay.noi { outline:2px solid #ffd60a; outline-offset:-2px; background:rgba(255,214,10,.12); }
   .lay .chi { font-size:10px; padding:0 3px; line-height:14px; }
   .lay { display:grid; grid-template-columns:18px 14px 1fr 34px 18px 20px; gap:4px; padding:3px 8px; align-items:center; border-bottom:1px solid var(--ln); }
@@ -665,7 +666,7 @@
     <div class="lay-tool" id="lay-tool">
       <input type="search" id="lay-q" placeholder="Tìm layer theo tên...">
       <div class="hang"><select id="lay-loc" style="flex:1"><option value="tat_ca">Tất cả layer</option><option value="chua">Chưa gán (Bỏ qua)</option><option value="da">Đã gán</option><option value="hinh">Có hình kín</option><option value="chu">Có chữ</option></select>
-        <select id="lay-sx" style="flex:1"><option value="sl">Nhiều hình nhất trước</option><option value="ten">Theo tên A-Z</option></select></div>
+        <select id="lay-sx" style="flex:1"><option value="ten">Theo tên A-Z</option><option value="sl">Nhiều hình nhất trước</option><option value="gan">Đã gán loại trước</option></select></div>
       <div class="hang"><button id="lay-hoi" title="Bật rồi bấm vào một hình trên bản vẽ: danh sách sẽ nhảy tới layer của hình đó (kể cả layer đang khóa) để Sếp biết nó là gì và gán loại ngay">🎯 Hình này thuộc layer nào?</button>
         <button id="lay-het" title="Bật mọi layer; bấm lần nữa để về trạng thái ban đầu (như lúc vừa tải file)">Hiện tất cả</button></div>
       <div class="dem" id="lay-dem"></div>
@@ -984,7 +985,7 @@ $("tab-file").addEventListener("click", e => {
   const d = e.target.closest("[data-i]"); if (d) moFile(+d.dataset.i);
 });
 
-const LAY = {q:"", loc:"tat_ca", sx:"sl", noi:"", hoi:false};   // trạng thái bộ lọc danh sách layer (chỉ ảnh hưởng hiển thị)
+const LAY = {q:"", loc:"tat_ca", sx:(() => { try { return localStorage.getItem("azb_lay_sx") || "ten"; } catch (e) { return "ten"; } })(), noi:"", hoi:false};   // trạng thái bộ lọc danh sách layer (chỉ ảnh hưởng hiển thị)
 function ve_layer(chiDS) {
   const f = F();
   if (!f) { $("ds-layer").innerHTML = ""; $("lay-dem").textContent = ""; return; }
@@ -998,7 +999,9 @@ function ve_layer(chiDS) {
     if (LAY.loc === "chu") return l.so_chu > 0;
     return true;
   });
-  ds.sort((a, b) => LAY.sx === "ten" ? a.l.ten.localeCompare(b.l.ten) : (b.l.sl + b.l.so_chu) - (a.l.sl + a.l.so_chu));
+  const theoTen = (a, b) => a.l.ten.localeCompare(b.l.ten, "vi", {numeric:true, sensitivity:"base"});  // 2 < 10 < 100, không phân biệt hoa thường
+  const daGan = x => (x.l.loai && x.l.loai !== "bo_qua") ? 0 : 1;
+  ds.sort(LAY.sx === "ten" ? theoTen : LAY.sx === "gan" ? (a, b) => daGan(a) - daGan(b) || theoTen(a, b) : (a, b) => (b.l.sl + b.l.so_chu) - (a.l.sl + a.l.so_chu));
   $("lay-dem").textContent = `Hiện ${ds.length}/${f.layers.length} layer` + (gan ? ` · đã gán ${f.layers.filter(l => l.loai && l.loai !== "bo_qua").length}` : "");
   $("lay-hoi").classList.toggle("on", LAY.hoi);
   $("ds-layer").innerHTML = ds.map(({l, i}) => `<div class="lay${l.ten === LAY.noi ? " noi" : ""}" data-ten="${esc(l.ten)}">
@@ -1024,7 +1027,8 @@ $("ds-layer").addEventListener("click", e => {
 });
 $("lay-q").addEventListener("input", e => { LAY.q = e.target.value; ve_layer(true); });
 $("lay-loc").addEventListener("change", e => { LAY.loc = e.target.value; ve_layer(true); });
-$("lay-sx").addEventListener("change", e => { LAY.sx = e.target.value; ve_layer(true); });
+$("lay-sx").value = LAY.sx;
+$("lay-sx").addEventListener("change", e => { LAY.sx = e.target.value; try { localStorage.setItem("azb_lay_sx", LAY.sx); } catch (err) {} ve_layer(true); });
 $("lay-het").addEventListener("click", () => {
   const f = F(); if (!f) return;
   const dp = l => /^defpoints$/i.test(l.ten);
