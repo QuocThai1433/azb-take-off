@@ -570,10 +570,12 @@
         <input type="range" id="x3-cr" min="${f2(hop.min.y)}" max="${f2(hop.max.y + 0.01)}" step="0.01" value="${st.catY}" ${st.cat ? "" : "disabled"}>
         <div class="x3-mut">Cao độ cắt: <b id="x3-cv2" style="color:#e6ebf5">${f2(st.catY)}</b> m · 0 = mặt sàn tầng. Kéo xuống để nhìn vào bên trong.</div></div>`;
       // MEP + khoét lỗ
+      const cdH = (d.chan_doan || []).map(c => `<div class="x3-cb">${esc(c)}</div>`).join("");
+      if (!coOng) s += `<div class="x3-sec"><h5>Hệ thống MEP &amp; khoét lỗ</h5>${cdH || '<div class="x3-mut">Chưa có ống nào để khoét lỗ.</div>'}<div class="x3-mut" style="margin-top:6px">Khi bản vẽ có ống (gió, nước, PCCC, khay cáp) đã gán layer, mục này hiện bảng chỉnh cao độ, danh sách lỗ và va chạm.</div></div>`;
       if (coOng) {
         const c = soHo(), nv = vaCham.length + vaMep.length, loaiO = MEPK.filter(k => st.mep[k]);
         const ngMau = k => `<span class="x3-dot" style="background:${MAU_HEX(k)}"></span>`;
-        s += `<div class="x3-sec"><h5>Hệ thống MEP &amp; khoét lỗ</h5>
+        s += `<div class="x3-sec"><h5>Hệ thống MEP &amp; khoét lỗ</h5>${cdH}
           <div class="x3-row"><label><input type="checkbox" data-o="khoet" ${st.khoet ? "checked" : ""}>Khoét lỗ dầm, sàn, vách cho ống đi xuyên</label></div>
           <div class="x3-row"><span>Khe hở quanh ống (mỗi phía)</span><span class="n"><input type="number" id="x3-hm" step="5" min="0" max="200" value="${st.hoMm}"> mm</span></div>
           ${loaiO.map(k => { const m = st.mep[k], kt = m.kt || m.kt0;
