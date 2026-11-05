@@ -17,6 +17,7 @@ import math
 import re
 import statistics
 import unicodedata
+from bisect import bisect_left, bisect_right
 from collections import Counter
 from dataclasses import replace
 
@@ -136,11 +137,79 @@ def _tim_dam(ban_ve, loai_layer, canh_bao):
     for g in sorted(hinh, key=lambda g: -g.area):  # bỏ hình trùng (hatch + polyline)
         if not any(g.intersection(u).area > 0.95 * g.area for u in duy_nhat):
             duy_nhat.append(g)
-    hop_ly = [g for g in duy_nhat if (d := _do_dam(g)) and BE_RONG_DAM[0] <= d[2] <= BE_RONG_DAM[1] and d[3] >= 2 * d[2]]
+    if not duy_nhat and not co_dam and not co_khung_o:  # dầm vẽ bằng cặp nét hở, chưa gán layer nào
+        cap = _dam_tu_cap_net(ban_ve, dict(loai2))
+        if cap:
+            canh_bao.append(f"Chưa gán layer dầm: suy {len(cap)} dầm từ cặp nét song song (hai nét cách 0,10-1,00 m, hở đầu). "
+                            "Sếp kiểm tra, đối chiếu với mặt bằng; đúng thì gán layer 'Dầm' ở tab Layer cho chắc.")
+            duy_nhat = cap
+    hop_ly =[g for g in duy_nhat if (d := _do_dam(g)) and BE_RONG_DAM[0] <= d[2] <= BE_RONG_DAM[1] and d[3] >= 2 * d[2]]
     if len(hop_ly) < len(duy_nhat):
         canh_bao.append(f"Dầm: bỏ {len(duy_nhat) - len(hop_ly)} hình không giống dầm (bề rộng ngoài {BE_RONG_DAM[0] * 1000:.0f}-{BE_RONG_DAM[1] * 1000:.0f} mm hoặc quá ngắn). "
                         "Nếu thiếu dầm, gán đúng layer 'Dầm' ở tab Layer.")
     return hop_ly
+
+
+LOAI_KHONG_NET_DAM = {"cot", "san", "mong", "coc", "vach", "lo_san", "bo_qua", "khung_dam", "o_dam"}
+DO_LECH_GOC_DAM = math.radians(1.0)  # hai nét được coi là song song khi lệch nhau dưới 1 độ
+BE_DAY_NET_DAM = 0.3                 # đoạn nét ngắn hơn này (m) không dùng để ghép dầm
+
+
+def _dam_tu_cap_net(ban_ve, loai_layer, toi_da=20000):
+    """Dầm vẽ bằng hai nét song song hở đầu (không có hình kín, chưa gán layer): mỗi cặp đoạn thẳng song song,
+    cách nhau 0,10-1,00 m, chồng lên nhau đủ dài (>= 0,5 m và >= 2 lần bề rộng) thành một hình chữ nhật dầm.
+    Trả danh sách hình học (m). Các hình chồng nhau quá nửa được bỏ, giữ hình lớn hơn."""
+    segs = []  # (x0, y0, x1, y1, góc rad 0..pi)
+    for ld in ban_ve.layers.values():
+        if ld.tat or RE_LAYER_KHONG_PHAI_DAM.search(ld.ten) or RE_LAYER_TRUC.search(ld.ten):
+            continue
+        if loai_layer.get(ld.ten) in LOAI_KHONG_NET_DAM:
+            continue
+        for n in ld.net_ho:
+            c = list(n.coords)
+            for (x0, y0), (x1, y1) in zip(c, c[1:]):
+                if math.hypot(x1 - x0, y1 - y0) >= BE_DAY_NET_DAM:
+                    segs.append((x0, y0, x1, y1, math.atan2(y1 - y0, x1 - x0) % math.pi))
+    if len(segs) < 2:
+        return []
+    # Sắp theo góc; thêm bản sao lệch ±180° để cửa sổ góc không gãy quanh 0/π (nét song song kiểu 179° và 1°)
+    ds = sorted([(th + k * math.pi, j) for j, (_, _, _, _, th) in enumerate(segs) for k in (-1, 0, 1)])
+    goc_sx = [t for t, _ in ds]
+    ung_vien = []
+    for i, (x0, y0, x1, y1, th) in enumerate(segs):
+        L = math.hypot(x1 - x0, y1 - y0)
+        dx, dy = (x1 - x0) / L, (y1 - y0) / L
+        nx, ny = -dy, dx
+        ui0, ui1 = sorted((x0 * dx + y0 * dy, x1 * dx + y1 * dy))
+        vi = x0 * nx + y0 * ny
+        lo = bisect_left(goc_sx, th - DO_LECH_GOC_DAM)
+        hi = bisect_right(goc_sx, th + DO_LECH_GOC_DAM)
+        for k in range(lo, hi):
+            j = ds[k][1]
+            if j == i:
+                continue
+            ax0, ay0, ax1, ay1, _ = segs[j]
+            mx, my = (ax0 + ax1) / 2, (ay0 + ay1) / 2
+            b = mx * nx + my * ny - vi
+            if not (0.10 <= abs(b) <= 1.0):
+                continue
+            uj0, uj1 = sorted((ax0 * dx + ay0 * dy, ax1 * dx + ay1 * dy))
+            ol0, ol1 = max(ui0, uj0), min(ui1, uj1)
+            if ol1 - ol0 < max(0.5, 2 * abs(b)):
+                continue
+            vj = vi + b
+            pts = [(u * dx + v * nx, u * dy + v * ny) for u, v in ((ol0, vi), (ol1, vi), (ol1, vj), (ol0, vj))]
+            g = Polygon(pts)
+            if g.is_valid and g.area > 0:
+                ung_vien.append(g)
+            if len(ung_vien) > toi_da:
+                return []  # bản vẽ quá dày nét: không suy được một cách đáng tin
+    ung_vien.sort(key=lambda g: -g.area)
+    giu = []
+    for g in ung_vien:
+        if not any(g.intersection(u).area > 0.5 * g.area for u in giu):
+            giu.append(g)
+    return giu
 
 
 def _do_dam(g):

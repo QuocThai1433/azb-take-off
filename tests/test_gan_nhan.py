@@ -335,3 +335,37 @@ def test_sua_tay_tung_nhan_doi_xoa_them(tmp_path):
     chu = [n["t"] for n in kq]
     assert len(kq) == len(goc) and "COC DAC BIET" in chu and b["t"] not in chu and "GHI CHU" in chu
     assert next(n for n in kq if n["t"] == "GHI CHU")["loai"] == "tay"
+
+
+def _tao_net_dam(tmp_path, ve_dam=True):
+    """Dầm vẽ bằng hai nét LINE hở đầu song song (200 mm), không có hình kín, không gán layer."""
+    doc = ezdxf.new("R2010")
+    doc.header["$INSUNITS"] = 4
+    for l in ("NET_DAM", "KHUNG", "TRUC", "CHU"):
+        doc.layers.add(l)
+    msp = doc.modelspace()
+    if ve_dam:
+        for y in (21000, 21200):  # 2 dầm X chạy ngang
+            msp.add_line((X0, y), (X1, y), dxfattribs={"layer": "NET_DAM"})
+        for x in (10500, 10700):  # 2 dầm Y chạy đứng
+            msp.add_line((x, Y0), (x, Y1), dxfattribs={"layer": "NET_DAM"})
+    else:
+        msp.add_line((X0, 21000), (X1, 21000), dxfattribs={"layer": "NET_DAM"})  # một nét lẻ, không phải dầm
+    msp.add_text("MẶT BẰNG DẦM TL:1/50", dxfattribs={"layer": "CHU", "height": 150, "insert": (X0, Y0 - 2500)})
+    f = tmp_path / "net_dam.dxf"
+    doc.saveas(f)
+    return doc_ban_ve(f)
+
+
+def test_nhan_dam_tu_cap_net_song_song_khi_chua_gan_layer(tmp_path):
+    kq = gan_nhan(_tao_net_dam(tmp_path), LOAI, VUNG, {"nhan_truc": False, "nhan_san": False, "nhan_mong": False, "nhan_coc": False})
+    huong = sorted((l["huong"], l["b"]) for l in kq["loai_dam"])
+    assert ("X", 200) in huong and ("Y", 200) in huong
+    assert sum(l["so_luong"] for l in kq["loai_dam"]) == 2  # mỗi cặp nét là một dầm
+    assert any("cặp nét song song" in c for c in kq["canh_bao"])
+    assert any(n["loai"] == "dam" for n in kq["nhan"])
+
+
+def test_mot_net_le_khong_thanh_dam(tmp_path):
+    kq = gan_nhan(_tao_net_dam(tmp_path, ve_dam=False), LOAI, VUNG, {"nhan_truc": False, "nhan_san": False, "nhan_mong": False, "nhan_coc": False})
+    assert kq["loai_dam"] == [] and any("Không tìm thấy dầm" in c for c in kq["canh_bao"])
