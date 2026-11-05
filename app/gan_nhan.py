@@ -400,6 +400,9 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
                 continue
             _dat_nhan_dam(d, cao_chu, va_cham, them, d["chu"], canh_bao)
 
+    ghi_de = {str(k).upper(): v for k, v in (tc.get("kt_mong") or {}).items()}  # sếp sửa số trong bảng loại (khoá = tên loại)
+    loai_cot, loai_san, loai_coc = [], [], []
+
     # ----- Cột -----
     if tc.get("nhan_cot", False):
         if not cot_hinh:
@@ -407,9 +410,13 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
             if doc and ngang:  # bản vẽ chưa vẽ cột: đề xuất tên cột tại giao điểm lưới trục
                 doc, ngang = sorted(doc), sorted(ngang)
                 khe = KHE_NHAN * cao_chu
+                gd = ghi_de.get("C") or {}
+                kt = f" {int(gd['a'])}X{int(gd['b'])}" if gd.get("a") and gd.get("b") else ""
                 for i, (x, _, _) in enumerate(doc, 1):
                     for j, (y, _, _) in enumerate(ngang, 1):
-                        them("cot", f"C({tien_to}X{i}-Y{j})", x + khe, y + khe, 0.0, cao_chu, "bl")
+                        them("cot", f"C({tien_to}X{i}-Y{j}){kt}", x + khe, y + khe, 0.0, cao_chu, "bl")
+                loai_cot.append({"ten": "C", "a": int(gd["a"]) if gd.get("a") else None, "b": int(gd["b"]) if gd.get("b") else None,
+                                 "so_luong": len(doc) * len(ngang), "khac_nhau": False})
                 canh_bao.append(f"Bản vẽ chưa có hình cột: đã đặt {len(doc) * len(ngang)} nhãn cột tại giao điểm lưới trục, "
                                 "chỉ có tên vị trí, chưa có kích thước. Sếp bỏ nhãn ở vị trí không có cột và ghi kích thước sau.")
             else:
@@ -417,13 +424,13 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
                                 "trong khung) và cũng không thấy lưới trục. Gán layer chứa hình cột là 'Cột' ở tab Layer rồi bấm Dán nhãn lại.")
         else:
             n0 = len(nhan)
-            _nhan_cot(cot_hinh, cao_chu, va_cham, them)
+            _nhan_cot(cot_hinh, cao_chu, va_cham, them, ghi_de, loai_cot)
             if len(nhan) == n0:
                 canh_bao.append("Có hình cột nhưng không tìm được chỗ trống để đặt nhãn (đều vướng dầm/chữ khác).")
 
     # ----- Sàn -----
     if tc.get("nhan_san", True) and dam:
-        _nhan_san(ban_ve, dam, tang, cao_chu, va_cham, them, canh_bao)
+        _nhan_san(ban_ve, dam, tang, cao_chu, va_cham, them, canh_bao, ghi_de, loai_san)
 
     # ----- Móng -----
     loai_mong = []
@@ -434,7 +441,7 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
 
     # ----- Cọc -----
     if tc.get("nhan_coc", True):
-        _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao)  # tự báo lý do khi không dán được cọc nào
+        _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao, ghi_de=ghi_de, loai_coc=loai_coc)  # tự báo lý do khi không dán được cọc nào
 
     # ----- Trục -----
     bong = []
@@ -459,7 +466,7 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
     if da_co:
         canh_bao.append(f"Vùng này đã có {da_co} nhãn dầm trong bản vẽ; nhãn mới sẽ nằm cạnh/chồng lên, Sếp xem lại trước khi xuất.")
     return {"ty_le": ty_le, "nguon_ty_le": nguon_ty_le, "cao_chu": cao_chu, "tang": tang, "tien_to": tien_to,
-            "nhan": nhan, "bong": bong, "loai_dam": loai_dam, "loai_mong": loai_mong, "canh_bao": canh_bao, "da_co": da_co}
+            "nhan": nhan, "bong": bong, "loai_dam": loai_dam, "loai_mong": loai_mong, "loai_cot": loai_cot, "loai_coc": loai_coc, "loai_san": loai_san, "canh_bao": canh_bao, "da_co": da_co}
 
 
 def _tam_bong(bong_cs, pos, dau, huong, r_bong, cao_truc):
@@ -519,7 +526,7 @@ def _dat_nhan_dam(d, cao_chu, va_cham, them, chu, canh_bao):
     canh_bao.append(f"Nhãn {chu} không tìm được chỗ trống, đang đè lên nét khác. Sếp kéo nhãn sang chỗ thoáng trong CAD.")
 
 
-def _nhan_cot(cot_hinh, cao_chu, va_cham, them):
+def _nhan_cot(cot_hinh, cao_chu, va_cham, them, ghi_de=None, loai_cot=None):
     duy_nhat = []
     for g in sorted(cot_hinh, key=lambda g: -g.area):
         if g.area >= 0.005 and not any(g.intersection(u).area > 0.95 * g.area for u in duy_nhat):
@@ -531,7 +538,11 @@ def _nhan_cot(cot_hinh, cao_chu, va_cham, them):
         a, b = math.hypot(p[1][0] - p[0][0], p[1][1] - p[0][1]), math.hypot(p[2][0] - p[1][0], p[2][1] - p[1][1])
         loai.setdefault((_lam_tron_mm(max(a, b)), _lam_tron_mm(min(a, b))), []).append(g)
     for i, (k, ds) in enumerate(sorted(loai.items(), key=lambda kv: -kv[0][0] * kv[0][1]), 1):
-        chu = f"C{i}-{k[0]}X{k[1]}"
+        gd = (ghi_de or {}).get(f"C{i}") or {}
+        ka, kb = int(gd.get("a") or k[0]), int(gd.get("b") or k[1])
+        chu = f"C{i}-{ka}X{kb}"
+        if loai_cot is not None:
+            loai_cot.append({"ten": f"C{i}", "a": ka, "b": kb, "so_luong": len(ds), "khac_nhau": False})
         for g in ds:
             x0, y0, x1, y1 = g.bounds
             khe = KHE_NHAN * cao_chu
@@ -769,7 +780,7 @@ def _ghi_chu_coc(ban_ve):
     return (dks.pop() if len(dks) == 1 else None), (dais.pop() if len(dais) == 1 else None)
 
 
-def _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao, toi_da=0.8):
+def _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao, toi_da=0.8, ghi_de=None, loai_coc=None):
     dk_bang, dai_bang = _bang_coc(ban_ve)
     tron = []
     for ld in trong.layers.values():
@@ -781,6 +792,7 @@ def _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao, toi_da=0.8):
                 tron.append((g, d))
     ten_coc = [c for c in _tat_ca_chu(trong) if RE_TEN_COC.match(_nfc(c.noi_dung))]
     da_dat, so, lech_dk = set(), 0, []
+    ghi_de, thong_ke, thieu_dai = ghi_de or {}, {}, 0
     for c in ten_coc:
         m = RE_TEN_COC.match(_nfc(c.noi_dung))
         ten = f"P{m.group(1).upper()}"
@@ -800,7 +812,12 @@ def _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao, toi_da=0.8):
         da_dat.add(khoa)
         dung_bang = bool(dk_bang) and abs(d * 1000 - dk_bang) <= 0.05 * dk_bang
         dk = dk_bang if dung_bang else _lam_tron_mm(d)
-        chu = f"{ten} D{dk}" + (f" L={dai_bang:g}m" if dai_bang else "")
+        gd = ghi_de.get(ten) or {}  # sếp nhập tay: d (mm), l (m)
+        dk = int(gd.get("d") or dk)
+        dai = float(gd.get("l") or 0) or dai_bang
+        thong_ke.setdefault(ten, Counter())[(dk, dai)] += 1
+        thieu_dai += 0 if dai else 1
+        chu = f"{ten} D{dk}" + (f" L={dai:g}m" if dai else "")
         khe, cy, cx = KHE_NHAN * cao_chu, (y0 + y1) / 2, (x0 + x1) / 2
         dat = False
         for ox, oy, neo in ((x1 + khe, cy, "ml"), (x0 - khe, cy, "mr"), (cx, y0 - khe, "tc"), (cx, y1 + khe, "bc")):
@@ -813,7 +830,11 @@ def _nhan_coc(ban_ve, trong, cao_chu, va_cham, them, canh_bao, toi_da=0.8):
         so += 1
     if so and not dk_bang:
         canh_bao.append("Cọc: không đọc được đường kính từ bảng thống kê cọc, nhãn dùng số đo từ hình vẽ.")
-    if so and not dai_bang:
+    if loai_coc is not None:
+        for ten, dem in sorted(thong_ke.items(), key=lambda kv: (len(kv[0]), kv[0])):
+            (dk, dai), _ = dem.most_common(1)[0]
+            loai_coc.append({"ten": ten, "d": dk, "l": dai, "so_luong": sum(dem.values()), "khac_nhau": len(dem) > 1})
+    if so and thieu_dai:
         canh_bao.append("Cọc: không đọc được chiều dài cọc từ bảng thống kê, nhãn không ghi L.")
     if lech_dk:
         canh_bao.append(f"Cọc: hình tròn đo được D{sorted(set(lech_dk))} không khớp đường kính bảng thống kê D{dk_bang}. "
@@ -854,7 +875,7 @@ def _day_san(ban_ve, tang):
     return None, ""
 
 
-def _nhan_san(ban_ve, dam, tang, cao_chu, va_cham, them, canh_bao):
+def _nhan_san(ban_ve, dam, tang, cao_chu, va_cham, them, canh_bao, ghi_de=None, loai_san=None):
     """Ô sàn = lỗ hổng bên trong cụm dầm. Mỗi ô ghi "S1 t={mm}"."""
     cum = unary_union([d["geom"].buffer(0.01) for d in dam])
     cum = [cum] if cum.geom_type == "Polygon" else list(cum.geoms)
@@ -864,6 +885,9 @@ def _nhan_san(ban_ve, dam, tang, cao_chu, va_cham, them, canh_bao):
                         "Mặt bằng móng thường không có sàn; mặt bằng sàn thì kiểm tra layer dầm đã gán đúng chưa.")
         return 0
     t_mm, _ = _day_san(ban_ve, tang)
+    t_mm = int((ghi_de or {}).get("S1", {}).get("t") or 0) or t_mm
+    if loai_san is not None:
+        loai_san.append({"ten": "S1", "t": t_mm, "so_luong": len(o), "khac_nhau": False})
     if not t_mm:
         canh_bao.append("Sàn: bản vẽ không có ghi chú chiều dày sàn (kiểu 'SÀN TẦNG 1 DÀY 100mm'), nhãn ghi 't=?'.")
     chu = f"S1 t={t_mm if t_mm else '?'}"

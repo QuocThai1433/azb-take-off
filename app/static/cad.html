@@ -1769,7 +1769,7 @@ function docOGN() {  // đọc các ô nhập của bảng Gán nhãn vào thôn
   if (!$("gn-tl")) return;
   tc.ty_le = +v("gn-tl") || null; tc.tang = v("gn-tang").trim(); tc.tien_to = v("gn-tt").trim();
   tc.kt_mong = {};
-  document.querySelectorAll("#p-gn input[data-km]").forEach(i => { const [t, k] = i.dataset.km.split("|"); const goc = ((mbHienTai().kq || {}).loai_mong || []).find(l => l.ten === t); if (+i.value > 0 && !(goc && goc[k] === +i.value)) (tc.kt_mong[t] ||= {})[k] = +i.value; });
+  document.querySelectorAll("#p-gn input[data-km]").forEach(i => { const [t, k] = i.dataset.km.split("|"); const kqh = mbHienTai().kq || {}, goc = [kqh.loai_mong, kqh.loai_cot, kqh.loai_coc, kqh.loai_san].flatMap(d => d || []).find(l => l.ten === t); if (+i.value > 0 && !(goc && goc[k] === +i.value)) (tc.kt_mong[t] ||= {})[k] = +i.value; });
   document.querySelectorAll("#p-gn input[data-gh]").forEach(i => { if (+i.value > 0) tc.cao_dam[i.dataset.gh] = +i.value; else delete tc.cao_dam[i.dataset.gh]; });
 }
 function chayGanNhan(a, c) {  // chỉ GHI NHẬN vùng; chưa dán nhãn cho tới khi nhân sự chọn loại và bấm "Dán nhãn"
@@ -1820,6 +1820,20 @@ function xoaNhan(thongBao) {
   if (S.gn && S.gn.fileId === f.id) S.gn = null;
   veNhanLenHinh(f); veGN(); if (thongBao) lenh("Đã xóa nhãn khỏi khung xem.", "ok");
 }
+const BANG_GN = {  // loại → bảng sửa kích thước: khoá kq, tiêu đề, các cột [khoá, nhãn cột, bước]
+  mong:{kq:"loai_mong", ten:"Bảng loại móng", cot:[["a", "Dài (mm)", 10], ["b", "Rộng (mm)", 10], ["h", "Sâu (mm)", 10]]},
+  cot:{kq:"loai_cot", ten:"Bảng loại cột", cot:[["a", "Dài (mm)", 10], ["b", "Rộng (mm)", 10]]},
+  coc:{kq:"loai_coc", ten:"Bảng loại cọc", cot:[["d", "Đường kính (mm)", 10], ["l", "Dài L (m)", 0.5]]},
+  san:{kq:"loai_san", ten:"Bảng loại sàn", cot:[["t", "Dày (mm)", 10]]}};
+function bangLoaiGN(loai, kq) {  // một bảng chung cho móng / cột / cọc / sàn: sửa số rồi bấm Cập nhật nhãn
+  const cf = BANG_GN[loai], ds = cf && kq[cf.kq]; if (!ds || !ds.length) return "";
+  return `<div style="margin:8px 0"><b>${cf.ten}</b> <span class="nho">(sửa số rồi bấm Cập nhật nhãn)</span>
+    <table><tr><th>Loại</th>${cf.cot.map(c => `<th>${c[1]}</th>`).join("")}<th>SL</th></tr>
+    ${ds.map(l => `<tr><td><b>${esc(l.ten)}</b>${l.khac_nhau ? '<div class="nho chua">kích thước không đều</div>' : ""}</td>
+      ${cf.cot.map(c => `<td><input type="number" min="0" step="${c[2]}" data-km="${esc(l.ten)}|${c[0]}" value="${l[c[0]] || ""}" placeholder="?" style="width:70px"></td>`).join("")}
+      <td>${l.so_luong}</td></tr>`).join("")}</table>
+    <button id="gn-ap" class="on" style="margin-top:6px">Cập nhật nhãn theo bảng</button></div>`;
+}
 function veGN() {
   const pn = $("p-gn"), f = F();
   if (!f || !S.gn || S.gn.fileId !== f.id || !S.gn.ds.length) {
@@ -1844,12 +1858,7 @@ function veGN() {
       ${kq.loai_dam.map(l => `<tr><td><b>${esc(l.ten)}</b><div class="nho">hướng ${l.huong} · ${l.vai_tro === "bien" ? "dầm biên" : "dầm giữa"}</div></td><td>${l.b}</td>
         <td><input type="number" min="0" step="10" data-gh="${esc(l.ma)}" value="${l.h || ""}" placeholder="?" style="width:70px">${l.nguon_h ? `<div class="nho">${esc(l.nguon_h)}</div>` : '<div class="chua">chưa biết</div>'}</td>
         <td>${l.so_luong}</td><td>${so(l.tong_dai, 2)}</td></tr>`).join("")}</table>` : '<div class="nho">Không có dầm trong vùng.</div>') : ""}
-    ${tc.loai === "mong" && kq.loai_mong && kq.loai_mong.length ? `<div style="margin:8px 0"><b>Bảng loại móng</b> <span class="nho">(sửa số rồi bấm Cập nhật nhãn, đơn vị mm)</span>
-      <table><tr><th>Loại</th><th>Dài</th><th>Rộng</th><th>Sâu</th><th>SL</th></tr>
-      ${kq.loai_mong.map(l => `<tr><td><b>${esc(l.ten)}</b>${l.khac_nhau ? '<div class="nho chua">kích thước không đều</div>' : ""}</td>
-        ${["a", "b", "h"].map(k => `<td><input type="number" min="0" step="10" data-km="${esc(l.ten)}|${k}" value="${l[k] || ""}" placeholder="?" style="width:64px"></td>`).join("")}
-        <td>${l.so_luong}</td></tr>`).join("")}</table>
-      <button id="gn-ap" class="on" style="margin-top:6px">Cập nhật nhãn theo bảng</button></div>` : ""}
+    ${bangLoaiGN(tc.loai, kq)}
     ${kq.canh_bao.map(w => `<div class="nho chua" style="margin:3px 0">⚠ ${esc(w)}</div>`).join("")}` : ""}
     <div class="nho" style="margin-top:6px">Nhãn chỉ là đề xuất do công cụ tính từ hình học, kỹ sư kiểm tra trước khi dùng. Trong DXF xuất ra, nhãn nằm riêng trên layer ${TEN_NHAN} nên kéo chỉnh hoặc tắt dễ dàng.</div></div>`;
 }

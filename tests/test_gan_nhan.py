@@ -263,3 +263,21 @@ def test_nhan_mong_sep_nhap_kich_thuoc_theo_loai(tmp_path):
     kq = gan_nhan(bv, {"MONG": "mong"}, VUNG, {**tc, "kt_mong": {"F1": {"a": 1000, "h": 900}}})
     assert [n["t"] for n in kq["nhan"] if n["loai"] == "mong"] == ["F1 1000x800x900"] * 2
     assert kq["loai_mong"][0]["h"] == 900 and kq["loai_mong"][0]["a"] == 1000
+
+
+def test_coc_sep_nhap_duong_kinh_va_chieu_dai_theo_loai(tmp_path):
+    bv = _tao_coc(tmp_path, True, 300, dk_bang=300)
+    kq = gan_nhan(bv, LOAI, VUNG, COC_CHON)
+    assert [l["ten"] for l in kq["loai_coc"]] == ["P1", "P2", "P3", "P4"] and kq["loai_coc"][0]["d"] == 300
+    kq = gan_nhan(bv, LOAI, VUNG, {**COC_CHON, "kt_mong": {"P1": {"d": 350, "l": 22}}})
+    chu = {n["t"] for n in kq["nhan"]}
+    assert "P1 D350 L=22m" in chu and "P2 D300" in chu
+    assert any(l["ten"] == "P1" and l["d"] == 350 and l["l"] == 22 for l in kq["loai_coc"])
+
+
+def test_san_sep_nhap_chieu_day_theo_bang(tmp_path):
+    tc = {"nhan_dam": False, "nhan_truc": False, "nhan_cot": False, "nhan_mong": False, "nhan_coc": False, "nhan_san": True}
+    kq = gan_nhan(_tao(tmp_path), LOAI, VUNG, tc)
+    if kq["loai_san"]:  # fixture có ô sàn
+        kq = gan_nhan(_tao(tmp_path), LOAI, VUNG, {**tc, "kt_mong": {"S1": {"t": 120}}})
+        assert kq["loai_san"][0]["t"] == 120 and all(n["t"] == "S1 t=120" for n in kq["nhan"])
