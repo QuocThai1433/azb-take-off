@@ -166,6 +166,7 @@
   .tab-phai div { padding:7px 13px; cursor:pointer; color:var(--mo); border-right:1px solid var(--vien); white-space:nowrap; flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; font-weight:500; }
   .tab-phai .tab-cuon > div { padding:7px 10px; }
   .tab-phai div:hover { color:var(--xanh); background:var(--hv); }
+  .tab-phai div:hover { flex:0 0 auto; overflow:visible; }
   .tab-phai div.act { background:var(--sf); color:var(--xanh); box-shadow:inset 0 -3px var(--cam); }
   .noi-dung { flex:1; overflow:auto; padding:10px; background:var(--sf); }
   .noi-dung h4 { margin:14px 0 5px; color:var(--xanh); font-size:12.5px; padding-left:8px; border-left:3px solid var(--cam); }
@@ -447,7 +448,7 @@
 
   <div class="chia" id="chia-p" title="Kéo để đổi độ rộng (kéo hết cỡ để ẩn, bấm đúp: về mặc định)"></div>
   <div class="cot phai" id="pn-p">
-    <div class="tab-phai"><span class="grip" data-pn="p" title="Kéo tay nắm này tới mép trái / phải / dưới để gắn bảng vào đó" style="align-self:center;margin-left:4px">⠿</span><span class="tab-cuon"><div data-t="cc" class="act">Công cụ</div><div data-t="dt">Đối tượng chọn</div><div data-t="tk">Thống kê</div><div data-t="gn">Gán nhãn</div><div data-t="ct">Cốt thép</div><div data-t="tm">Tách mặt bằng</div><div data-t="ai">Gán layer</div><div data-t="kl">Khối lượng</div><div data-t="gc">Ghi chú chung</div></span><button class="dong-x" id="dong-p" title="Ẩn bảng này (mở lại bằng nút trên thanh tiêu đề)">✕</button></div>
+    <div class="tab-phai"><span class="grip" data-pn="p" title="Kéo tay nắm này tới mép trái / phải / dưới để gắn bảng vào đó" style="align-self:center;margin-left:4px">⠿</span><span class="tab-cuon"><div data-t="cc" class="act" title="Công cụ">Công cụ</div><div data-t="dt" title="Đối tượng chọn">Đối tượng chọn</div><div data-t="tk" title="Thống kê">Thống kê</div><div data-t="gn" title="Gán nhãn">Gán nhãn</div><div data-t="ct" title="Cốt thép">Cốt thép</div><div data-t="tm" title="Tách mặt bằng">Tách mặt bằng</div><div data-t="ai" title="Gán layer">Gán layer</div><div data-t="kl" title="Khối lượng">Khối lượng</div><div data-t="gc" title="Ghi chú chung">Ghi chú chung</div></span><button class="dong-x" id="dong-p" title="Ẩn bảng này (mở lại bằng nút trên thanh tiêu đề)">✕</button></div>
     <div class="noi-dung" id="p-cc"></div>
     <div class="noi-dung" id="p-dt" hidden></div>
     <div class="noi-dung" id="p-tk" hidden></div>
