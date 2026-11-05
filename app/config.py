@@ -1,4 +1,5 @@
 """Đọc các file cấu hình trong thư mục config/."""
+import os
 import re
 import unicodedata
 from pathlib import Path
@@ -7,6 +8,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_DIR = ROOT / "config"
+# Mặc định data/ trong thư mục app. Đặt biến AZB_DATA_DIR để dùng thư mục dữ liệu riêng (vd: bản dùng thử qua tunnel).
+DATA_DIR = Path(os.environ.get("AZB_DATA_DIR") or ROOT / "data")
 
 LOAI_CAU_KIEN = ["cot", "dam", "san", "lo_san", "mong", "coc", "vach", "khung_dam", "o_dam", "nhan", "ong_gio", "bo_qua"]
 

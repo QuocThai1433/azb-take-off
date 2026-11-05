@@ -9,7 +9,9 @@ from pathlib import Path
 
 import yaml
 
-DUONG_DAN = Path(__file__).resolve().parent.parent / "data" / "ho_so_layer.yaml"
+from . import config
+
+DUONG_DAN = config.DATA_DIR / "ho_so_layer.yaml"
 
 
 def chuan_hoa_khoa(ten):

@@ -14,7 +14,7 @@ from pathlib import Path
 
 from . import config
 
-THU_MUC = config.ROOT / "data" / "logs"
+THU_MUC = config.DATA_DIR / "logs"
 FILE_LOG = THU_MUC / "azb.log"
 DINH_DANG = "%(asctime)s %(levelname)-7s %(name)s: %(message)s"
 CHAM_GIAY = 5.0     # yêu cầu chậm hơn mức này được ghi lại để biết thao tác nào nặng

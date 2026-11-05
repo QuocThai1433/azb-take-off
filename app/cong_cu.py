@@ -28,7 +28,7 @@ DON_VI_HIEN = {"m3": "m³", "m2": "m²", "m": "m", "cái": "cái", "kg": "kg", "
 HAM = {"min": min, "max": max, "abs": abs, "sqrt": math.sqrt, "round": round}
 HAM_EXCEL = {"min": "MIN", "max": "MAX", "abs": "ABS", "sqrt": "SQRT", "round": "ROUND"}
 RE_TEN_BIEN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-DUONG_TUY_CHINH = config.ROOT / "data" / "cong_cu_tuy_chinh.yaml"
+DUONG_TUY_CHINH = config.DATA_DIR / "cong_cu_tuy_chinh.yaml"
 
 NEN = PatternFill("solid", fgColor="1F4E78")
 NEN_TONG = PatternFill("solid", fgColor="DDEBF7")

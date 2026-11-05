@@ -10,3 +10,6 @@ data/*
 !data/mau/
 !data/cong_cu_tuy_chinh.yaml
 !data/ho_so_layer.yaml
+
+# Dữ liệu bản dùng thử qua tunnel (CHAY_DUNG_THU.bat)
+data_dung_thu/
