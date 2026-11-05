@@ -165,6 +165,38 @@ def _sap_doc(vung):
     return sorted(vung, key=lambda v: (-round(((v["khung"][1] + v["khung"][3]) / 2) / (0.6 * cao)), v["khung"][0]))
 
 
+def _cat_chong(vung, bien=1e-3):
+    """Cắt phần khung đè lên nhau. Mỗi cặp chồng nhau được cắt đôi theo trục có độ chồng nhỏ hơn, đường cắt
+    đặt giữa dải chồng, nên hai vùng sát nhau thành hai khung liền kề. Khung gần trọn nằm trong khung kia thì
+    không cắt được (vẫn để cảnh báo). Vùng bị cắt được ghi cảnh báo để kiểm tra ranh giới."""
+    for _ in range(4 * len(vung) + 4):
+        da_cat = False
+        for i, a in enumerate(vung):
+            for b in vung[i + 1:]:
+                ka, kb = a["khung"], b["khung"]
+                ox = min(ka[2], kb[2]) - max(ka[0], kb[0])
+                oy = min(ka[3], kb[3]) - max(ka[1], kb[1])
+                if ox <= bien or oy <= bien:
+                    continue
+                dt_a = (ka[2] - ka[0]) * (ka[3] - ka[1])
+                dt_b = (kb[2] - kb[0]) * (kb[3] - kb[1])
+                if ox * oy >= 0.9 * min(dt_a, dt_b):
+                    continue
+                lo, hi = (0, 2) if ox <= oy else (1, 3)     # trục cắt: x nếu chồng theo x ít hơn
+                trai, phai = (a, b) if ka[lo] + ka[hi] <= kb[lo] + kb[hi] else (b, a)
+                cat = round((max(ka[lo], kb[lo]) + min(ka[hi], kb[hi])) / 2, 3)
+                if not (trai["khung"][lo] < cat < phai["khung"][hi]):
+                    continue
+                trai["khung"][hi] = cat
+                phai["khung"][lo] = cat
+                for v, khac in ((trai, phai), (phai, trai)):
+                    v["canh_bao"].append(f"Đã cắt bớt phần khung chồng với vùng #{khac['id']}: kiểm tra ranh giới")
+                    v["tin_cay"] = min(v["tin_cay"], 0.6)
+                da_cat = True
+        if not da_cat:
+            break
+
+
 def do_mat_bang(ban_ve, khoang_cach=None):
     """Đề xuất các vùng (mặt bằng / chi tiết / bảng) trong một bản vẽ. Trả {ds, khoang_cach, cach}."""
     X, Y, K, C = _thu_thap(ban_ve)
@@ -217,6 +249,7 @@ def do_mat_bang(ban_ve, khoang_cach=None):
     vung = _sap_doc(sorted(vung, key=lambda v: -(v["so_hinh"] + v["so_net"] + v["so_chu"]))[:TOI_DA_VUNG])
     for i, v in enumerate(vung, 1):
         v["id"] = i
+    _cat_chong(vung)
     for a in vung:       # vùng chồng lấn nhau: dấu hiệu nhiều tờ vẽ đè lên nhau, hoặc khung bị vẽ trùng
         ba = box(*a["khung"])
         for b in vung:

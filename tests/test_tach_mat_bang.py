@@ -1,6 +1,7 @@
 """Tự tách nhiều mặt bằng trong một file: khung giấy, cụm nét vẽ, tiêu đề, tầng, tỷ lệ, vai trò, cảnh báo chồng lấn."""
 import ezdxf
 from fastapi.testclient import TestClient
+from shapely.geometry import box
 
 from app.dxf_reader import doc_ban_ve
 from app.tach_mat_bang import do_mat_bang
@@ -89,8 +90,11 @@ def test_khung_chong_lan_va_nhieu_tieu_de_bi_canh_bao(tmp_path):
     _mat_bang(m, 20, 5, "MẶT BẰNG ĐÀ KIỀNG")                # khung thứ hai đè lên khung đầu
     r = do_mat_bang(_doc_ve(tmp_path, d))
     assert len(r["ds"]) == 2
+    a, b = r["ds"]
+    ba, bb = box(*a["khung"]), box(*b["khung"])
+    assert ba.intersection(bb).area < 1e-6                 # đã cắt, không còn đè nhau
     nd = " ".join(c for v in r["ds"] for c in v["canh_bao"])
-    assert "Chồng lấn" in nd and all(v["tin_cay"] <= 0.6 for v in r["ds"])
+    assert "Đã cắt bớt" in nd and all(v["tin_cay"] <= 0.6 for v in r["ds"])
 
 
 def test_ban_ve_trong_khong_loi(tmp_path):
