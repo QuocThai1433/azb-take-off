@@ -6,6 +6,16 @@ Công cụ web chạy trên máy cá nhân. Đọc mặt bằng kết cấu DWG/
 
 ---
 
+## 0. Cách nhanh nhất (Windows)
+
+1. Bấm đúp **`CAI_DAT.bat`** (một lần): tạo môi trường ảo, cài thư viện, tự dò ODA File Converter và ghi đường dẫn vào `config/app.yaml`.
+2. Từ đó chỉ cần bấm đúp **`CHAY_AZB.bat`**: khởi động phần mềm và tự mở trình duyệt. Nếu phần mềm đã chạy sẵn thì chỉ mở trình duyệt. Chưa cài thì tự chạy bước 1.
+3. Gặp lỗi: bấm đúp **`XEM_NHAT_KY.bat`** (mở `data/logs/azb.log`) hoặc vào `http://127.0.0.1:8765/api/nhat-ky`. Khi giao diện báo "mã lỗi xxxxxxxx", tìm mã đó trong nhật ký để thấy lỗi chi tiết.
+
+Cần Python 3.10 trở lên (tải tại python.org, nhớ tick *Add python.exe to PATH*). Các mục 1 và 2 bên dưới là cách làm tay, tương đương.
+
+**Vận hành:** nhật ký xoay vòng (tối đa khoảng 6 MB). Thư mục `data/backup` giữ tối đa 10 bản tự động + 20 bản khác, tổng không quá 1 GB (xóa bản cũ nhất trước), và không giữ thêm bản tự động nếu nội dung y hệt bản trước. Mã nguồn nằm trong git (`git log`); dữ liệu người dùng trong `data/` không đưa vào git, trừ bản vẽ mẫu và hai file thiết lập cá nhân (`data/cong_cu_tuy_chinh.yaml`, `data/ho_so_layer.yaml`). Các bản giao diện cũ trước đây ở `backup_ui/` lấy lại bằng `git show 58269c6:backup_ui/<tên file>`.
+
 ## 1. Cài đặt (làm một lần)
 
 Mở **PowerShell** tại thư mục `azb-take-off` (trong File Explorer: Shift + chuột phải > Open PowerShell window here).
