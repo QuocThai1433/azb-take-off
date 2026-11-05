@@ -109,6 +109,15 @@ Mở bản vẽ rồi vào tab **Tách mặt bằng**: phần mềm dò từng t
 - Bấm một dòng để phóng tới vùng. Sửa tên và vai trò nếu cần, tick các vùng cần dùng, bấm **Tạo mục**: mỗi vùng thành một mục trong "Bản vẽ trong dự án", đã có sẵn vùng cắt, bóc độc lập. Gán layer cho từng mặt bằng rồi tính.
 - Chỉ là đề xuất. Vùng chồng lấn nhau hoặc chứa nhiều tiêu đề khác nhau (nhiều mặt bằng vẽ đè lên nhau) được cảnh báo và hạ độ tin cậy.
 
+## 3f. Cốt thép theo bảng thống kê thép (tab "Cốt thép")
+
+Khác với dòng *"cốt thép ước tính theo hàm lượng"* ở các công cụ tính (chỉ nhân khối lượng bê tông với kg/m³), tab này tính **từ bảng thống kê thép của hồ sơ thiết kế**: mỗi dòng = số cấu kiện × số thanh × chiều dài × đơn trọng (0,00617 × Ø², khớp bảng tra Ø6 đến Ø32).
+
+- **Nạp bảng:** từ file Excel/CSV (tự nhận dòng tiêu đề tiếng Việt: Cấu kiện, Đường kính/Ø, Số thanh, Chiều dài (mm/m), Tổng chiều dài, Khối lượng), hoặc **kéo khung quanh bảng chữ trong bản vẽ CAD**.
+- **Kiểm tra tự động:** bảng có cột khối lượng thì đối chiếu, lệch quá 2% thì cảnh báo dòng đó; tiêu đề không ghi đơn vị thì đoán mm/m theo độ lớn và báo; dòng thiếu dữ liệu bị bỏ qua và báo; có bê tông đã bóc thì đối chiếu hàm lượng kg/m³ (khoảng thường gặp 40–250).
+- **Sửa tay** ô đọc sai, bỏ tick dòng không tính, xuất Excel (mỗi con số là công thức, có sheet tổng hợp theo Ø).
+- **Giới hạn:** các bản vẽ mẫu hiện có không chứa bảng thép nên bộ đọc mới được thử trên bảng dựng theo các cách trình bày thường gặp, chưa trên bảng thật của đơn vị thiết kế nào. Bảng CAD vẽ bằng chữ lệch cột sẽ đọc sai: luôn xem lại các dòng đã đọc.
+
 ## 4. Bản vẽ cần như thế nào để bóc chính xác
 
 | Yêu cầu | Lý do |
@@ -148,7 +157,7 @@ Bản vẽ mẫu `data/mau/khung_mau.dxf` (tạo bằng `tools/tao_ban_ve_mau.py
 
 ## 8. Chưa làm ở giai đoạn 1
 
-- Cốt thép (cần bảng thống kê thép, định dạng mỗi đơn vị một kiểu).
+- Tự bố trí cốt thép từ nội lực (bài toán kết cấu, cần kỹ sư chịu trách nhiệm). Cốt thép từ bảng thống kê: xem mục 3f.
 - Đọc BIM (Revit/IFC), bộ môn MEP, hạ tầng/san nền.
 - Nhận cao độ từ mặt cắt. (Tách nhiều mặt bằng trong một file: xem mục 3e.)
 - Định dạng đúng mẫu Excel AZB: hiện dùng mẫu tạm, sẽ chỉnh khi có mẫu thật.

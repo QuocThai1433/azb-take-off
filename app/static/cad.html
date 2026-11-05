@@ -447,11 +447,12 @@
 
   <div class="chia" id="chia-p" title="Kéo để đổi độ rộng (kéo hết cỡ để ẩn, bấm đúp: về mặc định)"></div>
   <div class="cot phai" id="pn-p">
-    <div class="tab-phai"><span class="grip" data-pn="p" title="Kéo tay nắm này tới mép trái / phải / dưới để gắn bảng vào đó" style="align-self:center;margin-left:4px">⠿</span><span class="tab-cuon"><div data-t="cc" class="act">Công cụ</div><div data-t="dt">Đối tượng chọn</div><div data-t="tk">Thống kê</div><div data-t="gn">Gán nhãn</div><div data-t="tm">Tách mặt bằng</div><div data-t="ai">Gán layer</div><div data-t="kl">Khối lượng</div><div data-t="gc">Ghi chú chung</div></span><button class="dong-x" id="dong-p" title="Ẩn bảng này (mở lại bằng nút trên thanh tiêu đề)">✕</button></div>
+    <div class="tab-phai"><span class="grip" data-pn="p" title="Kéo tay nắm này tới mép trái / phải / dưới để gắn bảng vào đó" style="align-self:center;margin-left:4px">⠿</span><span class="tab-cuon"><div data-t="cc" class="act">Công cụ</div><div data-t="dt">Đối tượng chọn</div><div data-t="tk">Thống kê</div><div data-t="gn">Gán nhãn</div><div data-t="ct">Cốt thép</div><div data-t="tm">Tách mặt bằng</div><div data-t="ai">Gán layer</div><div data-t="kl">Khối lượng</div><div data-t="gc">Ghi chú chung</div></span><button class="dong-x" id="dong-p" title="Ẩn bảng này (mở lại bằng nút trên thanh tiêu đề)">✕</button></div>
     <div class="noi-dung" id="p-cc"></div>
     <div class="noi-dung" id="p-dt" hidden></div>
     <div class="noi-dung" id="p-tk" hidden></div>
     <div class="noi-dung" id="p-gn" hidden></div>
+    <div class="noi-dung" id="p-ct" hidden></div>
     <div class="noi-dung" id="p-tm" hidden></div>
     <div class="noi-dung" id="p-ai" hidden></div>
     <div class="noi-dung" id="p-kl" hidden></div>
@@ -927,6 +928,7 @@ window.addEventListener("mouseup", e => {
     const m = chuotToa(e);  // lấy toạ độ lúc thả chuột, phòng khi kéo nhanh không kịp phát sự kiện di chuyển
     if (Math.hypot(m.x - S.keo.px, m.y - S.keo.py) > 4) { S.keo.moved = true; S.keo.b = [wx(m.x), wy(m.y)]; }
     if (LAY.hoi && !S.keo.moved) hoiLayerTaiDiem({x:S.keo.px, y:S.keo.py});
+    else if (S.ctCho) { if (S.keo.moved) docThepCad(S.keo.a, S.keo.b); else lenh("Kéo khung (giữ chuột trái và kéo) quanh bảng thống kê thép, trùm cả dòng tiêu đề. Esc để hủy.", "loi"); }
     else if (S.gnCho) { if (S.keo.moved) chayGanNhan(S.keo.a, S.keo.b); else lenh("Gán nhãn: kéo khung (giữ chuột trái và kéo) quanh một mặt bằng. Esc để hủy.", "loi"); }
     else if (S.buoc && S.buoc.so === 3) ganChon(S.keo.a, S.keo.b, S.keo.moved, {x:S.keo.px, y:S.keo.py});
     else if (S.buoc) { if (S.keo.moved) chayBuoc(S.keo.a, S.keo.b); else lenh("Đang ở bước quét chọn: kéo khung (giữ chuột trái và kéo) quanh vùng cần đọc. Esc để hủy.", "loi"); }
@@ -1721,7 +1723,8 @@ function datLoaiGN(tc, loai) {  // chỉ bật đúng loại nhân sự đã ch�
   if (loai) tc[CO_GN[loai]] = true;
 }
 S.gn = null;  // {fileId, khung, tc, kq}: kết quả gán nhãn gần nhất của bản vẽ đang mở
-window.addEventListener("keydown", e => { if (e.key === "Escape" && S.gnCho) { S.gnCho = false; $("s-cc").textContent = "Chọn đối tượng"; lenh("Đã hủy gán nhãn."); } });
+window.addEventListener("keydown", e => { if (e.key === "Escape" && S.ctCho) { S.ctCho = false; $("s-cc").textContent = "Chọn đối tượng"; lenh("Đã hủy đọc bảng thép."); }
+  if (e.key === "Escape" && S.gnCho) { S.gnCho = false; $("s-cc").textContent = "Chọn đối tượng"; lenh("Đã hủy gán nhãn."); } });
 $("t-gn").onclick = () => {
   if (!F()) return lenh("Chưa mở bản vẽ. Bấm 'Thêm bản vẽ' trước.", "loi");
   if (S.buoc) huyBuoc(); S.nhanh = false; $("t-nhanh").classList.remove("on"); datCongCu("pick");
@@ -1837,11 +1840,84 @@ $("p-gn").addEventListener("click", async e => {
 // ---------- Tab phải ----------
 document.querySelectorAll(".tab-phai div").forEach(d => d.onclick = () => {
   document.querySelectorAll(".tab-phai div").forEach(x => x.classList.toggle("act", x === d));
-  ["cc", "dt", "tk", "gn", "tm", "ai", "kl", "gc"].forEach(k => $("p-" + k).hidden = k !== d.dataset.t);
+  ["cc", "dt", "tk", "gn", "ct", "tm", "ai", "kl", "gc"].forEach(k => $("p-" + k).hidden = k !== d.dataset.t);
+  if (d.dataset.t === "ct") ve_CT();
   if (d.dataset.t === "ai") veAI();
   if (d.dataset.t === "tm") veTM(false); else veLai();
 });
 function chonTab(t) { document.querySelector(`.tab-phai div[data-t="${t}"]`).click(); }
+
+// ---------- Cốt thép theo bảng thống kê thép (đọc bảng + tính; khác với cốt thép ước tính theo hàm lượng ở các công cụ tính) ----------
+let CT = {dong:[], canh_bao_doc:[], nguon:"", kq:null, loaiBo:new Set()};
+const CT_TRUONG = [["ky_hieu", "Cấu kiện", "text"], ["duong_kinh", "Ø (mm)", "number"], ["so_ck", "Số CK", "number"], ["so_thanh", "Số thanh", "number"], ["chieu_dai", "Dài (m)", "number"]];
+async function ctTinh() {
+  if (!CT.dong.length) { CT.kq = null; return; }
+  const f = F();
+  try { CT.kq = await json("/api/cot-thep/tinh", {dong:CT.dong, loai_bo:[...CT.loaiBo], id:f?.id || null}); }
+  catch (e) { CT.kq = null; lenh(e.message, "loi"); }
+}
+async function ctNap(r, nguon) {
+  CT.dong = r.dong; CT.canh_bao_doc = r.canh_bao || []; CT.nguon = nguon; CT.loaiBo = new Set();
+  await ctTinh(); ve_CT();
+  lenh(r.dong.length ? `Đã đọc ${r.dong.length} dòng thép từ ${nguon}. Kiểm tra bảng rồi xem tổng.` : `Không đọc được dòng thép nào từ ${nguon}: ${(r.canh_bao || [])[0] || ""}`, r.dong.length ? "ok" : "loi");
+}
+async function docThepFile(file) {
+  const fd = new FormData(); fd.append("file", file);
+  try { const r = await (await goi("/api/cot-thep/doc-file", {method:"POST", body:fd})).json(); await ctNap(r, file.name); }
+  catch (e) { lenh(e.message, "loi"); }
+}
+async function docThepCad(a, b) {
+  const f = F(); S.ctCho = false; $("s-cc").textContent = "Chọn đối tượng";
+  try { const r = await json("/api/cot-thep/doc-cad", {id:f.id, khung:[a[0], a[1], b[0], b[1]]}); await ctNap(r, `bản vẽ ${f.ten}`); chonTab("ct"); }
+  catch (e) { lenh(e.message, "loi"); }
+}
+function ve_CT() {
+  const p = $("p-ct"), k = CT.kq;
+  const dong = k ? Object.fromEntries(k.dong.map(r => [r.chi_so, r])) : {};
+  p.innerHTML = `<div style="padding:8px 10px">
+    <details style="margin:0 0 8px;font-size:12px"><summary style="cursor:pointer;font-weight:600">Tính năng này làm gì?</summary>
+      <div class="nho" style="margin-top:4px">Tính khối lượng cốt thép <b>từ bảng thống kê thép</b> của hồ sơ thiết kế: mỗi dòng = số cấu kiện × số thanh × chiều dài × đơn trọng (0,00617 × Ø²). Đây là con số thật, khác với dòng <b>"cốt thép ước tính theo hàm lượng"</b> ở các công cụ tính (chỉ là ước tính từ khối lượng bê tông).
+      Nạp bảng từ <b>file Excel/CSV</b>, hoặc <b>kéo khung quanh bảng chữ trong bản vẽ CAD</b>. Nếu bảng có sẵn cột khối lượng, công cụ đối chiếu và cảnh báo khi lệch quá 2%. Nếu đã bấm Tính khối lượng, có đối chiếu hàm lượng kg/m³ để bắt lỗi đơn vị hoặc thiếu dòng.
+      Bộ đọc chưa được kiểm chứng trên bảng thép thật của đơn vị thiết kế nào: luôn xem lại các dòng đã đọc.</div></details>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <label class="nut-file" for="ct-file" style="cursor:pointer">+ Nạp bảng từ Excel / CSV</label><input type="file" id="ct-file" accept=".xlsx,.xlsm,.csv" hidden>
+      <button id="ct-cad" title="Kéo khung quanh bảng thống kê thép trong bản vẽ đang mở, trùm cả dòng tiêu đề (Đường kính, Số thanh, Chiều dài...)" ${F() ? "" : "disabled"}>▭ Đọc bảng thép trong bản vẽ</button>
+      <button id="ct-xuat" ${CT.dong.length ? "" : "disabled"}>Xuất Excel</button><button id="ct-xoa" ${CT.dong.length ? "" : "disabled"}>Xóa bảng</button></div>
+    ${CT.dong.length ? `<div class="nho">Nguồn: <b>${esc(CT.nguon)}</b> · ${CT.dong.length} dòng đã đọc. Sửa trực tiếp ô nào đọc sai; bỏ tick dòng không tính.</div>` : '<div class="nho">Chưa nạp bảng thép.</div>'}
+    ${[...CT.canh_bao_doc, ...(k ? k.canh_bao : [])].map(c => `<div class="cb">⚠ ${esc(c)}</div>`).join("")}
+    ${k ? `<table style="margin-top:6px"><tr><th></th>${CT_TRUONG.map(c => `<th>${c[1]}</th>`).join("")}<th>Tổng dài (m)</th><th>KL tính (kg)</th><th>KL bảng (kg)</th><th>Lệch</th></tr>
+    ${CT.dong.map((r, i) => { const t = dong[i], bo = CT.loaiBo.has(i);
+      return `<tr ${bo ? 'style="opacity:.45"' : ""}><td><input type="checkbox" data-cti="${i}" ${bo ? "" : "checked"}></td>
+        ${CT_TRUONG.map(c => `<td><input data-ctf="${c[0]}" data-i="${i}" type="${c[2]}" step="any" value="${esc(r[c[0]] ?? "")}" style="width:${c[2] === "text" ? 80 : 58}px"></td>`).join("")}
+        <td class="so">${t ? so(t.tong_dai, 1) : ""}</td><td class="so">${t ? so(t.kl, 1) : ""}</td><td class="so">${r.kl_ban_ve ? so(r.kl_ban_ve, 1) : ""}</td>
+        <td class="${t && t.lech != null && Math.abs(t.lech) > 0.02 ? "cb" : ""}">${t && t.lech != null ? (t.lech * 100).toFixed(1) + "%" : ""}</td></tr>`; }).join("")}</table>
+    <h4 style="margin:10px 0 4px">Tổng hợp: <b>${so(k.tong_kg, 1)} kg</b> (${so(k.tong_kg / 1000, 3)} tấn)</h4>
+    <table><tr><th>Ø (mm)</th><th>Tổng dài (m)</th><th>Khối lượng (kg)</th></tr>
+    ${k.theo_phi.map(x => `<tr><td>${x.duong_kinh}</td><td class="so">${so(x.tong_dai, 1)}</td><td class="so">${so(x.kl, 1)}</td></tr>`).join("")}</table>
+    ${k.doi_chieu ? `<div class="nho" style="margin-top:6px">Đối chiếu bê tông đã bóc: ${so(k.doi_chieu.bt_m3, 1)} m³ → hàm lượng thép <b>${so(k.doi_chieu.ham_luong, 0)} kg/m³</b> ${k.doi_chieu.hop_ly ? "(trong khoảng thường gặp)" : "(ngoài khoảng thường gặp, xem cảnh báo)"}.</div>`
+      : '<div class="nho" style="margin-top:6px">Muốn đối chiếu hàm lượng kg/m³: mở bản vẽ, gán layer và bấm Tính khối lượng trước.</div>'}` : ""}
+    <div class="nho" style="margin-top:8px">Kỹ sư kiểm tra, đối chiếu bản vẽ và ký duyệt trước khi dùng cho dự toán hoặc thanh toán.</div></div>`;
+}
+$("p-ct").addEventListener("change", async e => {
+  const d = e.target;
+  if (d.id === "ct-file" && d.files[0]) { await docThepFile(d.files[0]); d.value = ""; return; }
+  if (d.dataset.cti != null) { const i = +d.dataset.cti; d.checked ? CT.loaiBo.delete(i) : CT.loaiBo.add(i); }
+  else if (d.dataset.ctf) {
+    const r = CT.dong[+d.dataset.i], v = d.type === "number" ? parseFloat(d.value) : d.value;
+    if (d.type === "number" && !(v > 0)) { lenh("Giá trị phải là số lớn hơn 0.", "loi"); return ve_CT(); }
+    r[d.dataset.ctf] = v; r.kl_ban_ve = r.kl_ban_ve;   // sửa tay: KL bảng giữ nguyên để còn đối chiếu
+  } else return;
+  await ctTinh(); ve_CT();
+});
+$("p-ct").addEventListener("click", async e => {
+  const d = e.target;
+  if (d.id === "ct-cad") { S.ctCho = true; S.gnCho = false; datCongCu("pick"); $("s-cc").textContent = "Đọc bảng thép · kéo khung"; lenh("Kéo khung quanh bảng thống kê thép trong bản vẽ (trùm cả dòng tiêu đề). Esc để hủy."); }
+  if (d.id === "ct-xoa") { CT = {dong:[], canh_bao_doc:[], nguon:"", kq:null, loaiBo:new Set()}; ve_CT(); }
+  if (d.id === "ct-xuat") {
+    try { await taiXuong("/api/cot-thep/xuat-excel", {dong:CT.dong, loai_bo:[...CT.loaiBo], id:F()?.id || null, du_an:$("du-an").value, nguon:CT.nguon, canh_bao_doc:CT.canh_bao_doc}, "cot_thep.xlsx"); lenh("Đã xuất Excel cốt thép (mỗi con số là công thức).", "ok"); }
+    catch (err) { lenh(err.message, "loi"); }
+  }
+});
 
 // ---------- Tách nhiều mặt bằng trong một file (chỉ đề xuất vùng; người dùng tick rồi bấm Tạo mới có hiệu lực) ----------
 const TM_VAI = {mat_bang:"Mặt bằng", chi_tiet:"Chi tiết", ghi_chu:"Ghi chú / bảng"};
