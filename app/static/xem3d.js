@@ -149,7 +149,7 @@
       .x3-top .tt{opacity:.7;font-size:12px}
       .x3-main{flex:1;min-height:0;display:flex;position:relative}
       .x3-cv{flex:1;min-width:0;position:relative;overflow:hidden}
-      .x3-cv canvas{display:block;outline:0}
+      .x3-cv canvas{display:block;outline:0;cursor:default}
       .x3-bar{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:6px;padding:6px;background:rgba(14,20,33,.86);border:1px solid #26334f;border-radius:12px;backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:calc(100% - 20px);flex-wrap:wrap;justify-content:center}
       .x3-bar .sep{width:1px;background:#2a3957;margin:2px 3px}
       .x3-nh{position:absolute;pointer-events:none;font-size:10.5px;font-weight:600;color:#fff;background:rgba(8,12,20,.72);border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:0 5px;transform:translate(-50%,-100%);white-space:nowrap;z-index:2}
