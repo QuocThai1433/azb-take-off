@@ -13,7 +13,10 @@ if not exist ".venv\Scripts\python.exe" (
 
 set "AZB_DATA_DIR=%~dp0data_dung_thu"
 set "AZB_PORT=8766"
-if not exist "%AZB_DATA_DIR%" mkdir "%AZB_DATA_DIR%"
+rem Moi lan bat la mot lan dung thu moi: xoa sach du lieu cu (chi thu muc data_dung_thu co dinh nay).
+rem Dong cua so server cu (neu con mo) truoc khi bat lai, vi no dang giu file trong thu muc nay.
+if exist "%AZB_DATA_DIR%" rmdir /s /q "%AZB_DATA_DIR%"
+mkdir "%AZB_DATA_DIR%"
 
 echo Dang khoi dong server dung thu tai http://127.0.0.1:8766 ...
 start "AZB dung thu - server (dong cua so nay de tat)" cmd /k ".venv\Scripts\python.exe -m app.main"
