@@ -26,6 +26,7 @@ from .thong_ke import thong_ke, xuat_excel as xuat_excel_thong_ke
 from .excel_io import doi_chieu, xuat_excel
 from .excel_ong_gio import xuat_excel_ong_gio
 from .gan_nhan import gan_nhan, ve_nhan_vao_dxf
+from .mep import doc_mep
 from .ong_gio import boc_ong_gio
 from .pdf_reader import pdf_sang_dxf
 from .quet_chon import quet_chi_tiet, quet_mat_bang
@@ -659,6 +660,17 @@ def _tinh_ong_gio(yc):
 @app.post("/api/ong-gio")
 def ong_gio(yc: YeuCauTinh):
     return _tinh_ong_gio(yc)
+
+
+@app.post("/api/mep-3d")
+def mep_3d(yc: YeuCauTinh):
+    """Đường ống nước, PCCC, khay cáp để dựng 3D và kiểm tra va chạm / khoét lỗ."""
+    p = _phien(yc.id)
+    try:
+        nap_doc(p["ban_ve"], luu_tru.tim_file(yc.id), config.app_config().get("oda_path"))
+        return doc_mep(p["ban_ve"], yc.loai_layer)
+    except ValueError as ex:
+        raise HTTPException(400, str(ex))
 
 
 @app.post("/api/xuat-excel-ong-gio")

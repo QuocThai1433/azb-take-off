@@ -167,7 +167,7 @@ def _kiem_tra_cheo(loai, tt, tin_cay):
 
 
 LOAI_VN = {"cot": "cột", "dam": "dầm", "san": "sàn", "mong": "móng", "vach": "vách"}
-LOAI_KHONG_TINH = {"bo_qua", "nhan", "ong_gio"}
+LOAI_KHONG_TINH = {"bo_qua", "nhan", "ong_gio", "ong_nuoc", "ong_pccc", "khay_cap"}
 TIN_CAY_NHAN_TOI_DA = 0.88   # chỉ có nhãn, không có tên layer xác nhận: luôn cần người xác nhận
 
 
