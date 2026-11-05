@@ -322,3 +322,16 @@ def test_coc_khong_ten_dan_theo_duong_kinh_o_layer_pile(tmp_path):
     assert kq["loai_coc"][0]["ten"] == "P" and kq["loai_coc"][0]["so_luong"] == 2
     kq = gan_nhan(bv, {}, VUNG, {**COC_CHON, "ty_le": 50, "kt_mong": {"P": {"d": 350, "l": 20}}})
     assert {n["t"] for n in kq["nhan"]} == {"D350 L=20m"}
+
+
+def test_sua_tay_tung_nhan_doi_xoa_them(tmp_path):
+    """Sếp sửa chữ, xóa, thêm nhãn: áp lại được sau mỗi lần dán (khoá theo vị trí)."""
+    from app.gan_nhan import khoa_nhan
+    bv = _tao_coc(tmp_path, True, 300, dk_bang=300)
+    goc = gan_nhan(bv, LOAI, VUNG, COC_CHON)["nhan"]
+    a, b = goc[0], goc[1]
+    sua = {"doi": {khoa_nhan(a["x"], a["y"]): "COC DAC BIET"}, "xoa": [khoa_nhan(b["x"], b["y"])], "them": [{"t": "GHI CHU", "x": 1.5, "y": 2.5}]}
+    kq = gan_nhan(bv, LOAI, VUNG, {**COC_CHON, "sua": sua})["nhan"]
+    chu = [n["t"] for n in kq]
+    assert len(kq) == len(goc) and "COC DAC BIET" in chu and b["t"] not in chu and "GHI CHU" in chu
+    assert next(n for n in kq if n["t"] == "GHI CHU")["loai"] == "tay"

@@ -482,8 +482,35 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
 
     if da_co:
         canh_bao.append(f"Vùng này đã có {da_co} nhãn dầm trong bản vẽ; nhãn mới sẽ nằm cạnh/chồng lên, Sếp xem lại trước khi xuất.")
+    nhan = ap_dung_sua(nhan, tc.get("sua"), cao_chu)
     return {"ty_le": ty_le, "nguon_ty_le": nguon_ty_le, "cao_chu": cao_chu, "tang": tang, "tien_to": tien_to,
             "nhan": nhan, "bong": bong, "loai_dam": loai_dam, "loai_mong": loai_mong, "loai_cot": loai_cot, "loai_coc": loai_coc, "loai_san": loai_san, "canh_bao": canh_bao, "da_co": da_co}
+
+
+def khoa_nhan(x, y):
+    """Khoá nhận dạng một nhãn theo vị trí (làm tròn 1 cm) để nhớ sửa tay qua các lần dán lại."""
+    return f"{float(x):.2f}|{float(y):.2f}"
+
+
+def ap_dung_sua(nhan, sua, cao_chu):
+    """Áp chỉnh sửa tay của sếp: sua = {"doi": {khoá: chữ mới}, "xoa": [khoá], "them": [{"t","x","y"}]}."""
+    if not sua:
+        return nhan
+    doi, xoa = sua.get("doi") or {}, set(sua.get("xoa") or [])
+    kq = []
+    for n in nhan:
+        k = khoa_nhan(n["x"], n["y"])
+        if k in xoa:
+            continue
+        if k in doi and str(doi[k]).strip():
+            n = {**n, "t": str(doi[k]).strip(), "sua": True}
+        kq.append(n)
+    for m in sua.get("them") or []:
+        t = str(m.get("t", "")).strip()
+        if t:
+            kq.append({"loai": "tay", "t": t, "x": round(float(m["x"]), 4), "y": round(float(m["y"]), 4), "goc": float(m.get("goc") or 0),
+                       "cao": cao_chu, "neo": m.get("neo") or "mc", "sua": True})
+    return kq
 
 
 def _tam_bong(bong_cs, pos, dau, huong, r_bong, cao_truc):

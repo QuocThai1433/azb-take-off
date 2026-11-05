@@ -938,6 +938,7 @@ window.addEventListener("mouseup", e => {
     if (Math.hypot(m.x - S.keo.px, m.y - S.keo.py) > 4) { S.keo.moved = true; S.keo.b = [wx(m.x), wy(m.y)]; }
     if (LAY.hoi && !S.keo.moved) hoiLayerTaiDiem({x:S.keo.px, y:S.keo.py});
     else if (S.ctCho) { if (S.keo.moved) docThepCad(S.keo.a, S.keo.b); else lenh("Kéo khung (giữ chuột trái và kéo) quanh bảng thống kê thép, trùm cả dòng tiêu đề. Esc để hủy.", "loi"); }
+    else if (S.gnMode && !S.keo.moved) { const x = wx(S.keo.px), y = wy(S.keo.py); if (S.gnMode === "them") themNhanTai(x, y); else suaNhanTaiDiem(x, y); }
     else if (S.gnCho) { if (S.keo.moved) chayGanNhan(S.keo.a, S.keo.b); else lenh("Gán nhãn: kéo khung (giữ chuột trái và kéo) quanh một mặt bằng. Esc để hủy.", "loi"); }
     else if (S.buoc && S.buoc.so === 3) ganChon(S.keo.a, S.keo.b, S.keo.moved, {x:S.keo.px, y:S.keo.py});
     else if (S.buoc) { if (S.keo.moved) chayBuoc(S.keo.a, S.keo.b); else lenh("Đang ở bước quét chọn: kéo khung (giữ chuột trái và kéo) quanh vùng cần đọc. Esc để hủy.", "loi"); }
@@ -1015,10 +1016,11 @@ function giaoHop(p, b) {  // có đoạn nào của p cắt hoặc nằm trong h
   return false;
 }
 const hieuLuc = () => S.chon.filter(o => !S.loaiTru.has(o.ten));
+window.addEventListener("keydown", e => { if (e.key === "Escape" && S.gnMode) { e.preventDefault(); S.gnMode = null; veGN(); lenh("Đã thoát chế độ sửa nhãn."); } });
 window.addEventListener("keydown", e => {  // Esc: bỏ chọn tất cả đối tượng đang chọn (không đụng khi đang gõ vào ô nhập hay đang có hộp thoại)
   if (e.key !== "Escape" || e.defaultPrevented || !S.chon.length || document.getElementById("hop")) return;
   if (e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
-  if (S.buoc || S.ctCho || S.gnCho || LAY.hoi) return;  // Esc đang dành để hủy các chế độ đó
+  if (S.buoc || S.ctCho || S.gnCho || LAY.hoi || S.gnMode) return;  // Esc đang dành để hủy các chế độ đó
   const n = S.chon.length; S.chon = []; S.loaiTru = new Set(); veDT(); veLai(); lenh(`Đã bỏ chọn ${n} đối tượng (Esc).`, "ok");
 });
 const trung = (a, b) => a.ten === b.ten && a.k === b.k && a.i === b.i;
@@ -1757,14 +1759,14 @@ $("t-gn").onclick = () => {
 $("t-gn-xoa").onclick = () => xoaNhan(true);
 $("t-gn-dxf").onclick = async () => {
   const f = F(); if (!f || !S.gn || S.gn.fileId !== f.id || !S.gn.ds.some(p => p.kq)) return lenh("Chưa gán nhãn cho bản vẽ này. Bấm 'Gán nhãn tự động' trước.", "loi");
-  const ds = S.gn.ds.filter(p => p.kq).map(p => { const y = yeuCauGN(f, p); return {khung:y.khung, ty_le:y.ty_le, tang:y.tang, tien_to:y.tien_to, cao_dam:y.cao_dam, kt_mong:y.kt_mong, nhan_dam:y.nhan_dam, nhan_truc:y.nhan_truc, nhan_cot:y.nhan_cot, nhan_mong:y.nhan_mong, nhan_coc:y.nhan_coc, nhan_san:y.nhan_san}; });
+  const ds = S.gn.ds.filter(p => p.kq).map(p => { const y = yeuCauGN(f, p); return {khung:y.khung, ty_le:y.ty_le, tang:y.tang, tien_to:y.tien_to, cao_dam:y.cao_dam, kt_mong:y.kt_mong, sua:y.sua, nhan_dam:y.nhan_dam, nhan_truc:y.nhan_truc, nhan_cot:y.nhan_cot, nhan_mong:y.nhan_mong, nhan_coc:y.nhan_coc, nhan_san:y.nhan_san}; });
   try { lenh(`Đang tạo DXF có nhãn (${ds.length} mặt bằng) ...`); await taiXuong("/api/xuat-dxf-nhan", {id:f.id, khung:ds[0].khung, loai_layer:loaiLayer(f), ds}, f.ten.replace(/\.[^.]+$/, "") + "_co_nhan.dxf"); lenh("Đã xuất DXF có nhãn (layer AZB-NHAN).", "ok"); }
   catch (e) { lenh(e.message, "loi"); }
 };
 const mbHienTai = () => S.gn && S.gn.ds[S.gn.sel];
 function yeuCauGN(f, p) {
   const tc = p.tc;
-  return {id:f.id, khung:p.khung, loai_layer:loaiLayer(f), cao_dam:{...tc.cao_dam}, kt_mong:JSON.parse(JSON.stringify(tc.kt_mong || {})), nhan_dam:tc.nhan_dam, nhan_truc:tc.nhan_truc, nhan_cot:tc.nhan_cot, nhan_mong:tc.nhan_mong !== false, nhan_coc:tc.nhan_coc !== false, nhan_san:tc.nhan_san !== false,
+  return {id:f.id, khung:p.khung, loai_layer:loaiLayer(f), cao_dam:{...tc.cao_dam}, kt_mong:JSON.parse(JSON.stringify(tc.kt_mong || {})), sua:JSON.parse(JSON.stringify(tc.sua || {})), nhan_dam:tc.nhan_dam, nhan_truc:tc.nhan_truc, nhan_cot:tc.nhan_cot, nhan_mong:tc.nhan_mong !== false, nhan_coc:tc.nhan_coc !== false, nhan_san:tc.nhan_san !== false,
     ty_le:tc.ty_le || null, tang:tc.tang ?? null, tien_to:tc.tien_to ?? null};
 }
 function docOGN() {  // đọc các ô nhập của bảng Gán nhãn vào thông số của vùng đang chọn
@@ -1831,6 +1833,53 @@ const BANG_GN = {  // loại → bảng sửa kích thước: khoá kq, tiêu đ
   cot:{kq:"loai_cot", ten:"Bảng loại cột", cot:[["a", "Dài (mm)", 10], ["b", "Rộng (mm)", 10]]},
   coc:{kq:"loai_coc", ten:"Bảng loại cọc", cot:[["d", "Đường kính (mm)", 10], ["l", "Dài L (m)", 0.5]]},
   san:{kq:"loai_san", ten:"Bảng loại sàn", cot:[["t", "Dày (mm)", 10]]}};
+const khoaNhan = n => n.x.toFixed(2) + "|" + n.y.toFixed(2);
+function suaGN(p) { return p.tc.sua ||= {doi:{}, xoa:[], them:[]}; }
+function capNhatNhanSua(f) { veNhanLenHinh(f); veGN(); veLai(); }
+function doiNhan(i, chu) {  // sửa chữ nhãn thứ i của vùng đang chọn; rỗng = xóa
+  const f = F(), p = mbHienTai(), n = p.kq.nhan[i]; if (!n) return;
+  chu = (chu || "").trim(); const s = suaGN(p), k = khoaNhan(n);
+  if (!chu) return xoaNhanLe(i);
+  if (n.loai === "tay") { const m = s.them.find(m => khoaNhan(m) === k); if (m) m.t = chu; }
+  else s.doi[k] = chu;
+  n.t = chu; n.sua = true; capNhatNhanSua(f); lenh(`Đã sửa nhãn thành "${chu}".`, "ok");
+}
+function xoaNhanLe(i) {
+  const f = F(), p = mbHienTai(), n = p.kq.nhan[i]; if (!n) return;
+  const s = suaGN(p), k = khoaNhan(n);
+  if (n.loai === "tay") s.them = s.them.filter(m => khoaNhan(m) !== k); else { s.xoa.push(k); delete s.doi[k]; }
+  p.kq.nhan.splice(i, 1); capNhatNhanSua(f); lenh(`Đã xóa nhãn "${n.t}".`, "ok");
+}
+function themNhanTai(x, y) {
+  const p = mbHienTai(); if (!p || !p.kq) return;
+  const chu = (prompt("Nội dung nhãn mới:", "") || "").trim(); if (!chu) return lenh("Chưa nhập nội dung, không thêm nhãn.");
+  const m = {t:chu, x:+x.toFixed(4), y:+y.toFixed(4), goc:0, neo:"mc"}; suaGN(p).them.push(m);
+  p.kq.nhan.push({loai:"tay", t:chu, x:m.x, y:m.y, goc:0, cao:p.kq.cao_chu, neo:"mc", sua:true});
+  capNhatNhanSua(F()); lenh(`Đã thêm nhãn "${chu}". Bấm lên bản vẽ để thêm tiếp, Esc để thoát.`, "ok");
+}
+function nhanGanDiem(x, y) {  // chỉ số nhãn (vùng đang chọn) gần điểm bấm nhất, hoặc -1
+  const p = mbHienTai(); if (!p || !p.kq) return -1;
+  let tot = -1, dm = 1e9; const gioiHan = 14 / S.v.s;
+  p.kq.nhan.forEach((n, i) => { const rong = 0.31 * n.cao * n.t.length, d = Math.hypot(n.x - x, n.y - y); if (d < dm && d <= Math.max(gioiHan, rong + n.cao)) { dm = d; tot = i; } });
+  return tot;
+}
+function suaNhanTaiDiem(x, y) {
+  const i = nhanGanDiem(x, y); if (i < 0) return lenh("Không có nhãn nào ở chỗ bấm (zoom gần hơn rồi bấm vào chữ nhãn).", "loi");
+  const n = mbHienTai().kq.nhan[i], chu = prompt("Sửa nhãn (để trống = xóa nhãn):", n.t);
+  if (chu !== null) doiNhan(i, chu);
+}
+function danhSachNhanGN(p) {  // bảng sửa từng nhãn: lọc theo chữ, sửa trực tiếp, xóa, tới nhãn
+  const ds = p.kq.nhan, loc = (S.gnLoc || "").toLowerCase();
+  const hang = ds.map((n, i) => [n, i]).filter(([n]) => !loc || n.t.toLowerCase().includes(loc));
+  return `<div style="margin:8px 0"><b>Sửa từng nhãn</b> <span class="nho">(${ds.length} nhãn${loc ? ", đang lọc " + hang.length : ""})</span>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0"><input id="gn-loc" type="search" placeholder="Lọc theo chữ, vd M7" value="${esc(S.gnLoc || "")}" style="width:150px">
+      <button id="gn-them" ${S.gnMode === "them" ? 'class="on"' : ""}>+ Thêm nhãn</button><button id="gn-sua" ${S.gnMode === "sua" ? 'class="on"' : ""}>Sửa nhãn trên hình</button></div>
+    <div class="nho">"+ Thêm nhãn": bấm lên bản vẽ chỗ cần đặt. "Sửa nhãn trên hình": bấm vào chữ nhãn để đổi hoặc xóa. Hoặc sửa trực tiếp trong danh sách dưới (Enter để lưu).</div>
+    <div style="max-height:260px;overflow:auto;margin-top:4px"><table>${hang.slice(0, 150).map(([n, i]) => `<tr><td style="width:26px">${i + 1}</td>
+      <td><input type="text" data-nh="${i}" value="${esc(n.t)}" style="width:100%">${n.sua ? '<div class="nho">đã sửa tay</div>' : ""}</td>
+      <td style="white-space:nowrap"><button data-nz="${i}" title="Tới nhãn này">⌖</button> <button data-nx="${i}" title="Xóa nhãn">✕</button></td></tr>`).join("")}</table>
+      ${hang.length > 150 ? `<div class="nho">Chỉ hiện 150 nhãn đầu, gõ vào ô lọc để thu hẹp.</div>` : ""}</div></div>`;
+}
 function bangLoaiGN(loai, kq) {  // một bảng chung cho móng / cột / cọc / sàn: sửa số rồi bấm Cập nhật nhãn
   const cf = BANG_GN[loai], ds = cf && kq[cf.kq]; if (!ds || !ds.length) return "";
   return `<div style="margin:8px 0"><b>${cf.ten}</b> <span class="nho">(sửa số rồi bấm Cập nhật nhãn)</span>
@@ -1865,9 +1914,12 @@ function veGN() {
         <td><input type="number" min="0" step="10" data-gh="${esc(l.ma)}" value="${l.h || ""}" placeholder="?" style="width:70px">${l.nguon_h ? `<div class="nho">${esc(l.nguon_h)}</div>` : '<div class="chua">chưa biết</div>'}</td>
         <td>${l.so_luong}</td><td>${so(l.tong_dai, 2)}</td></tr>`).join("")}</table>` : '<div class="nho">Không có dầm trong vùng.</div>') : ""}
     ${bangLoaiGN(tc.loai, kq)}
+    ${kq.nhan.length ? danhSachNhanGN(p) : ""}
     ${kq.canh_bao.map(w => `<div class="nho chua" style="margin:3px 0">⚠ ${esc(w)}</div>`).join("")}` : ""}
     <div class="nho" style="margin-top:6px">Nhãn chỉ là đề xuất do công cụ tính từ hình học, kỹ sư kiểm tra trước khi dùng. Trong DXF xuất ra, nhãn nằm riêng trên layer ${TEN_NHAN} nên kéo chỉnh hoặc tắt dễ dàng.</div></div>`;
 }
+$("p-gn").addEventListener("change", e => { if (e.target.dataset.nh !== undefined) doiNhan(+e.target.dataset.nh, e.target.value); });
+$("p-gn").addEventListener("input", e => { if (e.target.id === "gn-loc") { S.gnLoc = e.target.value; const pos = e.target.selectionStart; veGN(); const o = $("gn-loc"); o.focus(); o.setSelectionRange(pos, pos); } });
 $("p-gn").addEventListener("click", async e => {
   const f = F(); if (!f || !S.gn) return;
   const mb = e.target.closest("[data-mb]");
@@ -1878,6 +1930,12 @@ $("p-gn").addEventListener("click", async e => {
   if (e.target.name === "gn-loai") { const q = mbHienTai(), cu = q.tc.loai; docOGN(); if (q.tc.loai !== cu) { q.kq = null; veNhanLenHinh(f); } veGN(); veLai(); }
   else if (e.target.id === "gn-ct") { docOGN(); }
   else if (e.target.id === "gn-lai") { docOGN(); await goiGanNhan(f, false); }
+  else if (e.target.id === "gn-them" || e.target.id === "gn-sua") {
+    const m = e.target.id === "gn-them" ? "them" : "sua"; S.gnMode = S.gnMode === m ? null : m; datCongCu("pick"); veGN();
+    lenh(S.gnMode ? (m === "them" ? "Bấm lên bản vẽ chỗ muốn đặt nhãn mới. Esc để thoát." : "Bấm vào chữ nhãn cần sửa. Esc để thoát.") : "Đã thoát chế độ sửa nhãn.");
+  }
+  else if (e.target.dataset.nz !== undefined) zoomNhan(+e.target.dataset.nz);
+  else if (e.target.dataset.nx !== undefined) xoaNhanLe(+e.target.dataset.nx);
   else if (e.target.id === "gn-ap") { docOGN(); await goiGanNhan(f, false, true); }
   else if (e.target.id === "gn-xem") zoomNhan((S.gnI ?? -1) + 1);
   else if (e.target.id === "gn-xoa1") { S.gn.ds.splice(S.gn.sel, 1); S.gn.sel = Math.max(0, S.gn.ds.length - 1); veNhanLenHinh(f); veGN(); veLai(); }
