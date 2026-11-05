@@ -424,3 +424,22 @@ def test_chieu_dai_coc_doc_tu_bang_thong_ke_tieu_de_tach_roi(tmp_path):
     f = tmp_path / "bang.dxf"
     doc.saveas(f)
     assert _bang_coc(doc_ban_ve(f))[1] == 8.0
+
+
+def test_cot_layer_da_gan_thieu_thi_bo_sung_hinh_theo_kich_thuoc_ghi_san(tmp_path):
+    """Layer gán 'Cột' chỉ có cột 20x30; cột 40x60 ở layer chưa gán nhưng bản vẽ ghi '40x60' → lấy cả hai."""
+    doc = ezdxf.new("R2010")
+    doc.header["$INSUNITS"] = 4
+    for l in ("COT_NHO", "KHAC"):
+        doc.layers.add(l)
+    msp = doc.modelspace()
+    for i in range(3):
+        _hcn(msp, "COT_NHO", 1000 + i * 4000, 1000, 1300 + i * 4000, 1200)       # 300x200
+        _hcn(msp, "KHAC", 1000 + i * 4000, 5000, 1600 + i * 4000, 5400)          # 600x400
+        msp.add_text("40x60", dxfattribs={"height": 100, "insert": (1000 + i * 4000, 5600)})
+        msp.add_text("20x30", dxfattribs={"height": 100, "insert": (1000 + i * 4000, 1400)})
+    f = tmp_path / "cot.dxf"
+    doc.saveas(f)
+    kq = gan_nhan(doc_ban_ve(f), {"COT_NHO": "cot"}, [0, 0, 14, 8], {"nhan_cot": True, "nhan_dam": False, "nhan_truc": False,
+                                                                    "nhan_mong": False, "nhan_coc": False, "nhan_san": False})
+    assert {(l["a"], l["b"]) for l in kq["loai_cot"]} == {(600, 400), (300, 200)}

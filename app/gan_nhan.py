@@ -478,6 +478,15 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
 
     # Chướng ngại để né: dầm, cột, chữ có sẵn
     cot_hinh = [h.geom for t, v in loai_layer.items() if v == "cot" and t in trong.layers for h in trong.layers[t].hinh_kin]
+    if tc.get("nhan_cot", False) and cot_hinh:
+        # Layer đã gán "Cột" thường chỉ có một phần cột (vd chỉ cột 20x30): bổ sung hình đúng kích thước cột ghi bằng chữ (40x60, 40x80...)
+        # ở các layer chưa gán loại khác. Hình đã có thì không lấy lại.
+        tu_do, them_hinh = _do_layer_cot(trong, loai_layer)
+        moi = [g for g in them_hinh if not any(g.intersection(u).area > 0.5 * g.area for u in cot_hinh)]
+        if moi:
+            cot_hinh = list(cot_hinh) + moi
+            canh_bao.append(f"Ngoài layer đã gán Cột, bổ sung {len(moi)} hình cột đúng kích thước ghi trong bản vẽ (40x60...) ở layer "
+                            f"{', '.join(repr(t) for t in tu_do)}. Sếp kiểm tra, hoặc gán các layer đó là Cột ở tab Layer.")
     if tc.get("nhan_cot", False) and not cot_hinh:  # chưa gán layer Cột: tự dò theo bảng kích thước cột ghi sẵn (40x60...)
         tu_do, cot_hinh = _do_layer_cot(trong, loai_layer)
         if tu_do:
@@ -686,6 +695,25 @@ def _dat_nhan_dam(d, cao_chu, va_cham, them, chu, canh_bao):
 
 
 RE_KT_COT_CM = re.compile(r"^\s*(\d{2,3})\s*[xX×]\s*(\d{2,3})\s*$")
+
+
+def _ty_le_cot_khop_chu(trong, cot_hinh):
+    """Tỷ lệ hình cột (layer đã gán) có kích thước trùng một kích thước cột ghi bằng chữ ('40x60') trong bản vẽ.
+    None nếu bản vẽ không ghi kích thước cột nào (không có gì để đối chiếu)."""
+    ghi = set()
+    for c in _tat_ca_chu(trong):
+        m = RE_KT_COT_CM.match(_nfc(c.noi_dung))
+        if m:
+            a, b = int(m.group(1)) * 10, int(m.group(2)) * 10
+            ghi.add((max(a, b), min(a, b)))
+    if not ghi or not cot_hinh:
+        return None
+    khop = 0
+    for g in cot_hinh:
+        a, b, _ = _hinh_chu_nhat(g)
+        if any(abs(a * 1000 - ka) <= 0.05 * ka and abs(b * 1000 - kb) <= 0.05 * kb for ka, kb in ghi):
+            khop += 1
+    return khop / len(cot_hinh)
 
 
 def _do_layer_cot(trong, loai_layer):
