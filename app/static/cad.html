@@ -1045,6 +1045,7 @@ const cv = $("cv"), ctxChinh = cv.getContext("2d");
 let ctx = ctxChinh;  // nơi đang vẽ: cảnh nền vẽ vào canvas ẩn, lớp phủ vẽ vào canvas chính
 // Bản vẽ nặng: cảnh nền (hình, đường, chữ) chỉ vẽ lại khi khung nhìn hoặc dữ liệu đổi; rê chuột/hover chỉ chép lại ảnh đã vẽ
 const canh = {cv: document.createElement("canvas"), khoa: null}; canh.ctx = canh.cv.getContext("2d");
+const phu = {cv: document.createElement("canvas")}; phu.ctx = phu.cv.getContext("2d");  // lớp phủ đã vẽ sẵn
 const NANG = 15000;  // từ ngần này đối tượng trở lên coi là bản vẽ nặng: kéo/zoom thì vẽ bản nhanh, dừng tay mới vẽ đủ
 let tZoom = 0, hoverCho = null, hoverRaf = 0;
 function dangTuongTac() {
@@ -1082,7 +1083,9 @@ function zoomVung() {
   S.v = {cx:(a + c) / 2, cy:(b + d) / 2, s:Math.min(W / w, H / h) * 0.85};
   veLai();
 }
-function veLai() { if (cho) return; cho = true; requestAnimationFrame(() => { cho = false; ve(); }); }
+// veLai(true): chỉ chuột đổi (con trỏ, hover, khung kéo) nên lớp phủ nặng (ký hiệu, đối tượng đã chọn, kết quả tìm) dùng lại ảnh cũ
+let phuBan = true;
+function veLai(chiChuot) { if (!chiChuot) phuBan = true; if (cho) return; cho = true; requestAnimationFrame(() => { cho = false; ve(); }); }
 
 function veCanh(f) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
@@ -1137,20 +1140,26 @@ function veCanh(f) {
 function ve() {
   const f = F();
   const khoa = f ? khoaCanh(f) : "-" + W + "x" + H + "@" + dpr;
-  if (khoa !== canh.khoa) {
+  const khoaMoi = khoa !== canh.khoa;
+  if (khoaMoi) {
     if (canh.cv.width !== cv.width || canh.cv.height !== cv.height) { canh.cv.width = cv.width; canh.cv.height = cv.height; }
     ctx = canh.ctx; try { veCanh(f); } finally { ctx = ctxChinh; }
     canh.khoa = khoa;
     if (dangTuongTac()) setTimeout(veLai, 220);  // vừa vẽ bản nhanh khi kéo/zoom; dừng tay thì vẽ lại đủ chi tiết
   }
-  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(canh.cv, 0, 0);
+  if (canh.cv.width !== phu.cv.width || canh.cv.height !== phu.cv.height) { phu.cv.width = cv.width; phu.cv.height = cv.height; phuBan = true; }
+  if (khoaMoi) phuBan = true;
+  if (phuBan) {
+    phuBan = false; ctx = phu.ctx; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, phu.cv.width, phu.cv.height);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.lineWidth = 1; ctx.lineJoin = "round"; ctx.setLineDash([]);
+    try { if (f) { veNhanCC(f); veDoiTuong(f); veTim(f); } } finally { ctx = ctxChinh; }
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(canh.cv, 0, 0); ctx.drawImage(phu.cv, 0, 0);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.lineWidth = 1; ctx.lineJoin = "round"; ctx.setLineDash([]);
   ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   if (f) {
     const s = S.v.s;
-    veNhanCC(f);
-    veDoiTuong(f);
-    veTim(f);
+    veHover(f);
     if (S.keo && S.keo.kieu === "hop" && S.keo.moved) {  // khung chọn: Window (xanh dương, nét liền) hoặc Crossing (xanh lá, nét đứt)
       const cat = S.keo.b[0] < S.keo.a[0], x = sx(Math.min(S.keo.a[0], S.keo.b[0])), y = sy(Math.max(S.keo.a[1], S.keo.b[1]));
       const w = Math.abs(S.keo.b[0] - S.keo.a[0]) * s, h = Math.abs(S.keo.b[1] - S.keo.a[1]) * s;
@@ -1196,9 +1205,9 @@ cv.addEventListener("mousemove", e => {
     else if (S.keo.kieu === "hop") { S.keo.b = [wx(m.x), wy(m.y)]; S.hover = null; $("tip").hidden = true; }
     else { S.keo.b = [wx(m.x), wy(m.y)]; const f = F(); f.vung = [S.keo.a[0], S.keo.a[1], S.keo.b[0], S.keo.b[1]].map(v => +v.toFixed(3)); dongBoVung(true); }
   }
-  veLai();
+  veLai(true);
 });
-cv.addEventListener("mouseleave", () => { hoverCho = null; S.mouse = null; S.hover = null; $("tip").hidden = true; veLai(); });
+cv.addEventListener("mouseleave", () => { hoverCho = null; S.mouse = null; S.hover = null; $("tip").hidden = true; veLai(true); });
 cv.addEventListener("mousedown", e => {
   if (!F()) return; const m = chuotToa(e);
   if (e.button === 1 || (e.button === 0 && S.tool === "pan")) {
@@ -1309,7 +1318,9 @@ function timDoiTuong(m, boQuaKhoa) {
   for (const l of f.layers) {
     if (!l.hien) continue; const g = f.hinh.layers[l.ten]; if (!g) continue;
     // Layer khoá vẫn rê chuột xem được các đối tượng đã chọn (để xem S, P của thứ đang bóc)
-    const khoaL = l.khoa && !boQuaKhoa, daChon = (k, i) => S.chon.some(c => c.ten === l.ten && c.k === k && c.i === i);
+    const khoaL = l.khoa && !boQuaKhoa;
+    let tapChon = null;  // layer khoá: chỉ đối tượng đã chọn mới rê chuột xem được; dựng tập một lần thay vì quét lại S.chon cho từng đối tượng
+    const daChon = (k, i) => { if (!tapChon) tapChon = new Set(S.chon.filter(c => c.ten === l.ten).map(c => c.k + "|" + c.i)); return tapChon.has(k + "|" + i); };
     g.net.forEach((p, i) => {
       if (khoaL && !daChon("net", i)) return;
       const bb = bbCua(p); if (x < bb[0] - tol || x > bb[1] + tol || y < bb[2] - tol || y > bb[3] + tol) return;
@@ -1343,7 +1354,7 @@ function capNhatHover(m) {
     let x = m.x + 14; if (x + tw > W) x = m.x - tw - 14; x = Math.max(0, Math.min(x, W - tw));
     tip.style.left = x + "px"; tip.style.top = Math.max(0, Math.min(m.y + 16, H - th)) + "px";
   } else tip.hidden = true;
-  if (!cu !== !o || (cu && o && !trung(cu, o))) veLai();
+  if (!cu !== !o || (cu && o && !trung(cu, o))) veLai(true);
 }
 function bocNhanh(m) {
   const o = timDoiTuong(m); if (!o) return;
@@ -1397,6 +1408,13 @@ function veDoiTuong(f) {
     ctx.strokeStyle = mau; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1;
   };
   for (const o of hieuLuc().slice(0, 3000)) ve1(o, "#00e5ff", "rgba(0,229,255,.28)");
+}
+function veHover(f) {
+  const ve1 = (o, mau, to) => {
+    duongPath(o);
+    if (o.k === "hinh") { ctx.fillStyle = to; ctx.fill(); }
+    ctx.strokeStyle = mau; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1;
+  };
   if (S.hover && !S.chon.some(c => trung(c, S.hover))) ve1(S.hover, "#ffe600", "rgba(255,230,0,.25)");
 }
 
