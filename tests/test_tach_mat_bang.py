@@ -97,6 +97,20 @@ def test_khung_chong_lan_va_nhieu_tieu_de_bi_canh_bao(tmp_path):
     assert "Đã cắt bớt" in nd and all(v["tin_cay"] <= 0.6 for v in r["ds"])
 
 
+def test_cat_chong_o_khoang_trong_giua_hai_to_va_doc_lai_tieu_de(tmp_path):
+    d = _doc()
+    m = d.modelspace()
+    _mat_bang(m, 0, 0, "MẶT BẰNG MÓNG  TL:1/100")
+    _mat_bang(m, 50, 0, "MẶT BẰNG ĐÀ KIỀNG  TL:1/50")      # hai khung giấy chồng nhau 10 m theo chiều ngang
+    r = do_mat_bang(_doc_ve(tmp_path, d))
+    assert len(r["ds"]) == 2
+    a, b = sorted(r["ds"], key=lambda v: v["khung"][0])
+    assert a["khung"][2] == b["khung"][0] and 47.5 < a["khung"][2] < 55     # cắt ở khoảng trống giữa nét vẽ hai tờ
+    assert "MÓNG" in a["ten"] and a["ty_le"] == 100
+    assert "ĐÀ KIỀNG" in b["ten"] and b["ty_le"] == 50
+    assert not any(c.startswith("Có ") for v in r["ds"] for c in v["canh_bao"])
+
+
 def test_ban_ve_trong_khong_loi(tmp_path):
     assert do_mat_bang(_doc_ve(tmp_path, _doc()))["ds"] == []
 

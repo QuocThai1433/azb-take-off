@@ -107,7 +107,8 @@ Mở bản vẽ rồi vào tab **Tách mặt bằng**: phần mềm dò từng t
 
 - Cách dò: nếu file có từ 2 khung giấy lớn trở lên thì mỗi khung là một vùng; không thì gom các nét, hình, chữ nằm gần nhau, hai cụm cách nhau từ ngưỡng *Tách khi cách nhau* trở lên thì tách. Mặt bằng bị cắt đôi thì tăng ngưỡng, hai mặt bằng dính nhau thì giảm, rồi bấm *Dò lại*.
 - Bấm một dòng để phóng tới vùng. Sửa tên và vai trò nếu cần, tick các vùng cần dùng, bấm **Tạo mục**: mỗi vùng thành một mục trong "Bản vẽ trong dự án", đã có sẵn vùng cắt, bóc độc lập. Gán layer cho từng mặt bằng rồi tính.
-- Chỉ là đề xuất. Vùng chồng lấn nhau hoặc chứa nhiều tiêu đề khác nhau (nhiều mặt bằng vẽ đè lên nhau) được cảnh báo và hạ độ tin cậy.
+- Chỉ là đề xuất. Vùng chồng lấn nhau được cắt tại khoảng trống rộng nhất giữa nét vẽ của hai tờ (tiêu đề, tầng, tỷ lệ được đọc lại theo khung mới; vùng bị cắt có cảnh báo để kiểm tra ranh giới); vùng chứa nhiều tiêu đề khác nhau (nhiều mặt bằng vẽ đè lên nhau) được cảnh báo và hạ độ tin cậy.
+- **Làm việc từng mặt bằng:** bấm một mục trong "Bản vẽ trong dự án" thì bản vẽ tự phóng tới vùng của mục đó và làm mờ phần ngoài vùng. Nút **Ngoài vùng** trên thanh công cụ đổi qua lại giữa *Mờ*, *Ẩn* (che hẳn) và *Hiện* (hiện tất cả); lựa chọn được nhớ. Chỉ đổi cách hiển thị: bản vẽ gốc và toạ độ giữ nguyên, khối lượng vẫn chỉ tính trong vùng.
 
 ## 3f. Cốt thép theo bảng thống kê thép (tab "Cốt thép")
 

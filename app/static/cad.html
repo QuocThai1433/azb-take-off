@@ -636,6 +636,7 @@
   <div class="nhom"><div class="nut">
       <button id="t-vung" title="Kéo khung chữ nhật để chọn mặt bằng cần tính">Chọn vùng</button>
       <button id="t-bo-vung">Bỏ vùng</button>
+      <button id="t-ngoai" title="Phần bản vẽ nằm ngoài vùng đang chọn: Mờ (mặc định), Ẩn hẳn hoặc Hiện tất cả. Chỉ đổi cách hiển thị, khối lượng vẫn chỉ tính trong vùng.">Ngoài vùng: Mờ</button>
       <input type="number" step="any" id="v0" placeholder="X từ"><input type="number" step="any" id="v1" placeholder="Y từ">
       <input type="number" step="any" id="v2" placeholder="X đến"><input type="number" step="any" id="v3" placeholder="Y đến">
     </div><h6 title="Vùng mặt bằng cần tính, đơn vị mét">Vùng (m)</h6></div>
@@ -941,7 +942,7 @@ async function xoaHan(id, ten) {
 $("chon-file").onchange = async e => { const ds = [...e.target.files]; e.target.value = ""; await themBanVe(ds); };
 
 function moFile(i) {
-  S.act = i; S.chon = []; S.loaiTru = new Set(); S.hover = null; veDT(); ve_ds(); ve_layer(); ve_tab(); dongBoVung(); zoomToanBo(); veLai();
+  S.act = i; S.chon = []; S.loaiTru = new Set(); S.hover = null; veDT(); ve_ds(); ve_layer(); ve_tab(); dongBoVung(); if (F() && F().vung) zoomVung(); else zoomToanBo(); veLai();
 }
 
 // ---------- Danh sách file, tab, layer ----------
@@ -1188,6 +1189,10 @@ function ve() {
   ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   if (f) {
     const s = S.v.s;
+    if (f.vung && S.ngoai !== "hien" && !(S.keo && S.keo.kieu === "vung")) {   // làm mờ hoặc che hẳn phần ngoài vùng đang làm việc
+      const v = f.vung, x = sx(Math.min(v[0], v[2])), y = sy(Math.max(v[1], v[3])), w = Math.abs(v[2] - v[0]) * s, h = Math.abs(v[3] - v[1]) * s;
+      ctx.fillStyle = S.ngoai === "an" ? "#000" : "rgba(0,0,0,.82)"; ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.rect(x, y, w, h); ctx.fill("evenodd");
+    }
     veHover(f);
     if (S.keo && S.keo.kieu === "hop" && S.keo.moved) {  // khung chọn: Window (xanh dương, nét liền) hoặc Crossing (xanh lá, nét đứt)
       const cat = S.keo.b[0] < S.keo.a[0], x = sx(Math.min(S.keo.a[0], S.keo.b[0])), y = sy(Math.max(S.keo.a[1], S.keo.b[1]));
@@ -1288,6 +1293,16 @@ $("t-pan").onclick = () => datCongCu("pan");
 $("t-vung").onclick = () => { datCongCu("vung"); lenh("Kéo một khung chữ nhật quanh mặt bằng cần tính."); };
 $("t-ze").onclick = () => { zoomToanBo(); veLai(); };
 $("t-zv").onclick = zoomVung;
+const NGOAI = {mo:"Mờ", an:"Ẩn", hien:"Hiện"};   // phần ngoài vùng đang làm việc: mờ / ẩn hẳn / hiện tất cả
+try { S.ngoai = localStorage.getItem("azb_ngoai_vung"); } catch (e) {}
+if (!NGOAI[S.ngoai]) S.ngoai = "mo";
+function capNhatNgoai() { $("t-ngoai").textContent = "Ngoài vùng: " + NGOAI[S.ngoai]; }
+$("t-ngoai").onclick = () => {
+  const ks = Object.keys(NGOAI); S.ngoai = ks[(ks.indexOf(S.ngoai) + 1) % ks.length];
+  try { localStorage.setItem("azb_ngoai_vung", S.ngoai); } catch (e) {}
+  capNhatNgoai(); veLai();
+};
+capNhatNgoai();
 $("t-bo-vung").onclick = () => { if (F()) { F().vung = null; dongBoVung(); veLai(); lenh("Đã bỏ vùng, tính toàn bộ bản vẽ."); } };
 ["v0", "v1", "v2", "v3"].forEach((id, i) => $(id).addEventListener("input", () => {
   const f = F(); if (!f) return;

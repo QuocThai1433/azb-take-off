@@ -165,10 +165,19 @@ def _sap_doc(vung):
     return sorted(vung, key=lambda v: (-round(((v["khung"][1] + v["khung"][3]) / 2) / (0.6 * cao)), v["khung"][0]))
 
 
-def _cat_chong(vung, bien=1e-3):
-    """Cắt phần khung đè lên nhau. Mỗi cặp chồng nhau được cắt đôi theo trục có độ chồng nhỏ hơn, đường cắt
-    đặt giữa dải chồng, nên hai vùng sát nhau thành hai khung liền kề. Khung gần trọn nằm trong khung kia thì
-    không cắt được (vẫn để cảnh báo). Vùng bị cắt được ghi cảnh báo để kiểm tra ranh giới."""
+def _vi_tri_cat(P, b0, b1):
+    """Đường cắt trong dải [b0, b1]: giữa khoảng trống rộng nhất giữa các điểm vẽ nằm trong dải (không có điểm nào thì giữa dải)."""
+    ps = np.unique(np.concatenate(([b0, b1], P[(P > b0) & (P < b1)])))
+    if len(ps) < 3:
+        return (b0 + b1) / 2
+    i = int(np.argmax(np.diff(ps)))
+    return float((ps[i] + ps[i + 1]) / 2)
+
+
+def _cat_chong(vung, X, Y, bien=1e-3):
+    """Cắt phần khung đè lên nhau. Mỗi cặp chồng nhau được cắt theo trục có độ chồng nhỏ hơn, tại khoảng trống
+    rộng nhất giữa nét vẽ của hai tờ trong dải chồng, nên hai vùng sát nhau thành hai khung liền kề. Khung gần trọn
+    nằm trong khung kia thì không cắt được (vẫn để cảnh báo). Vùng bị cắt được ghi cảnh báo để kiểm tra ranh giới."""
     for _ in range(4 * len(vung) + 4):
         da_cat = False
         for i, a in enumerate(vung):
@@ -184,7 +193,9 @@ def _cat_chong(vung, bien=1e-3):
                     continue
                 lo, hi = (0, 2) if ox <= oy else (1, 3)     # trục cắt: x nếu chồng theo x ít hơn
                 trai, phai = (a, b) if ka[lo] + ka[hi] <= kb[lo] + kb[hi] else (b, a)
-                cat = round((max(ka[lo], kb[lo]) + min(ka[hi], kb[hi])) / 2, 3)
+                g0, g1 = max(ka[lo], kb[lo]), min(ka[hi], kb[hi])
+                trong = (X >= max(ka[0], kb[0])) & (X <= min(ka[2], kb[2])) & (Y >= max(ka[1], kb[1])) & (Y <= min(ka[3], kb[3]))
+                cat = round(_vi_tri_cat((X if lo == 0 else Y)[trong], g0, g1), 3)
                 if not (trai["khung"][lo] < cat < phai["khung"][hi]):
                     continue
                 trai["khung"][hi] = cat
@@ -249,7 +260,19 @@ def do_mat_bang(ban_ve, khoang_cach=None):
     vung = _sap_doc(sorted(vung, key=lambda v: -(v["so_hinh"] + v["so_net"] + v["so_chu"]))[:TOI_DA_VUNG])
     for i, v in enumerate(vung, 1):
         v["id"] = i
-    _cat_chong(vung)
+    khung_cu = [list(v["khung"]) for v in vung]
+    _cat_chong(vung, X, Y)
+    for v, kc_cu in zip(vung, khung_cu):    # khung đã cắt thì đọc lại tiêu đề, tầng, tỷ lệ theo khung mới (không còn lẫn tiêu đề tờ bên cạnh)
+        if v["khung"] == kc_cu:
+            continue
+        pt = _phan_tich_vung(chu_ds, v["khung"], 0.0)
+        if pt["tieu_de"]:
+            v["ten"], v["tang"], v["vai_tro"] = pt["tieu_de"][:70], pt["tang"], pt["loai_tieu_de"]
+            v["ly_do"] = f'Tiêu đề: "{pt["tieu_de"][:50]}"'
+        if pt["ty_le"]:
+            v["ty_le"] = pt["ty_le"]
+        if pt["so_tieu_de"] < 2:
+            v["canh_bao"] = [c for c in v["canh_bao"] if not c.startswith("Có ")]
     for a in vung:       # vùng chồng lấn nhau: dấu hiệu nhiều tờ vẽ đè lên nhau, hoặc khung bị vẽ trùng
         ba = box(*a["khung"])
         for b in vung:
