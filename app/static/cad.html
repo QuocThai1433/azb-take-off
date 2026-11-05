@@ -2246,7 +2246,9 @@ function veGN() {
         <td>${l.so_luong}</td><td>${so(l.tong_dai, 2)}</td></tr>`).join("")}</table>` : '<div class="nho">Không có dầm trong vùng.</div>') : ""}
     ${bangLoaiGN(tc.loai, kq)}
     ${kq.nhan.length ? danhSachNhanGN(p) : ""}
-    ${kq.canh_bao.map(w => `<div class="nho chua" style="margin:3px 0">⚠ ${esc(w)}</div>`).join("")}` : ""}
+    ${(() => { const bo = new Set(p.tc.boCB || []), hien = kq.canh_bao.filter(w => !bo.has(w));
+      return hien.map(w => `<div class="nho chua" style="margin:3px 0;display:flex;gap:6px;align-items:flex-start"><span style="flex:1">⚠ ${esc(w)}</span><button data-bocb="${esc(w)}" title="Đã xem, ẩn cảnh báo này" style="padding:0 6px;line-height:18px">✕</button></div>`).join("")
+        + (bo.size && kq.canh_bao.some(w => bo.has(w)) ? `<div class="nho" style="margin:3px 0"><a href="#" id="gn-hien-cb">Hiện lại ${kq.canh_bao.filter(w => bo.has(w)).length} cảnh báo đã ẩn</a></div>` : ""); })()}` : ""}
     <div class="nho" style="margin-top:6px">Nhãn chỉ là đề xuất do công cụ tính từ hình học, kỹ sư kiểm tra trước khi dùng. Trong DXF xuất ra, nhãn nằm riêng trên layer ${TEN_NHAN} nên kéo chỉnh hoặc tắt dễ dàng.</div></div>`;
 }
 $("p-gn").addEventListener("change", e => { if (e.target.dataset.nh !== undefined) doiNhan(+e.target.dataset.nh, e.target.value); });
@@ -2268,6 +2270,8 @@ $("p-gn").addEventListener("click", async e => {
   else if (e.target.dataset.nz !== undefined) zoomNhan(+e.target.dataset.nz);
   else if (e.target.dataset.nx !== undefined) xoaNhanLe(+e.target.dataset.nx);
   else if (e.target.id === "gn-ap") { docOGN(); await goiGanNhan(f, false, true); }
+  else if (e.target.dataset.bocb !== undefined) { const q = mbHienTai(); (q.tc.boCB ||= []).push(e.target.dataset.bocb); veGN(); }
+  else if (e.target.id === "gn-hien-cb") { e.preventDefault(); mbHienTai().tc.boCB = []; veGN(); }
   else if (e.target.id === "gn-xem") zoomNhan((S.gnI ?? -1) + 1);
   else if (e.target.id === "gn-xoa1") { S.gn.ds.splice(S.gn.sel, 1); S.gn.sel = Math.max(0, S.gn.ds.length - 1); veNhanLenHinh(f); veGN(); veLai(); }
   else if (e.target.id === "gn-xoa") xoaNhan(true);
