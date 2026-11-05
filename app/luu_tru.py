@@ -19,7 +19,7 @@ from . import config
 
 log = logging.getLogger("azb.luu_tru")
 
-DATA = config.ROOT / "data"
+DATA = config.DATA_DIR
 THU_MUC_TAI_LEN = DATA / "uploads"
 FILE_TRANG_THAI = DATA / "du_an" / "trang_thai.json"
 THU_MUC_BACKUP = DATA / "backup"

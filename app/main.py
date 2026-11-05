@@ -31,7 +31,7 @@ from .pdf_reader import pdf_sang_dxf
 from .quet_chon import quet_chi_tiet, quet_mat_bang
 from .takeoff import boc_khoi_luong, thong_so_mac_dinh
 
-THU_MUC_TAI_LEN = config.ROOT / "data" / "uploads"
+THU_MUC_TAI_LEN = config.DATA_DIR / "uploads"
 STATIC = Path(__file__).parent / "static"
 
 log = logging.getLogger("azb.main")
@@ -685,5 +685,7 @@ def so_sanh(id: str = Form(...), file: UploadFile = File(...)):
 if __name__ == "__main__":
     import uvicorn
 
-    # Chỉ nghe trên máy này, không mở ra mạng
-    uvicorn.run(app, host="127.0.0.1", port=8765)
+    # Chỉ nghe trên máy này, không mở ra mạng. Đặt AZB_PORT để đổi cổng (bản dùng thử dùng cổng khác).
+    import os
+
+    uvicorn.run(app, host="127.0.0.1", port=int(os.environ.get("AZB_PORT") or 8765))
