@@ -580,6 +580,34 @@ def _hinh_chu_nhat(g):
     return max(a, b), min(a, b), g.area / max(r.area, 1e-12)
 
 
+def _co_hinh_mong(chu_mong, ds_hinh, mong_layer, toi_da):
+    """Đã có layer Móng gán sẵn và layer đó có hình chữ nhật nằm gần ít nhất một chữ tên móng?"""
+    if not mong_layer:
+        return False
+    for c, _ in chu_mong:
+        for t, g in ds_hinh:
+            if t in mong_layer and g.distance(c.diem) <= toi_da and _hinh_chu_nhat(g)[2] >= 0.95:
+                return True
+    return False
+
+
+def _do_layer_mong(chu_mong, ds_hinh, loai_layer, toi_da, dien_tich=(0.2, 80.0)):
+    """Layer chưa gán loại nhưng chứa hình móng: mỗi chữ tên móng bỏ một phiếu cho layer của hình chữ nhật gần nhất
+    (loại hình quá nhỏ/quá lớn như khung bản vẽ, và layer đã gán cột/dầm/sàn). Layer nhiều phiếu nhất thắng."""
+    khong = {t for t, v in loai_layer.items() if v in ("cot", "dam", "san", "khung_dam", "o_dam", "coc")}
+    ung = [(t, g) for t, g in ds_hinh if t not in khong and dien_tich[0] <= g.area <= dien_tich[1] and _hinh_chu_nhat(g)[2] >= 0.95]
+    phieu = Counter()
+    for c, _ in chu_mong:
+        tot = None
+        for t, g in ung:
+            d = g.distance(c.diem)
+            if d <= toi_da and (tot is None or d < tot[0]):
+                tot = (d, t)
+        if tot:
+            phieu[tot[1]] += 1
+    return phieu.most_common(1)[0][0] if phieu else None
+
+
 def _nhan_mong(ban_ve, trong, loai_layer, cao_chu, va_cham, them, canh_bao, toi_da=1.5):
     """Mỗi chữ tên móng (F1) trong vùng → tìm hình móng gần nhất, ghi "F1 800x800x700".
 
@@ -594,10 +622,14 @@ def _nhan_mong(ban_ve, trong, loai_layer, cao_chu, va_cham, them, canh_bao, toi_
             if h.geom.area >= 0.01:
                 ds_hinh.append((t, h.geom))
     da_dat, so_nhan, thieu_sau, chong = set(), 0, {}, 0
-    for c in _tat_ca_chu(trong):
-        ten = _ten_mong(c.noi_dung)
-        if not ten:
-            continue
+    chu_mong = [(c, _ten_mong(c.noi_dung)) for c in _tat_ca_chu(trong)]
+    chu_mong = [(c, ten) for c, ten in chu_mong if ten]
+    if chu_mong and not _co_hinh_mong(chu_mong, ds_hinh, mong_layer, toi_da):
+        tu_do = _do_layer_mong(chu_mong, ds_hinh, loai_layer, toi_da)
+        if tu_do:  # chưa gán layer Móng: tự chọn layer có hình chữ nhật gần chữ tên móng nhất
+            mong_layer = {tu_do}
+            canh_bao.append(f'Chưa gán layer "Móng": tự dò layer "{tu_do}" (hình chữ nhật gần chữ tên móng). Sếp kiểm tra, hoặc gán layer Móng ở tab Layer.')
+    for c, ten in chu_mong:
         ung_vien = []
         for t, g in ds_hinh:
             d = g.distance(c.diem)

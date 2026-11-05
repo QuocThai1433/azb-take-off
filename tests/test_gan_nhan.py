@@ -169,6 +169,23 @@ def test_nhan_mong_lay_kich_thuoc_tu_bang_thong_ke(tmp_path):
     assert [n["t"] for n in mong] == ["F1 800x800x700", "F1 800x800x700"]
 
 
+def test_nhan_mong_tu_do_layer_khi_chua_gan(tmp_path):
+    """Chưa gán layer Móng: tự chọn layer có hình chữ nhật gần chữ tên móng, không trả 0 nhãn."""
+    doc = ezdxf.new("R2010")
+    doc.header["$INSUNITS"] = 4
+    for l in ("HINH_LA", "CHU"):
+        doc.layers.add(l)
+    msp = doc.modelspace()
+    for x in (X0, X1):
+        _hcn(msp, "HINH_LA", x - 400, Y0 - 400, x + 400, Y0 + 400)
+        msp.add_text("F1", dxfattribs={"layer": "CHU", "height": 150, "insert": (x - 100, Y0 + 700)})
+    f = tmp_path / "mong2.dxf"
+    doc.saveas(f)
+    kq = gan_nhan(doc_ban_ve(f), {}, VUNG, {"nhan_dam": False, "nhan_truc": False, "nhan_mong": True, "nhan_coc": False, "nhan_san": False, "ty_le": 50})
+    assert [n["t"] for n in kq["nhan"] if n["loai"] == "mong"] == ["F1 800x800x?", "F1 800x800x?"]
+    assert any("HINH_LA" in w for w in kq["canh_bao"])
+
+
 def _tao_coc(tmp_path, ten_cac, dk_mm, dk_bang=None):
     """Mặt bằng cọc: 4 hình tròn, chữ tên cạnh mỗi cọc (ten_cac), bảng thống kê ghi đường kính dk_bang."""
     doc = ezdxf.new("R2010")
