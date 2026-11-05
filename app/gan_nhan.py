@@ -497,10 +497,12 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
               for c in _tat_ca_chu(trong)]
     da_dat = []  # hộp của các nhãn mới
 
-    def va_cham(hop):
+    cay_net = _cay_net_ve(trong, set())  # nét vẽ (kích thước, trục, khung...) để nhãn né
+
+    def va_cham(hop, ne_net=False):
         if any(hop.intersects(g) for g in vat_can) or any(hop.intersects(g) for g in hop_cu) or any(hop.intersects(g) for g in da_dat):
             return True
-        return False
+        return bool(ne_net and cay_net is not None and len(cay_net.query(hop, predicate="intersects")) > 0)
 
     nhan = []
 
@@ -509,7 +511,7 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
         nhan.append({"loai": loai, "t": t, "x": round(x, 4), "y": round(y, 4), "goc": round(goc, 2), "cao": cao, "neo": neo, **them_})
 
     # ----- Dầm -----
-    loai_dam = []
+    loai_dam, dam_khong_cho = [], []
     if tc.get("nhan_dam", True) and dam:
         thu_tu_vai_tro = {"bien": 0, "giua": 1}
         khoa = {}
@@ -535,7 +537,11 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
         for d in sorted(dam, key=lambda d: (d["huong"], d["cy"] if d["huong"] == "X" else d["cx"])):
             if "chu" not in d:
                 continue
-            _dat_nhan_dam(d, cao_chu, va_cham, them, d["chu"], canh_bao)
+            if not _dat_nhan_dam(d, cao_chu, va_cham, them, d["chu"], canh_bao):
+                dam_khong_cho.append((d["cx"], d["cy"]))
+        if dam_khong_cho:
+            canh_bao.append(f"Dầm: {len(dam_khong_cho)} nhãn không tìm được chỗ trống, đang đè lên nét khác, tại toạ độ "
+                            f"{_tom_tat_vi_tri(dam_khong_cho)}. Sếp kéo nhãn sang chỗ thoáng trong CAD hoặc nhập Tỷ lệ 1/ nhỏ hơn.")
 
     ghi_de = {str(k).upper(): v for k, v in (tc.get("kt_mong") or {}).items()}  # sếp sửa số trong bảng loại (khoá = tên loại)
     loai_cot, loai_san, loai_coc = [], [], []
@@ -560,10 +566,13 @@ def gan_nhan(ban_ve, loai_layer, vung, tuy_chon=None):
                 canh_bao.append("Không tìm thấy cột trong vùng: chưa có layer nào được gán loại 'Cột' (hoặc layer đó không có hình kín "
                                 "trong khung) và cũng không thấy lưới trục. Gán layer chứa hình cột là 'Cột' ở tab Layer rồi bấm Dán nhãn lại.")
         else:
-            n0 = len(nhan)
-            _nhan_cot(cot_hinh, cao_chu, va_cham, them, ghi_de, loai_cot)
+            n0, cot_khong_cho = len(nhan), []
+            _nhan_cot(cot_hinh, cao_chu, va_cham, them, ghi_de, loai_cot, cot_khong_cho)
             if len(nhan) == n0:
                 canh_bao.append("Có hình cột nhưng không tìm được chỗ trống để đặt nhãn (đều vướng dầm/chữ khác).")
+            elif cot_khong_cho:
+                canh_bao.append(f"Cột: {len(cot_khong_cho)} cột không còn chỗ trống để đặt nhãn, tại toạ độ {_tom_tat_vi_tri(cot_khong_cho)}. "
+                                "Thử nhập Tỷ lệ 1/ nhỏ hơn rồi dán lại, hoặc thêm nhãn tay.")
 
     # ----- Sàn -----
     if tc.get("nhan_san", True):
@@ -653,6 +662,24 @@ def _tam_bong(bong_cs, pos, dau, huong, r_bong, cao_truc):
     return (pos, dau - lui, True) if huong == "doc" else (dau - lui, pos, True)
 
 
+def _dat_thu_nho(vi_tri, cao_chu, chu_ds, va_cham):
+    """Tìm chỗ đặt nhãn: lượt 1 né cả nét vẽ (thu nhỏ chữ đến 35%, thử nhiều vị trí hơn), lượt 2 chấp nhận đè nét
+    (thu nhỏ đến 18%) để khỏi chồng lên nhãn/chữ khác. vi_tri(cao, ne_net) -> [(x, y, góc, neo)];
+    chu_ds: các dạng chữ từ đầy đủ đến ngắn (cùng cỡ chữ thì thử dạng đầy đủ trước). Trả (chữ, x, y, góc, neo, cao) hoặc None."""
+    for ne_net, cac_he_so in ((True, (1.0, 0.7, 0.5, 0.35)), (False, (1.0, 0.7, 0.5, 0.35, 0.25, 0.18))):
+        for he_so in cac_he_so:
+            cao = round(cao_chu * he_so, 4)
+            for chu in chu_ds:
+                for ox, oy, goc, neo in vi_tri(cao, ne_net):
+                    if not va_cham(_hop_chu(ox, oy, goc, cao, neo, len(chu) + 1), ne_net):  # +1 ký tự dự phòng: chữ in rộng hơn ước lượng
+                        return chu, ox, oy, goc, neo, cao
+    return None
+
+
+def _tom_tat_vi_tri(ds, toi_da=8):
+    return "; ".join(f"({x:.1f}; {y:.1f})" for x, y in ds[:toi_da]) + ("; …" if len(ds) > toi_da else "")
+
+
 def _dat_nhan_dam(d, cao_chu, va_cham, them, chu, canh_bao):
     """Đặt nhãn của một dầm: giữa dầm, cạnh dầm phía trong khung trước, rồi phía kia; trượt dọc dầm nếu bị vướng."""
     x0, y0, x1, y1 = d["geom"].bounds
@@ -668,30 +695,32 @@ def _dat_nhan_dam(d, cao_chu, va_cham, them, chu, canh_bao):
         phia_trong = "phai" if d["cx"] < tam_cum[0] else "trai"
         phia = [phia_trong, "trai" if phia_trong == "phai" else "phai"]
         goc = 90.0
-    for t in (0.5, 0.3, 0.7, 0.15, 0.85):
-        for p in phia:
-            if d["huong"] == "X":
-                x = x0 + t * (x1 - x0)
-                if p == "tren":
-                    ox, oy, neo = x, y1 + khe, "bc"
+    def vi_tri(cao, ne_net):
+        khe = KHE_NHAN * cao
+        kq = []
+        for t in ((0.5, 0.3, 0.7, 0.15, 0.85) + ((0.4, 0.6, 0.25, 0.75, 0.05, 0.95) if ne_net else ())):
+            for p in phia:
+                if d["huong"] == "X":
+                    x = x0 + t * (x1 - x0)
+                    kq.append((x, y1 + khe, goc, "bc") if p == "tren" else (x, y0 - khe, goc, "tc"))
                 else:
-                    ox, oy, neo = x, y0 - khe, "tc"
-            else:
-                y = y0 + t * (y1 - y0)
-                if p == "trai":  # chữ xoay 90°: đáy chữ hướng sang phải, thân chữ lồi sang trái
-                    ox, oy, neo = x0 - khe, y, "bc"
-                else:
-                    ox, oy, neo = x1 + khe, y, "tc"
-            if not va_cham(_hop_chu(ox, oy, goc, cao_chu, neo, n)):
-                them("dam", chu, ox, oy, goc, cao_chu, neo, ma=d["ma"])
-                return
-    # Vướng hết chỗ: vẫn đặt ở chỗ ưu tiên đầu tiên và báo
+                    y = y0 + t * (y1 - y0)
+                    # chữ xoay 90°: đáy chữ hướng sang phải, thân chữ lồi sang trái
+                    kq.append((x0 - khe, y, goc, "bc") if p == "trai" else (x1 + khe, y, goc, "tc"))
+        return kq
+
+    kq = _dat_thu_nho(vi_tri, cao_chu, [chu], va_cham)
+    if kq:
+        _, ox, oy, g, neo, cao = kq
+        them("dam", chu, ox, oy, g, cao, neo, ma=d["ma"])
+        return True
+    # Vướng hết chỗ: vẫn đặt ở chỗ ưu tiên đầu tiên; người gọi gom cảnh báo
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
     if d["huong"] == "X":
         them("dam", chu, cx, y1 + khe, 0.0, cao_chu, "bc", ma=d["ma"])
     else:
         them("dam", chu, x0 - khe, cy, 90.0, cao_chu, "bc", ma=d["ma"])
-    canh_bao.append(f"Nhãn {chu} không tìm được chỗ trống, đang đè lên nét khác. Sếp kéo nhãn sang chỗ thoáng trong CAD.")
+    return False
 
 
 RE_KT_COT_CM = re.compile(r"^\s*(\d{2,3})\s*[xX×]\s*(\d{2,3})\s*$")
@@ -754,7 +783,7 @@ def _do_layer_cot(trong, loai_layer):
     return layers, [g for t, g in chon if t in layers]
 
 
-def _nhan_cot(cot_hinh, cao_chu, va_cham, them, ghi_de=None, loai_cot=None):
+def _nhan_cot(cot_hinh, cao_chu, va_cham, them, ghi_de=None, loai_cot=None, khong_cho=None):
     duy_nhat = []
     for g in sorted(cot_hinh, key=lambda g: -g.area):
         if g.area >= 0.005 and not any(g.intersection(u).area > 0.95 * g.area for u in duy_nhat):
@@ -773,12 +802,22 @@ def _nhan_cot(cot_hinh, cao_chu, va_cham, them, ghi_de=None, loai_cot=None):
             loai_cot.append({"ten": f"C{i}", "a": ka, "b": kb, "so_luong": len(ds), "khac_nhau": False})
         for g in ds:
             x0, y0, x1, y1 = g.bounds
-            khe = KHE_NHAN * cao_chu
-            for ox, oy, neo in ((x1 + khe, (y0 + y1) / 2, "ml"), (x0 - khe, (y0 + y1) / 2, "mr"),
-                                ((x0 + x1) / 2, y1 + khe, "bc"), ((x0 + x1) / 2, y0 - khe, "tc")):
-                if not va_cham(_hop_chu(ox, oy, 0.0, cao_chu, neo, len(chu))):
-                    them("cot", chu, ox, oy, 0.0, cao_chu, neo)
-                    break
+            cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+
+            def vi_tri(cao, ne_net):
+                khe = KHE_NHAN * cao
+                kq = [(x1 + khe, cy, 0.0, "ml"), (x0 - khe, cy, 0.0, "mr"), (cx, y1 + khe, 0.0, "bc"), (cx, y0 - khe, 0.0, "tc")]
+                if ne_net:
+                    k2 = 4 * khe
+                    kq += [(x1 + khe, y1 + khe, 0.0, "bl"), (x0 - khe, y1 + khe, 0.0, "br"), (x1 + khe, y0 - khe, 0.0, "tl"), (x0 - khe, y0 - khe, 0.0, "tr"),
+                           (x1 + k2, cy, 0.0, "ml"), (x0 - k2, cy, 0.0, "mr"), (cx, y1 + k2, 0.0, "bc"), (cx, y0 - k2, 0.0, "tc")]
+                return kq
+            kq = _dat_thu_nho(vi_tri, cao_chu, [chu], va_cham)
+            if kq:
+                _, ox, oy, goc, neo, cao = kq
+                them("cot", chu, ox, oy, goc, cao, neo)
+            elif khong_cho is not None:
+                khong_cho.append((cx, cy))
 
 
 # ---------- Móng: tên + kích thước (F1 800x800x700) ----------
@@ -861,7 +900,7 @@ def _nhan_mong(ban_ve, trong, loai_layer, cao_chu, va_cham, them, canh_bao, toi_
         for h in ld.hinh_kin:
             if h.geom.area >= 0.01:
                 ds_hinh.append((t, h.geom))
-    da_dat, so_nhan, thieu_sau, chong = set(), 0, {}, 0
+    da_dat, so_nhan, thieu_sau, chong, mong_khong_cho = set(), 0, {}, 0, []
     ghi_de = {str(k).upper(): v for k, v in (ghi_de or {}).items()}
     thong_ke = {}  # tên móng -> {kích thước (a, b, h): số lượng}
     chu_mong = [(c, _ten_mong(c.noi_dung)) for c in _tat_ca_chu(trong)]
@@ -911,30 +950,34 @@ def _nhan_mong(ban_ve, trong, loai_layer, cao_chu, va_cham, them, canh_bao, toi_
         kich_thuoc = f"{ka}x{kb}x{kh if kh else '?'}"
         if not kh:
             thieu_sau[ten] = thieu_sau.get(ten, 0) + 1
-        khe = KHE_NHAN * cao_chu
         cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
-        vi_tri = ((x1 + khe, y0, 0.0, "bl"), (x0 - khe, y0, 0.0, "br"), (cx, y0 - khe, 0.0, "tc"), (cx, y1 + khe, 0.0, "bc"),
-                  (x1 + khe, cy, 90.0, "bl"), (x0 - khe, cy, 90.0, "br"))
-        dat = False
-        # Thử nhãn đầy đủ "M7 3000x2750x?" trước; chật quá thì chỉ ghi kích thước (tên móng đã có sẵn trong bản vẽ)
-        for chu in (f"{ten} {kich_thuoc}", kich_thuoc):
-            for ox, oy, goc, neo in vi_tri:
-                if not va_cham(_hop_chu(ox, oy, goc, cao_chu, neo, len(chu))):
-                    them("mong", chu, ox, oy, goc, cao_chu, neo)
-                    dat = True
-                    break
-            if dat:
-                break
-        if not dat:
-            them("mong", kich_thuoc, x1 + khe, y0, 0.0, cao_chu, "bl")
+
+        def vi_tri(cao, ne_net):
+            khe = KHE_NHAN * cao
+            kq = [(x1 + khe, y0, 0.0, "bl"), (x0 - khe, y0, 0.0, "br"), (cx, y0 - khe, 0.0, "tc"), (cx, y1 + khe, 0.0, "bc"),
+                  (x1 + khe, cy, 90.0, "bl"), (x0 - khe, cy, 90.0, "br")]
+            if ne_net:
+                k2 = 4 * khe
+                kq += [(x1 + khe, y1 + khe, 0.0, "bl"), (x0 - khe, y1 + khe, 0.0, "br"), (x1 + khe, y0 - khe, 0.0, "tl"), (x0 - khe, y0 - khe, 0.0, "tr"),
+                       (x1 + k2, y0, 0.0, "bl"), (x0 - k2, y0, 0.0, "br"), (cx, y0 - k2, 0.0, "tc"), (cx, y1 + k2, 0.0, "bc")]
+            return kq
+        # Nhãn đầy đủ "M7 3000x2750x?" trước; chật quá thì chỉ ghi kích thước (tên móng đã có sẵn trong bản vẽ)
+        kq = _dat_thu_nho(vi_tri, cao_chu, [f"{ten} {kich_thuoc}", kich_thuoc], va_cham)
+        if kq:
+            chu, ox, oy, goc, neo, cao = kq
+            them("mong", chu, ox, oy, goc, cao, neo)
+        else:
+            them("mong", kich_thuoc, x1 + KHE_NHAN * cao_chu, y0, 0.0, cao_chu, "bl")
             chong += 1
+            mong_khong_cho.append((cx, cy))
         so_nhan += 1
     if loai_mong is not None:
         for ten, dem in sorted(thong_ke.items()):
             (ka, kb, kh), _ = dem.most_common(1)[0]
             loai_mong.append({"ten": ten, "a": ka, "b": kb, "h": kh, "so_luong": sum(dem.values()), "khac_nhau": len(dem) > 1})
     if chong:
-        canh_bao.append(f"{chong} nhãn móng không tìm được chỗ trống nên chồng lên nét/chữ khác (mặt bằng móng dày). Sếp thử nhập Tỷ lệ 1/ nhỏ hơn (chữ nhỏ lại) rồi dán lại, hoặc dời nhãn trong CAD.")
+        canh_bao.append(f"{chong} nhãn móng không tìm được chỗ trống nên chồng lên nét/chữ khác (mặt bằng móng dày), tại toạ độ "
+                        f"{_tom_tat_vi_tri(mong_khong_cho)}. Sếp thử nhập Tỷ lệ 1/ nhỏ hơn (chữ nhỏ lại) rồi dán lại, hoặc dời nhãn trong CAD.")
     if thieu_sau:  # gộp một dòng cho cả loại, không lặp mỗi cái móng một cảnh báo
         ds = ", ".join(f"{t} ({n})" for t, n in sorted(thieu_sau.items()))
         canh_bao.append(f"Chưa biết chiều sâu móng {ds} (không có trong bảng thống kê móng), nhãn ghi '?'. Số trong ngoặc là số cái móng.")
@@ -1263,18 +1306,26 @@ def _nhan_san(ban_ve, dam, tang, cao_chu, va_cham, them, canh_bao, ghi_de=None, 
     if not t_mm:
         canh_bao.append("Sàn: bản vẽ không có ghi chú chiều dày sàn (kiểu 'SÀN TẦNG 1 DÀY 100mm'), nhãn ghi 't=?'.")
     chu = f"S1 t={t_mm if t_mm else '?'}"
+    khong_cho = []
     for g in sorted(o, key=lambda g: (-g.centroid.y, g.centroid.x)):
         cx, cy = g.centroid.x, g.centroid.y
         x0, y0, x1, y1 = g.bounds
-        dat = False
-        for dx, dy in ((0, 0), (0, 0.15), (0, -0.15), (0.3, 0), (-0.3, 0)):
-            ox, oy = cx + dx * (x1 - x0), cy + dy * (y1 - y0)
-            if not va_cham(_hop_chu(ox, oy, 0.0, cao_chu, "mc", len(chu))):
-                them("san", chu, ox, oy, 0.0, cao_chu, "mc")
-                dat = True
-                break
-        if not dat:
+
+        def vi_tri(cao, ne_net):
+            ds = [(0, 0), (0, 0.15), (0, -0.15), (0.3, 0), (-0.3, 0)]
+            if ne_net:
+                ds += [(0.25, 0.25), (-0.25, 0.25), (0.25, -0.25), (-0.25, -0.25), (0, 0.3), (0, -0.3), (0.4, 0), (-0.4, 0)]
+            return [(cx + dx * (x1 - x0), cy + dy * (y1 - y0), 0.0, "mc") for dx, dy in ds]
+        kq = _dat_thu_nho(vi_tri, cao_chu, [chu], va_cham)
+        if kq:
+            _, ox, oy, goc, neo, cao = kq
+            them("san", chu, ox, oy, goc, cao, neo)
+        else:
             them("san", chu, cx, cy, 0.0, cao_chu, "mc")
+            khong_cho.append((cx, cy))
+    if khong_cho:
+        canh_bao.append(f"Sàn: {len(khong_cho)} nhãn không tìm được chỗ trống nên chồng lên nét/chữ khác, tại toạ độ {_tom_tat_vi_tri(khong_cho)}. "
+                        "Thử nhập Tỷ lệ 1/ nhỏ hơn rồi dán lại, hoặc dời nhãn.")
     return len(o)
 
 
