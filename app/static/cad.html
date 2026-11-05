@@ -858,7 +858,11 @@ function ve() {
         if (!l.hien) continue; ctx.fillStyle = l.mau;
         for (const t of (f.hinh.layers[l.ten]?.chu || [])) {
           const cao = (t.h > 0 ? t.h : 0.25) * s;  // chữ không rõ chiều cao: tạm lấy 250mm
-          if (cao < 3 || t.x < xmin - 5 || t.x > xmax + 5 || t.y < ymin - 5 || t.y > ymax + 5) continue;
+          if (t.x < xmin - 5 || t.x > xmax + 5 || t.y < ymin - 5 || t.y > ymax + 5) continue;
+          if (cao < 3) {  // nhãn mới dán mà zoom xa quá: vẽ chấm đỏ để biết nhãn nằm đâu (zoom gần sẽ thấy chữ)
+            if (l.ten === TEN_NHAN) ctx.fillRect(sx(t.x) - 1.5, sy(t.y) - 1.5, 3, 3);
+            continue;
+          }
           const dong = t.t.split(/\r?\n|\\P/), a = t.a || "bl", r = -(t.r || 0) * Math.PI / 180;
           ctx.font = `${cao}px Arial, "Segoe UI", sans-serif`; ctx.textBaseline = NEN[a[0]]; ctx.textAlign = COT[a[1]];
           ctx.save(); ctx.translate(sx(t.x), sy(t.y)); ctx.rotate(r); if (t.w && t.w !== 1) ctx.scale(t.w, 1);
