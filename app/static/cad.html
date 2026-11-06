@@ -1375,6 +1375,12 @@ function xoaVungTM(e) {   // chuột phải vào vùng mặt bằng đề xuất
   lenh(`Đã xóa vùng #${r.id} ${r.ten} khỏi danh sách đề xuất${dong ? " và đóng mục tương ứng" : ""}.`, "ok"); ve_TM_bang(); veLai();
 }
 cv.addEventListener("contextmenu", e => e.preventDefault());
+window.addEventListener("keydown", e => {   // lỡ Ctrl+A bôi đen cả trang: Esc bỏ bôi đen trước, chưa đụng tới việc khác
+  if (e.key !== "Escape") return;
+  const sel = window.getSelection && window.getSelection(); if (!sel || sel.isCollapsed) return;
+  const ae = document.activeElement; if (ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && ae.selectionStart !== ae.selectionEnd) return;
+  sel.removeAllRanges(); e.preventDefault(); e.stopImmediatePropagation();
+}, true);
 window.addEventListener("keydown", e => {   // Esc: bỏ chọn các vùng đề xuất đang sáng
   if (e.key !== "Escape" || e.defaultPrevented || S.ctCho || S.gnCho || S.gnMode || S.buoc || LAY.hoi || document.getElementById("hop")) return;
   if (!tmDangMo(F()) || !S.tm.chon.size) return;
