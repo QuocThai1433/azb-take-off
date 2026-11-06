@@ -1296,6 +1296,7 @@ cv.addEventListener("mousemove", e => {
       if (k.ey < 0) v[1] = Math.min(k.v[1] + dy, v[3] - 0.01); else if (k.ey > 0) v[3] = Math.max(k.v[3] + dy, v[1] + 0.01);
     }
     f.vung = v.map(a => +a.toFixed(3)); dongBoVung(true); S.hover = null; $("tip").hidden = true;
+    if (k.z) k.z.khung = f.vung.slice();
   }
   else if (S.keo) {
     if (Math.hypot(m.x - S.keo.px, m.y - S.keo.py) > 4) S.keo.moved = true;
@@ -1316,6 +1317,8 @@ cv.addEventListener("mousedown", e => {
     if (v) {
       S.keo = {kieu:"sua", ex:h ? h.ex : 0, ey:h ? h.ey : 0, dich:!h, x0:wx(m.x), y0:wy(m.y), px:m.x, py:m.y,
         v:[Math.min(v[0], v[2]), Math.min(v[1], v[3]), Math.max(v[0], v[2]), Math.max(v[1], v[3])]};
+      // vùng đề xuất (khung vàng) tương ứng với mục này sẽ đi theo khi chỉnh
+      S.keo.z = tmDangMo(f) ? S.tm.ds.find(z => z.khung.every((a, j) => Math.abs(a - S.keo.v[j]) < 0.01)) : null;
       e.preventDefault();
     }
   }
@@ -1345,7 +1348,7 @@ window.addEventListener("mouseup", e => {
     else if (!S.keo.moved) chonTaiDiem({x:S.keo.px, y:S.keo.py}, S.keo.shift); else chonTrongKhung(S.keo.a, S.keo.b, S.keo.shift);
   }
   if (S.keo && S.keo.kieu === "sua") {
-    const v = F().vung; dongBoVung(); lenh(`Đã chỉnh khung: X ${v[0]} → ${v[2]}, Y ${v[1]} → ${v[3]} (m)`, "ok");
+    const v = F().vung; dongBoVung(); if (S.keo.z) ve_TM_bang(); lenh(`Đã chỉnh khung: X ${v[0]} → ${v[2]}, Y ${v[1]} → ${v[3]} (m)`, "ok");
   }
   if (S.keo && S.keo.kieu === "vung") {
     const f = F(); const v = f.vung;
