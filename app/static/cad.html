@@ -956,8 +956,8 @@ function chonThem(i) {
   const g = S.files[i], f = F(); if (!g || !f || i === S.act) return;
   if (g.id !== f.id) return lenh("Chỉ chọn cùng lúc được các mặt bằng của cùng một bản vẽ.", "loi");
   S.nhom = S.nhom || new Set(); S.nhom.has(i) ? S.nhom.delete(i) : S.nhom.add(i);
-  ve_ds(); const ds = nhomSang(); if (ds.length > 1) zoomNhom(ds); else if (f.vung) zoomVung();
-  veLai(); lenh(`Đang sáng ${ds.length} mặt bằng cùng lúc.`, "ok");
+  ve_ds(); const ds = nhomSang();
+  veLai(); lenh(`Đang sáng ${ds.length} mặt bằng cùng lúc. Bấm "Zoom vùng" để phóng vào.`, "ok");
 }
 function moFile(i) {
   S.nhom = new Set(); S.act = i; S.chon = []; S.loaiTru = new Set(); S.hover = null; veDT(); ve_ds(); ve_layer(); ve_tab(); dongBoVung(); if (F() && F().vung) zoomVung(); else zoomToanBo(); veLai();
@@ -1340,8 +1340,6 @@ window.addEventListener("mouseup", e => {
       else if (t.chon.has(r.id)) { t.chon.delete(r.id); lenh(`Bỏ chọn #${r.id} ${r.ten}. Đang chọn ${t.chon.size} vùng.`, "ok"); }
       else { t.chon.add(r.id); lenh(`Chọn thêm #${r.id} ${r.ten}. Đang chọn ${t.chon.size} vùng.`, "ok"); }
       ve_TM_bang();
-      const kz = t.ds.filter(z => t.chon.has(z.id)).map(z => z.khung);   // phóng vào các vùng đang chọn
-      if (kz.length) zoomTheoKhung([Math.min(...kz.map(k => k[0])), Math.min(...kz.map(k => k[1])), Math.max(...kz.map(k => k[2])), Math.max(...kz.map(k => k[3]))]);
     }
     else if (!S.keo.moved) chonTaiDiem({x:S.keo.px, y:S.keo.py}, S.keo.shift); else chonTrongKhung(S.keo.a, S.keo.b, S.keo.shift);
   }
@@ -1393,7 +1391,15 @@ $("t-nhanh").onclick = () => {
 $("t-pan").onclick = () => datCongCu("pan");
 $("t-vung").onclick = () => { datCongCu("vung"); lenh("Kéo một khung chữ nhật quanh mặt bằng cần tính."); };
 $("t-ze").onclick = () => { zoomToanBo(); veLai(); };
-$("t-zv").onclick = zoomVung;
+$("t-zv").onclick = () => {   // phóng vào: các vùng đề xuất đang chọn, hoặc nhóm mặt bằng sáng, hoặc vùng của mục đang mở
+  const f = F(), t = S.tm;
+  if (tmDangMo(f) && t.chon.size) {
+    const kz = t.ds.filter(z => t.chon.has(z.id)).map(z => z.khung);
+    return zoomTheoKhung([Math.min(...kz.map(k => k[0])), Math.min(...kz.map(k => k[1])), Math.max(...kz.map(k => k[2])), Math.max(...kz.map(k => k[3]))]);
+  }
+  const ds = nhomSang(); if (ds.length > 1) { zoomNhom(ds); return veLai(); }
+  zoomVung();
+};
 const NGOAI = {mo:"Mờ", an:"Ẩn", hien:"Hiện"};   // phần ngoài vùng đang làm việc: mờ / ẩn hẳn / hiện tất cả
 try { S.ngoai = localStorage.getItem("azb_ngoai_vung"); } catch (e) {}
 if (!NGOAI[S.ngoai]) S.ngoai = "mo";
