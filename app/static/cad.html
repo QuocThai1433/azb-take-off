@@ -1340,6 +1340,8 @@ window.addEventListener("mouseup", e => {
       else if (t.chon.has(r.id)) { t.chon.delete(r.id); lenh(`Bỏ chọn #${r.id} ${r.ten}. Đang chọn ${t.chon.size} vùng.`, "ok"); }
       else { t.chon.add(r.id); lenh(`Chọn thêm #${r.id} ${r.ten}. Đang chọn ${t.chon.size} vùng.`, "ok"); }
       ve_TM_bang();
+      const kz = t.ds.filter(z => t.chon.has(z.id)).map(z => z.khung);   // phóng vào các vùng đang chọn
+      if (kz.length) zoomTheoKhung([Math.min(...kz.map(k => k[0])), Math.min(...kz.map(k => k[1])), Math.max(...kz.map(k => k[2])), Math.max(...kz.map(k => k[3]))]);
     }
     else if (!S.keo.moved) chonTaiDiem({x:S.keo.px, y:S.keo.py}, S.keo.shift); else chonTrongKhung(S.keo.a, S.keo.b, S.keo.shift);
   }
