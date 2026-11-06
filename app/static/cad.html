@@ -1336,7 +1336,8 @@ window.addEventListener("mouseup", e => {
     else if (S.buoc) { if (S.keo.moved) chayBuoc(S.keo.a, S.keo.b); else lenh("Đang ở bước quét chọn: kéo khung (giữ chuột trái và kéo) quanh vùng cần đọc. Esc để hủy.", "loi"); }
     else if (!S.keo.moved && tmDangMo(F()) && tmTai(wx(S.keo.px), wy(S.keo.py))) {
       const r = tmTai(wx(S.keo.px), wy(S.keo.py)), t = S.tm; t.xem = r.id;
-      if (!S.keo.shift) { t.chon = new Set([r.id]); lenh(`Chọn #${r.id} ${r.ten} (bỏ các vùng chọn trước). Giữ Shift để chọn nhiều vùng.`, "ok"); }
+      if (!S.keo.shift && t.chon.size === 1 && t.chon.has(r.id)) { t.chon = new Set(); lenh(`Bỏ chọn #${r.id} ${r.ten}.`, "ok"); }
+      else if (!S.keo.shift) { t.chon = new Set([r.id]); lenh(`Chọn #${r.id} ${r.ten} (bỏ các vùng chọn trước). Giữ Shift để chọn nhiều vùng.`, "ok"); }
       else if (t.chon.has(r.id)) { t.chon.delete(r.id); lenh(`Bỏ chọn #${r.id} ${r.ten}. Đang chọn ${t.chon.size} vùng.`, "ok"); }
       else { t.chon.add(r.id); lenh(`Chọn thêm #${r.id} ${r.ten}. Đang chọn ${t.chon.size} vùng.`, "ok"); }
       ve_TM_bang();
@@ -1374,6 +1375,11 @@ function xoaVungTM(e) {   // chuột phải vào vùng mặt bằng đề xuất
   lenh(`Đã xóa vùng #${r.id} ${r.ten} khỏi danh sách đề xuất${dong ? " và đóng mục tương ứng" : ""}.`, "ok"); ve_TM_bang(); veLai();
 }
 cv.addEventListener("contextmenu", e => e.preventDefault());
+window.addEventListener("keydown", e => {   // Esc: bỏ chọn các vùng đề xuất đang sáng
+  if (e.key !== "Escape" || e.defaultPrevented || S.ctCho || S.gnCho || S.gnMode || S.buoc || LAY.hoi || document.getElementById("hop")) return;
+  if (!tmDangMo(F()) || !S.tm.chon.size) return;
+  S.tm.chon = new Set(); ve_TM_bang(); veLai(); lenh("Đã bỏ chọn các vùng.", "ok");
+});
 cv.addEventListener("mousedown", e => { if (e.button === 2) { e.preventDefault(); xoaVungTM(e); } });
 
 function datCongCu(t) {
