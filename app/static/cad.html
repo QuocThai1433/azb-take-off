@@ -1270,6 +1270,11 @@ function bamKhung(m, f) {
   const ey = Math.abs(m.y - y1) <= tx ? -1 : Math.abs(m.y - y0) <= tx ? 1 : 0;   // ey=1: cạnh trên (Y lớn)
   return ex || ey ? {ex, ey} : null;
 }
+// Con trỏ khi đang ở chế độ nhãn: "Thêm nhãn" = dấu + kèm ô chữ "T" (bấm là đặt nhãn ở đó); "Sửa nhãn" = bàn tay trỏ
+const CON_TRO_NHAN = {
+  them: `url("data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><path d="M10 1v18M1 10h18" stroke="#000" stroke-width="4"/><path d="M10 1v18M1 10h18" stroke="#ffd400" stroke-width="2"/><rect x="18.5" y="18.5" width="12" height="12" rx="2" fill="#ffd400" stroke="#000"/><text x="24.5" y="28.5" font-size="11" font-weight="700" font-family="Arial" text-anchor="middle" fill="#000">T</text></svg>')}") 10 10, copy`,
+  sua: "pointer",
+};
 function conTro(h) { return !h ? "" : h.ex && h.ey ? (h.ex * h.ey > 0 ? "nesw-resize" : "nwse-resize") : h.ex ? "ew-resize" : "ns-resize"; }
 // Các vùng mặt bằng đề xuất (Tách mặt bằng): rê chuột để làm sáng, bấm để chọn thêm / bỏ chọn
 function tmDangMo(f) { return !!f && !!S.tm && S.tm.fileId === f.id && !$("p-tm").hidden; }
@@ -1287,7 +1292,7 @@ cv.addEventListener("mousemove", e => {
     if (!hoverRaf) hoverRaf = requestAnimationFrame(() => { hoverRaf = 0; if (hoverCho && !S.keo && S.tool === "pick") capNhatHover(hoverCho); hoverCho = null; });
   }
   if (!S.keo && tmDangMo(F())) { const r = tmTai(wx(m.x), wy(m.y)); if ((r ? r.id : 0) !== (S.tm.hov || 0)) S.tm.hov = r ? r.id : 0; }
-  if (!S.keo) cv.style.cursor = e.altKey && F() && F().vung ? "move" : conTro(bamKhung(m, F()));
+  if (!S.keo) cv.style.cursor = S.gnMode ? CON_TRO_NHAN[S.gnMode] : e.altKey && F() && F().vung ? "move" : conTro(bamKhung(m, F()));
   if (S.keo && S.keo.kieu === "sua") {
     const f = F(), k = S.keo, dx = wx(m.x) - k.x0, dy = wy(m.y) - k.y0, v = k.v.slice();
     if (k.dich) { v[0] += dx; v[2] += dx; v[1] += dy; v[3] += dy; }
