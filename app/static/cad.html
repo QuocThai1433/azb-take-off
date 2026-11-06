@@ -1225,8 +1225,14 @@ function ve() {
             ctx.strokeStyle = "#ffc828"; ctx.lineWidth = i === S.gn.sel ? 2 : 1; ctx.setLineDash([8, 5]); ctx.strokeRect(x, y, w, h); ctx.setLineDash([]); ctx.lineWidth = 1;
       ctx.fillStyle = "#ffc828"; ctx.font = "12px sans-serif"; ctx.fillText(`Vùng ${i + 1}${p.tc.loai ? " · " + LOAI_GN[p.tc.loai] : " · chưa phân loại"}`, x + 4, y + 14);
     });
-    if (S.tm && S.tm.fileId === f.id && !$("p-tm").hidden) S.tm.ds.forEach(r => {   // các vùng mặt bằng đề xuất
+    if (tmDangMo(f) && S.tm.chon.size) {   // các mặt bằng đã chọn sáng lên, phần còn lại tối đi
+      ctx.fillStyle = "rgba(0,0,0,.6)"; ctx.beginPath(); ctx.rect(0, 0, W, H);
+      S.tm.ds.filter(r => S.tm.chon.has(r.id)).forEach(r => { const k = r.khung; ctx.rect(sx(k[0]), sy(k[3]), (k[2] - k[0]) * s, (k[3] - k[1]) * s); });
+      ctx.fill("evenodd");
+    }
+    if (tmDangMo(f)) S.tm.ds.forEach(r => {   // các vùng mặt bằng đề xuất
       const k = r.khung, x = sx(k[0]), y = sy(k[3]), w = (k[2] - k[0]) * s, h = (k[3] - k[1]) * s, xem = r.id === S.tm.xem, chon = S.tm.chon.has(r.id);
+      if (r.id === S.tm.hov) { ctx.fillStyle = chon ? "rgba(76,195,138,.12)" : "rgba(255,255,255,.14)"; ctx.fillRect(x, y, w, h); }
       ctx.strokeStyle = xem ? "#ffd60a" : chon ? "#4cc38a" : "#8a93a0"; ctx.lineWidth = xem ? 3 : 2; ctx.setLineDash([10, 6]); ctx.strokeRect(x, y, w, h); ctx.setLineDash([]); ctx.lineWidth = 1;
       ctx.fillStyle = xem ? "#ffd60a" : chon ? "#4cc38a" : "#aab2bd"; ctx.font = "bold 13px sans-serif"; ctx.fillText(`#${r.id} ${r.ten}`.slice(0, 48), x + 6, y + 16);
     });
@@ -1265,6 +1271,13 @@ function bamKhung(m, f) {
   return ex || ey ? {ex, ey} : null;
 }
 function conTro(h) { return !h ? "" : h.ex && h.ey ? (h.ex * h.ey > 0 ? "nesw-resize" : "nwse-resize") : h.ex ? "ew-resize" : "ns-resize"; }
+// Các vùng mặt bằng đề xuất (Tách mặt bằng): rê chuột để làm sáng, bấm để chọn thêm / bỏ chọn
+function tmDangMo(f) { return !!f && !!S.tm && S.tm.fileId === f.id && !$("p-tm").hidden; }
+function tmTai(x, y) {
+  let tot = null, dt = Infinity;
+  S.tm.ds.forEach(r => { const k = r.khung; if (x >= k[0] && x <= k[2] && y >= k[1] && y <= k[3]) { const a = (k[2] - k[0]) * (k[3] - k[1]); if (a < dt) { dt = a; tot = r; } } });
+  return tot;
+}
 function chuotToa(e) { const r = cv.getBoundingClientRect(); return {x:e.clientX - r.left, y:e.clientY - r.top}; }
 cv.addEventListener("mousemove", e => {
   const m = chuotToa(e); S.mouse = m;
@@ -1273,6 +1286,7 @@ cv.addEventListener("mousemove", e => {
     hoverCho = m;
     if (!hoverRaf) hoverRaf = requestAnimationFrame(() => { hoverRaf = 0; if (hoverCho && !S.keo && S.tool === "pick") capNhatHover(hoverCho); hoverCho = null; });
   }
+  if (!S.keo && tmDangMo(F())) { const r = tmTai(wx(m.x), wy(m.y)); if ((r ? r.id : 0) !== (S.tm.hov || 0)) S.tm.hov = r ? r.id : 0; }
   if (!S.keo) cv.style.cursor = e.altKey && F() && F().vung ? "move" : conTro(bamKhung(m, F()));
   if (S.keo && S.keo.kieu === "sua") {
     const f = F(), k = S.keo, dx = wx(m.x) - k.x0, dy = wy(m.y) - k.y0, v = k.v.slice();
@@ -1320,6 +1334,12 @@ window.addEventListener("mouseup", e => {
     else if (S.gnCho) { if (S.keo.moved) chayGanNhan(S.keo.a, S.keo.b); else lenh("Gán nhãn: kéo khung (giữ chuột trái và kéo) quanh một mặt bằng. Esc để hủy.", "loi"); }
     else if (S.buoc && S.buoc.so === 3) ganChon(S.keo.a, S.keo.b, S.keo.moved, {x:S.keo.px, y:S.keo.py});
     else if (S.buoc) { if (S.keo.moved) chayBuoc(S.keo.a, S.keo.b); else lenh("Đang ở bước quét chọn: kéo khung (giữ chuột trái và kéo) quanh vùng cần đọc. Esc để hủy.", "loi"); }
+    else if (!S.keo.moved && tmDangMo(F()) && tmTai(wx(S.keo.px), wy(S.keo.py))) {
+      const r = tmTai(wx(S.keo.px), wy(S.keo.py)), t = S.tm; t.xem = r.id;
+      if (t.chon.has(r.id)) { t.chon.delete(r.id); lenh(`Bỏ chọn #${r.id} ${r.ten}. Đang chọn ${t.chon.size} vùng.`, "ok"); }
+      else { t.chon.add(r.id); lenh(`Chọn thêm #${r.id} ${r.ten}. Đang chọn ${t.chon.size} vùng.`, "ok"); }
+      ve_TM_bang();
+    }
     else if (!S.keo.moved) chonTaiDiem({x:S.keo.px, y:S.keo.py}, S.keo.shift); else chonTrongKhung(S.keo.a, S.keo.b, S.keo.shift);
   }
   if (S.keo && S.keo.kieu === "sua") {
@@ -2472,12 +2492,12 @@ function ve_TM_bang() {
       ${t.ds.length === 1 ? "Bản vẽ này chỉ có một vùng: không cần tách." : ""}</div>
     <div style="margin:8px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
       <button id="tm-tao" ${t.chon.size ? "" : "disabled"}>Tạo mục cho ${t.chon.size} vùng đã tick</button>
-      <button id="tm-mb">Chỉ tick mặt bằng</button><button id="tm-het">Tick tất cả</button>
+      <button id="tm-mb">Chỉ tick mặt bằng</button><button id="tm-het">Tick tất cả</button><button id="tm-bo">Bỏ tick hết</button>
       <span class="nho" title="Chỉ dùng khi cách dò là 'cụm nét vẽ': hai cụm nét cách nhau xa hơn số mét này thì tách thành hai vùng. Tăng nếu một mặt bằng bị cắt đôi, giảm nếu hai mặt bằng bị dính nhau.">Tách khi cách nhau ≥ <input type="number" id="tm-kc" value="${t.kc}" min="0.5" step="0.5" style="width:60px"> m <button id="tm-lai">Dò lại</button></span>
     </div>
     <table><tr><th></th><th>#</th><th>Tên</th><th>Vai trò</th><th>Tầng · TL</th><th>Tin cậy</th></tr>
     ${t.ds.map(r => `<tr class="tm-dong" data-tx="${r.id}" ${r.id === t.xem ? 'style="background:rgba(255,214,10,.12)"' : ""}>
-      <td><input type="checkbox" data-tc="${r.id}" ${t.chon.has(r.id) ? "checked" : ""}></td><td>${r.id}</td>
+      <td><input type="checkbox" data-tc="${r.id}" ${t.chon.has(r.id) ? "checked" : ""}></td><td>${r.id} <button class="x" data-tdel="${r.id}" title="Xóa vùng đề xuất này khỏi danh sách">✕</button></td>
       <td><input type="text" data-tn="${r.id}" value="${esc(r.ten)}" style="width:100%;min-width:120px"></td>
       <td><select data-tv="${r.id}">${Object.entries(TM_VAI).map(([k, v]) => `<option value="${k}" ${k === r.vai_tro ? "selected" : ""}>${v}</option>`).join("")}</select></td>
       <td class="nho">${esc(r.tang || "?")} · ${r.ty_le ? "1/" + r.ty_le : "?"}</td><td>${Math.round(r.tin_cay * 100)}%</td></tr>
@@ -2498,6 +2518,8 @@ $("p-tm").addEventListener("click", e => {
   const t = S.tm, f = F(); if (!t || !f) return; const d = e.target;
   if (d.id === "tm-lai") return veTM(true, parseFloat($("tm-kc").value) || null);
   if (d.id === "tm-mb") { t.chon = new Set(t.ds.filter(r => r.vai_tro === "mat_bang").map(r => r.id)); ve_TM_bang(); return veLai(); }
+  if (d.id === "tm-bo") { t.chon = new Set(); ve_TM_bang(); return veLai(); }
+  if (d.dataset.tdel != null) { const id = +d.dataset.tdel; t.ds = t.ds.filter(r => r.id !== id); t.chon.delete(id); if (t.xem === id) t.xem = 0; ve_TM_bang(); return veLai(); }
   if (d.id === "tm-het") { t.chon = new Set(t.ds.map(r => r.id)); ve_TM_bang(); return veLai(); }
   if (d.id === "tm-tao") {
     const nguon = S.files.findIndex(x => x.id === f.id), g = S.files[nguon];
