@@ -1357,6 +1357,12 @@ cv.addEventListener("wheel", e => {
   S.v.s *= k; S.v.cx = x - (m.x - W / 2) / S.v.s; S.v.cy = y + (m.y - H / 2) / S.v.s; veLai();
 }, {passive:false});
 cv.addEventListener("auxclick", e => e.preventDefault());
+cv.addEventListener("contextmenu", e => {   // chuột phải vào vùng mặt bằng đề xuất: xóa vùng đó khỏi danh sách
+  e.preventDefault(); const f = F(); if (!tmDangMo(f)) return;
+  const m = chuotToa(e), r = tmTai(wx(m.x), wy(m.y)), t = S.tm; if (!r) return;
+  t.ds = t.ds.filter(x => x.id !== r.id); t.chon.delete(r.id); if (t.xem === r.id) t.xem = 0; if (t.hov === r.id) t.hov = 0;
+  lenh(`Đã xóa vùng #${r.id} ${r.ten} khỏi danh sách đề xuất.`, "ok"); ve_TM_bang(); veLai();
+});
 
 function datCongCu(t) {
   S.tool = t; ["pick", "pan", "vung"].forEach(k => $("t-" + k).classList.toggle("on", t === k));
