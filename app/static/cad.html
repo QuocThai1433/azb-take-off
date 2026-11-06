@@ -1358,11 +1358,20 @@ cv.addEventListener("wheel", e => {
   S.v.s *= k; S.v.cx = x - (m.x - W / 2) / S.v.s; S.v.cy = y + (m.y - H / 2) / S.v.s; veLai();
 }, {passive:false});
 cv.addEventListener("auxclick", e => e.preventDefault());
+// Bỏ vùng đề xuất thì mục tương ứng (đã tạo từ vùng đó) trong "Bản vẽ trong dự án" cũng đóng luôn, giữ nguyên màn hình đang xem
+function dongMucCuaVung(f, r) {
+  const i = S.files.findIndex(x => x.id === f.id && x.vung && x.vung.every((v, j) => Math.abs(v - r.khung[j]) < 0.01));
+  if (i < 0) return false;
+  const giu = F(), v = {...S.v}; dongFile(i);
+  const j = S.files.indexOf(giu); if (j >= 0 && j !== S.act) { S.act = j; ve_ds(); ve_tab(); }
+  S.v = v; veLai(); return true;
+}
 function xoaVungTM(e) {   // chuột phải vào vùng mặt bằng đề xuất: xóa vùng đó khỏi danh sách
   const f = F(); if (!tmDangMo(f)) return;
   const m = chuotToa(e), r = tmTai(wx(m.x), wy(m.y)), t = S.tm; if (!r) return;
   t.ds = t.ds.filter(x => x.id !== r.id); t.chon.delete(r.id); if (t.xem === r.id) t.xem = 0; if (t.hov === r.id) t.hov = 0;
-  lenh(`Đã xóa vùng #${r.id} ${r.ten} khỏi danh sách đề xuất.`, "ok"); ve_TM_bang(); veLai();
+  const dong = dongMucCuaVung(f, r);
+  lenh(`Đã xóa vùng #${r.id} ${r.ten} khỏi danh sách đề xuất${dong ? " và đóng mục tương ứng" : ""}.`, "ok"); ve_TM_bang(); veLai();
 }
 cv.addEventListener("contextmenu", e => e.preventDefault());
 cv.addEventListener("mousedown", e => { if (e.button === 2) { e.preventDefault(); xoaVungTM(e); } });
@@ -2528,7 +2537,7 @@ $("p-tm").addEventListener("click", e => {
   if (d.id === "tm-lai") return veTM(true, parseFloat($("tm-kc").value) || null);
   if (d.id === "tm-mb") { t.chon = new Set(t.ds.filter(r => r.vai_tro === "mat_bang").map(r => r.id)); ve_TM_bang(); return veLai(); }
   if (d.id === "tm-bo") { t.chon = new Set(); ve_TM_bang(); return veLai(); }
-  if (d.dataset.tdel != null) { const id = +d.dataset.tdel; t.ds = t.ds.filter(r => r.id !== id); t.chon.delete(id); if (t.xem === id) t.xem = 0; ve_TM_bang(); return veLai(); }
+  if (d.dataset.tdel != null) { const id = +d.dataset.tdel; const r0 = t.ds.find(r => r.id === id); if (r0) dongMucCuaVung(f, r0); t.ds = t.ds.filter(r => r.id !== id); t.chon.delete(id); if (t.xem === id) t.xem = 0; ve_TM_bang(); return veLai(); }
   if (d.id === "tm-het") { t.chon = new Set(t.ds.map(r => r.id)); ve_TM_bang(); return veLai(); }
   if (d.id === "tm-tao") {
     const nguon = S.files.findIndex(x => x.id === f.id), g = S.files[nguon];
