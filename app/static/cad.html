@@ -469,6 +469,7 @@
   html:root .ds-file { margin:4px 8px; padding:8px 10px; border:1px solid var(--ln); border-radius:var(--r-md); background:var(--sf); box-shadow:var(--sh-1); gap:6px; }
   html:root .ds-file:hover { border-color:var(--xanh-vien); background:var(--hv); }
   html:root .ds-file.act { background:var(--xanh-nhat); border-color:var(--xanh); box-shadow:inset 3px 0 var(--xanh); }
+  html:root .ds-file.cung { background:var(--xanh-nhat); border-color:var(--xanh); box-shadow:inset 3px 0 var(--xanh); }
   html:root .ds-file .ten { font-weight:600; font-size:12.5px; }
   html:root .ds-file select { height:28px; font-size:12px; }
   html[data-gd=toi]:root .ds-file { background:#0F1829; border-color:#1B2740; }
@@ -941,13 +942,30 @@ async function xoaHan(id, ten) {
 }
 $("chon-file").onchange = async e => { const ds = [...e.target.files]; e.target.value = ""; await themBanVe(ds); };
 
+// Các mặt bằng cùng sáng: mục đang mở + các mục chọn thêm bằng Ctrl/Shift+click (cùng một bản vẽ)
+function nhomSang() {
+  const f = F(); if (!f) return [];
+  return S.files.filter((g, i) => g.vung && g.id === f.id && (i === S.act || (S.nhom && S.nhom.has(i))));
+}
+function zoomNhom(ds) {
+  const x = ds.flatMap(g => [g.vung[0], g.vung[2]]), y = ds.flatMap(g => [g.vung[1], g.vung[3]]);
+  const a = Math.min(...x), c = Math.max(...x), b = Math.min(...y), d = Math.max(...y), w = (c - a) || 1, h = (d - b) || 1;
+  S.v = {cx:(a + c) / 2, cy:(b + d) / 2, s:Math.min(W / w, H / h) * 0.85};
+}
+function chonThem(i) {
+  const g = S.files[i], f = F(); if (!g || !f || i === S.act) return;
+  if (g.id !== f.id) return lenh("Chỉ chọn cùng lúc được các mặt bằng của cùng một bản vẽ.", "loi");
+  S.nhom = S.nhom || new Set(); S.nhom.has(i) ? S.nhom.delete(i) : S.nhom.add(i);
+  ve_ds(); const ds = nhomSang(); if (ds.length > 1) zoomNhom(ds); else if (f.vung) zoomVung();
+  veLai(); lenh(`Đang sáng ${ds.length} mặt bằng cùng lúc.`, "ok");
+}
 function moFile(i) {
-  S.act = i; S.chon = []; S.loaiTru = new Set(); S.hover = null; veDT(); ve_ds(); ve_layer(); ve_tab(); dongBoVung(); if (F() && F().vung) zoomVung(); else zoomToanBo(); veLai();
+  S.nhom = new Set(); S.act = i; S.chon = []; S.loaiTru = new Set(); S.hover = null; veDT(); ve_ds(); ve_layer(); ve_tab(); dongBoVung(); if (F() && F().vung) zoomVung(); else zoomToanBo(); veLai();
 }
 
 // ---------- Danh sách file, tab, layer ----------
 function ve_ds() {
-  $("ds-file").innerHTML = S.files.map((f, i) => `<div class="ds-file ${i === S.act ? "act" : ""}" data-i="${i}">
+  $("ds-file").innerHTML = S.files.map((f, i) => `<div class="ds-file ${i === S.act ? "act" : S.nhom && S.nhom.has(i) ? "cung" : ""}" data-i="${i}" title="Ctrl/Shift+click để chọn thêm mặt bằng cùng sáng">
       <div class="ten" title="${esc(f.ten)}">${esc(f.ten)}</div><span><button class="x" data-d="${i}" title="Nhân bản: thêm một vùng/mặt bằng khác của cùng bản vẽ">⧉</button><button class="x" data-x="${i}" title="Đóng bản vẽ này. File vẫn được giữ trong máy, mở lại ở mục Bản vẽ đã tải bên dưới">✕</button></span>
       <select data-vt="${i}">${Object.entries(VAI_TRO).map(([k, t]) => `<option value="${k}" ${k === f.vai_tro ? "selected" : ""}>${t}</option>`).join("")}</select></div>`).join("")
     || `<div class="nho" style="padding:8px">Chưa có bản vẽ. Bấm "Thêm bản vẽ", có thể chọn nhiều file cùng lúc.</div>`;
@@ -956,19 +974,20 @@ $("ds-file").addEventListener("click", e => {
   if (e.target.dataset.x != null) { dongFile(+e.target.dataset.x); return; }
   if (e.target.dataset.d != null) { nhanBan(+e.target.dataset.d); return; }
   if (e.target.tagName === "SELECT") return;
-  const d = e.target.closest(".ds-file"); if (d) moFile(+d.dataset.i);
+  const d = e.target.closest(".ds-file"); if (!d) return;
+  if (e.ctrlKey || e.metaKey || e.shiftKey) chonThem(+d.dataset.i); else moFile(+d.dataset.i);
 });
 $("ds-file").addEventListener("change", e => {
   if (e.target.dataset.vt != null) { S.files[+e.target.dataset.vt].vai_tro = e.target.value; ve_layer(); lenh(`Vai trò: ${S.files[+e.target.dataset.vt].ten} → ${VAI_TRO[e.target.value]}`); }
 });
 function nhanBan(i) {
   // Cùng một bản vẽ, thêm một mục mới có vùng và cách gán layer riêng (mỗi mặt bằng trên một tờ là một mục)
-  const g = S.files[i], n = S.files.filter(f => f.id === g.id).length + 1;
+  S.nhom = new Set(); const g = S.files[i], n = S.files.filter(f => f.id === g.id).length + 1;
   S.files.splice(i + 1, 0, {...g, ten:`${g.ten.replace(/ \(\d+\)$/, "")} (${n})`, layers:g.layers.map(l => ({...l})), vung:null, kl:null});
   lenh(`Đã nhân bản ${g.ten}: chọn vùng mặt bằng khác cho mục mới.`, "ok"); moFile(i + 1);
 }
 function dongFile(i) {
-  const g = S.files[i]; if (!g) return;
+  S.nhom = new Set(); const g = S.files[i]; if (!g) return;
   // Đóng chỉ gỡ khỏi màn hình làm việc. File vẫn nằm trong data/uploads; thiết lập (layer, vùng, vai trò) được nhớ để mở lại.
   const conDung = S.files.some((f, j) => j !== i && f.id === g.id);   // còn mục nhân bản dùng chung file thì chưa tính là đã đóng
   S.files.splice(i, 1);
@@ -1190,8 +1209,9 @@ function ve() {
   if (f) {
     const s = S.v.s;
     if (f.vung && S.ngoai !== "hien" && !(S.keo && S.keo.kieu === "vung")) {   // làm mờ hoặc che hẳn phần ngoài vùng đang làm việc
-      const v = f.vung, x = sx(Math.min(v[0], v[2])), y = sy(Math.max(v[1], v[3])), w = Math.abs(v[2] - v[0]) * s, h = Math.abs(v[3] - v[1]) * s;
-      ctx.fillStyle = S.ngoai === "an" ? "#000" : "rgba(0,0,0,.82)"; ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.rect(x, y, w, h); ctx.fill("evenodd");
+      ctx.fillStyle = S.ngoai === "an" ? "#000" : "rgba(0,0,0,.82)"; ctx.beginPath(); ctx.rect(0, 0, W, H);
+      nhomSang().forEach(g => { const v = g.vung; ctx.rect(sx(Math.min(v[0], v[2])), sy(Math.max(v[1], v[3])), Math.abs(v[2] - v[0]) * s, Math.abs(v[3] - v[1]) * s); });
+      ctx.fill("evenodd");
     }
     veHover(f);
     if (S.keo && S.keo.kieu === "hop" && S.keo.moved) {  // khung chọn: Window (xanh dương, nét liền) hoặc Crossing (xanh lá, nét đứt)
@@ -1209,6 +1229,10 @@ function ve() {
       const k = r.khung, x = sx(k[0]), y = sy(k[3]), w = (k[2] - k[0]) * s, h = (k[3] - k[1]) * s, xem = r.id === S.tm.xem, chon = S.tm.chon.has(r.id);
       ctx.strokeStyle = xem ? "#ffd60a" : chon ? "#4cc38a" : "#8a93a0"; ctx.lineWidth = xem ? 3 : 2; ctx.setLineDash([10, 6]); ctx.strokeRect(x, y, w, h); ctx.setLineDash([]); ctx.lineWidth = 1;
       ctx.fillStyle = xem ? "#ffd60a" : chon ? "#4cc38a" : "#aab2bd"; ctx.font = "bold 13px sans-serif"; ctx.fillText(`#${r.id} ${r.ten}`.slice(0, 48), x + 6, y + 16);
+    });
+    if (S.nhom && S.nhom.size) nhomSang().forEach(g => {   // các mặt bằng chọn thêm: viền xanh cùng kiểu
+      if (g === f) return; const v = g.vung, x = sx(Math.min(v[0], v[2])), y = sy(Math.max(v[1], v[3]));
+      ctx.strokeStyle = "#4aa3ff"; ctx.setLineDash([6, 4]); ctx.strokeRect(x, y, Math.abs(v[2] - v[0]) * s, Math.abs(v[3] - v[1]) * s); ctx.setLineDash([]);
     });
     if (f.vung || (S.keo && S.keo.kieu === "vung")) {
       const v = S.keo && S.keo.kieu === "vung" ? [S.keo.a[0], S.keo.a[1], S.keo.b[0], S.keo.b[1]] : f.vung;
