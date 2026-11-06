@@ -1340,7 +1340,7 @@ window.addEventListener("mouseup", e => {
       else if (!S.keo.shift) { t.chon = new Set([r.id]); lenh(`Chọn #${r.id} ${r.ten} (bỏ các vùng chọn trước). Giữ Shift để chọn nhiều vùng.`, "ok"); }
       else if (t.chon.has(r.id)) { t.chon.delete(r.id); lenh(`Bỏ chọn #${r.id} ${r.ten}. Đang chọn ${t.chon.size} vùng.`, "ok"); }
       else { t.chon.add(r.id); lenh(`Chọn thêm #${r.id} ${r.ten}. Đang chọn ${t.chon.size} vùng.`, "ok"); }
-      ve_TM_bang();
+      ve_TM_bang(); nhayMucTheoVung(f, t, r.id);
     }
     else if (!S.keo.moved) chonTaiDiem({x:S.keo.px, y:S.keo.py}, S.keo.shift); else chonTrongKhung(S.keo.a, S.keo.b, S.keo.shift);
   }
@@ -1366,6 +1366,16 @@ function dongMucCuaVung(f, r) {
   const giu = F(), v = {...S.v}; dongFile(i);
   const j = S.files.indexOf(giu); if (j >= 0 && j !== S.act) { S.act = j; ve_ds(); ve_tab(); }
   S.v = v; veLai(); return true;
+}
+// Chọn vùng nào thì mục tương ứng bên trái nhảy theo (mục đang mở = vùng vừa bấm, các vùng chọn kèm = nhóm sáng); không zoom
+function nhayMucTheoVung(f, t, idVuaBam) {
+  const mucCua = z => S.files.findIndex(x => x.id === f.id && x.vung && x.vung.every((v, j) => Math.abs(v - z.khung[j]) < 0.01));
+  const ids = t.chon.has(idVuaBam) ? idVuaBam : [...t.chon].pop();
+  const z0 = t.ds.find(z => z.id === ids), i0 = z0 ? mucCua(z0) : -1; if (i0 < 0) return;
+  S.nhom = new Set(t.ds.filter(z => t.chon.has(z.id) && z.id !== ids).map(mucCua).filter(i => i >= 0 && i !== i0));
+  if (S.act !== i0) { S.act = i0; S.chon = []; S.loaiTru = new Set(); S.hover = null; veDT(); ve_layer(); ve_tab(); dongBoVung(); }
+  ve_ds(); veLai();
+  const el = $("ds-file").querySelector(".ds-file.act"); if (el) el.scrollIntoView({block:"nearest"});
 }
 function xoaVungTM(e) {   // chuột phải vào vùng mặt bằng đề xuất: xóa vùng đó khỏi danh sách
   const f = F(); if (!tmDangMo(f)) return;
