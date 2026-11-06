@@ -2517,7 +2517,8 @@ async function veTM(doLai, kc) {
     const r = await json("/api/tach-mat-bang", {id:f.id, khoang_cach:kc || null});
     S.tm = {fileId:f.id, ds:r.ds, kc:r.khoang_cach, cach:r.cach, xem:0, chon:new Set(r.ds.filter(x => x.vai_tro === "mat_bang").map(x => x.id))};
   } catch (e) { p.innerHTML = `<div class="nho" style="padding:10px">${esc(e.message)}</div>`; return; }
-  ve_TM_bang(); veLai();
+  if (S.tm.ds.length > 1) taoMucTM(f, S.tm.ds, true);   // dò được bao nhiêu vùng thì tạo luôn bấy nhiêu mục, khỏi chờ bấm Tạo
+  ve_ds(); ve_tab(); ve_TM_bang(); veLai();
 }
 function ve_TM_bang() {
   const f = F(), p = $("p-tm"), t = S.tm; if (!f || !t) return;
@@ -2542,6 +2543,17 @@ function ve_TM_bang() {
       <tr><td></td><td colspan="5" class="nho">${esc(r.ly_do)} · ${r.so_hinh} hình, ${r.so_net} nét, ${r.so_chu} chữ${daCo(r) ? ' · <b style="color:#4cc38a">đã có mục cho vùng này</b>' : ""}
         ${r.canh_bao.map(c => `<div class="cb">⚠ ${esc(c)}</div>`).join("")}</td></tr>`).join("")}</table></div>`;
 }
+// Tạo mục (có vùng cắt + vai trò riêng) cho các vùng chưa có mục; trả về số mục mới
+function taoMucTM(f, ds, tuDong) {
+  const nguon = S.files.findIndex(x => x.id === f.id), g = S.files[nguon]; if (!g) return 0;
+  const dsTao = ds.filter(r => !S.files.some(x => x.id === f.id && x.vung && x.vung.every((v, i) => Math.abs(v - r.khung[i]) < 0.01)));
+  if (!dsTao.length) return 0;
+  const goc = g.ten.replace(/ \(\d+\)$/, "").replace(/\.[^.]+$/, "");
+  let vt = S.files.reduce((m, x, i) => x.id === f.id ? i : m, nguon);
+  dsTao.forEach(r => { S.files.splice(++vt, 0, {...g, ten:`${goc} - ${r.ten || "Vùng " + r.id}`, vai_tro:r.vai_tro, layers:g.layers.map(l => ({...l})), vung:r.khung.slice(), kl:null}); });
+  lenh(`${tuDong ? "Tách xong: đã tự tạo" : "Đã tạo"} ${dsTao.length} mục từ ${g.ten}, mỗi mục có vùng cắt và vai trò riêng. Gán layer cho từng mặt bằng rồi tính. Bỏ vùng nào (chuột phải) thì mục đó đóng theo.`, "ok");
+  return dsTao.length;
+}
 function zoomTheoKhung(k) {
   S.v.cx = (k[0] + k[2]) / 2; S.v.cy = (k[1] + k[3]) / 2;
   S.v.s = 0.9 * Math.min(W / Math.max(k[2] - k[0], 1e-6), H / Math.max(k[3] - k[1], 1e-6)); veLai();
@@ -2560,13 +2572,8 @@ $("p-tm").addEventListener("click", e => {
   if (d.dataset.tdel != null) { const id = +d.dataset.tdel; const r0 = t.ds.find(r => r.id === id); if (r0) dongMucCuaVung(f, r0); t.ds = t.ds.filter(r => r.id !== id); t.chon.delete(id); if (t.xem === id) t.xem = 0; ve_TM_bang(); return veLai(); }
   if (d.id === "tm-het") { t.chon = new Set(t.ds.map(r => r.id)); ve_TM_bang(); return veLai(); }
   if (d.id === "tm-tao") {
-    const nguon = S.files.findIndex(x => x.id === f.id), g = S.files[nguon];
-    const dsTao = t.ds.filter(r => t.chon.has(r.id) && !S.files.some(x => x.id === f.id && x.vung && x.vung.every((v, i) => Math.abs(v - r.khung[i]) < 0.01)));
-    if (!dsTao.length) return lenh("Không có vùng mới để tạo (các vùng đã tick đều đã có mục).", "loi");
-    const goc = g.ten.replace(/ \(\d+\)$/, "").replace(/\.[^.]+$/, "");
-    let vt = S.files.reduce((m, x, i) => x.id === f.id ? i : m, nguon);
-    dsTao.forEach(r => { S.files.splice(++vt, 0, {...g, ten:`${goc} - ${r.ten || "Vùng " + r.id}`, vai_tro:r.vai_tro, layers:g.layers.map(l => ({...l})), vung:r.khung.slice(), kl:null}); });
-    lenh(`Đã tạo ${dsTao.length} mục từ ${g.ten}, mỗi mục có vùng cắt và vai trò riêng. Gán layer cho từng mặt bằng rồi tính.`, "ok");
+    const n = taoMucTM(f, t.ds.filter(r => t.chon.has(r.id)));
+    if (!n) return lenh("Không có vùng mới để tạo (các vùng đã tick đều đã có mục).", "loi");
     ve_ds(); ve_TM_bang(); return veLai();
   }
   const dong = d.closest("[data-tx]");
