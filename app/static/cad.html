@@ -1336,7 +1336,8 @@ window.addEventListener("mouseup", e => {
     else if (S.buoc) { if (S.keo.moved) chayBuoc(S.keo.a, S.keo.b); else lenh("Đang ở bước quét chọn: kéo khung (giữ chuột trái và kéo) quanh vùng cần đọc. Esc để hủy.", "loi"); }
     else if (!S.keo.moved && tmDangMo(F()) && tmTai(wx(S.keo.px), wy(S.keo.py))) {
       const r = tmTai(wx(S.keo.px), wy(S.keo.py)), t = S.tm; t.xem = r.id;
-      if (t.chon.has(r.id)) { t.chon.delete(r.id); lenh(`Bỏ chọn #${r.id} ${r.ten}. Đang chọn ${t.chon.size} vùng.`, "ok"); }
+      if (!S.keo.shift) { t.chon = new Set([r.id]); lenh(`Chọn #${r.id} ${r.ten} (bỏ các vùng chọn trước). Giữ Shift để chọn nhiều vùng.`, "ok"); }
+      else if (t.chon.has(r.id)) { t.chon.delete(r.id); lenh(`Bỏ chọn #${r.id} ${r.ten}. Đang chọn ${t.chon.size} vùng.`, "ok"); }
       else { t.chon.add(r.id); lenh(`Chọn thêm #${r.id} ${r.ten}. Đang chọn ${t.chon.size} vùng.`, "ok"); }
       ve_TM_bang();
     }
@@ -1357,12 +1358,14 @@ cv.addEventListener("wheel", e => {
   S.v.s *= k; S.v.cx = x - (m.x - W / 2) / S.v.s; S.v.cy = y + (m.y - H / 2) / S.v.s; veLai();
 }, {passive:false});
 cv.addEventListener("auxclick", e => e.preventDefault());
-cv.addEventListener("contextmenu", e => {   // chuột phải vào vùng mặt bằng đề xuất: xóa vùng đó khỏi danh sách
-  e.preventDefault(); const f = F(); if (!tmDangMo(f)) return;
+function xoaVungTM(e) {   // chuột phải vào vùng mặt bằng đề xuất: xóa vùng đó khỏi danh sách
+  const f = F(); if (!tmDangMo(f)) return;
   const m = chuotToa(e), r = tmTai(wx(m.x), wy(m.y)), t = S.tm; if (!r) return;
   t.ds = t.ds.filter(x => x.id !== r.id); t.chon.delete(r.id); if (t.xem === r.id) t.xem = 0; if (t.hov === r.id) t.hov = 0;
   lenh(`Đã xóa vùng #${r.id} ${r.ten} khỏi danh sách đề xuất.`, "ok"); ve_TM_bang(); veLai();
-});
+}
+cv.addEventListener("contextmenu", e => e.preventDefault());
+cv.addEventListener("mousedown", e => { if (e.button === 2) { e.preventDefault(); xoaVungTM(e); } });
 
 function datCongCu(t) {
   S.tool = t; ["pick", "pan", "vung"].forEach(k => $("t-" + k).classList.toggle("on", t === k));
