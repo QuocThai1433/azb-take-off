@@ -1239,6 +1239,10 @@ function ve() {
       const x = sx(Math.min(v[0], v[2])), y = sy(Math.max(v[1], v[3])), w = Math.abs(v[2] - v[0]) * s, h = Math.abs(v[3] - v[1]) * s;
       ctx.fillStyle = "rgba(45,125,210,.18)"; ctx.fillRect(x, y, w, h);
       ctx.strokeStyle = "#4aa3ff"; ctx.setLineDash([6, 4]); ctx.strokeRect(x, y, w, h); ctx.setLineDash([]);
+      if (f.vung && S.tool === "pick" && !(S.keo && S.keo.kieu === "vung")) {   // tay nắm để kéo chỉnh khung
+        ctx.fillStyle = "#fff"; ctx.strokeStyle = "#2d7dd2";
+        [[x, y], [x + w / 2, y], [x + w, y], [x, y + h / 2], [x + w, y + h / 2], [x, y + h], [x + w / 2, y + h], [x + w, y + h]].forEach(([a, b]) => { ctx.fillRect(a - 4, b - 4, 8, 8); ctx.strokeRect(a - 4, b - 4, 8, 8); });
+      }
     }
   }
   if (S.mouse) {  // con trỏ chữ thập kiểu AutoCAD
@@ -1249,6 +1253,18 @@ function ve() {
   $("s-zoom").textContent = S.v.s >= 1 ? S.v.s.toFixed(1) + " px/m" : (S.v.s).toFixed(3) + " px/m";
 }
 
+// Chỉnh khung vùng/mặt bằng: kéo cạnh hoặc góc để đổi cỡ, giữ Alt và kéo trong khung để dời
+function bamKhung(m, f) {
+  if (!f || !f.vung || S.tool !== "pick") return null;
+  const v = f.vung, x0 = sx(Math.min(v[0], v[2])), x1 = sx(Math.max(v[0], v[2])), y0 = sy(Math.max(v[1], v[3])), y1 = sy(Math.min(v[1], v[3])), t = 7;
+  if (m.x < x0 - t || m.x > x1 + t || m.y < y0 - t || m.y > y1 + t) return null;
+  const nt = Math.min(t, (x1 - x0) / 3, (y1 - y0) / 3);   // khung nhỏ thì vùng bắt cạnh cũng nhỏ lại, còn chỗ để chọn bên trong
+  const tx = Math.max(nt, 3);
+  const ex = Math.abs(m.x - x0) <= tx ? -1 : Math.abs(m.x - x1) <= tx ? 1 : 0;
+  const ey = Math.abs(m.y - y1) <= tx ? -1 : Math.abs(m.y - y0) <= tx ? 1 : 0;   // ey=1: cạnh trên (Y lớn)
+  return ex || ey ? {ex, ey} : null;
+}
+function conTro(h) { return !h ? "" : h.ex && h.ey ? (h.ex * h.ey > 0 ? "nesw-resize" : "nwse-resize") : h.ex ? "ew-resize" : "ns-resize"; }
 function chuotToa(e) { const r = cv.getBoundingClientRect(); return {x:e.clientX - r.left, y:e.clientY - r.top}; }
 cv.addEventListener("mousemove", e => {
   const m = chuotToa(e); S.mouse = m;
@@ -1257,7 +1273,17 @@ cv.addEventListener("mousemove", e => {
     hoverCho = m;
     if (!hoverRaf) hoverRaf = requestAnimationFrame(() => { hoverRaf = 0; if (hoverCho && !S.keo && S.tool === "pick") capNhatHover(hoverCho); hoverCho = null; });
   }
-  if (S.keo) {
+  if (!S.keo) cv.style.cursor = e.altKey && F() && F().vung ? "move" : conTro(bamKhung(m, F()));
+  if (S.keo && S.keo.kieu === "sua") {
+    const f = F(), k = S.keo, dx = wx(m.x) - k.x0, dy = wy(m.y) - k.y0, v = k.v.slice();
+    if (k.dich) { v[0] += dx; v[2] += dx; v[1] += dy; v[3] += dy; }
+    else {
+      if (k.ex < 0) v[0] = Math.min(k.v[0] + dx, v[2] - 0.01); else if (k.ex > 0) v[2] = Math.max(k.v[2] + dx, v[0] + 0.01);
+      if (k.ey < 0) v[1] = Math.min(k.v[1] + dy, v[3] - 0.01); else if (k.ey > 0) v[3] = Math.max(k.v[3] + dy, v[1] + 0.01);
+    }
+    f.vung = v.map(a => +a.toFixed(3)); dongBoVung(true); S.hover = null; $("tip").hidden = true;
+  }
+  else if (S.keo) {
     if (Math.hypot(m.x - S.keo.px, m.y - S.keo.py) > 4) S.keo.moved = true;
     if (S.keo.kieu === "pan") { S.v.cx = S.keo.cx - (m.x - S.keo.px) / S.v.s; S.v.cy = S.keo.cy + (m.y - S.keo.py) / S.v.s; }
     else if (S.keo.kieu === "hop") { S.keo.b = [wx(m.x), wy(m.y)]; S.hover = null; $("tip").hidden = true; }
@@ -1270,6 +1296,14 @@ cv.addEventListener("mousedown", e => {
   if (!F()) return; const m = chuotToa(e);
   if (e.button === 1 || (e.button === 0 && S.tool === "pan")) {
     S.keo = {kieu:"pan", px:m.x, py:m.y, cx:S.v.cx, cy:S.v.cy, moved:false}; e.preventDefault();
+  }
+  else if (e.button === 0 && S.tool === "pick" && !S.gnMode && !S.ctCho && !S.gnCho && !S.buoc && (e.altKey || bamKhung(m, F()))) {
+    const f = F(), v = f.vung, h = e.altKey ? null : bamKhung(m, f);
+    if (v) {
+      S.keo = {kieu:"sua", ex:h ? h.ex : 0, ey:h ? h.ey : 0, dich:!h, x0:wx(m.x), y0:wy(m.y), px:m.x, py:m.y,
+        v:[Math.min(v[0], v[2]), Math.min(v[1], v[3]), Math.max(v[0], v[2]), Math.max(v[1], v[3])]};
+      e.preventDefault();
+    }
   }
   else if (e.button === 0 && S.tool === "pick") {
     S.keo = {kieu:"hop", px:m.x, py:m.y, a:[wx(m.x), wy(m.y)], b:[wx(m.x), wy(m.y)], shift:e.shiftKey, moved:false}; e.preventDefault();
@@ -1287,6 +1321,9 @@ window.addEventListener("mouseup", e => {
     else if (S.buoc && S.buoc.so === 3) ganChon(S.keo.a, S.keo.b, S.keo.moved, {x:S.keo.px, y:S.keo.py});
     else if (S.buoc) { if (S.keo.moved) chayBuoc(S.keo.a, S.keo.b); else lenh("Đang ở bước quét chọn: kéo khung (giữ chuột trái và kéo) quanh vùng cần đọc. Esc để hủy.", "loi"); }
     else if (!S.keo.moved) chonTaiDiem({x:S.keo.px, y:S.keo.py}, S.keo.shift); else chonTrongKhung(S.keo.a, S.keo.b, S.keo.shift);
+  }
+  if (S.keo && S.keo.kieu === "sua") {
+    const v = F().vung; dongBoVung(); lenh(`Đã chỉnh khung: X ${v[0]} → ${v[2]}, Y ${v[1]} → ${v[3]} (m)`, "ok");
   }
   if (S.keo && S.keo.kieu === "vung") {
     const f = F(); const v = f.vung;
