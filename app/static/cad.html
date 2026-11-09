@@ -2006,8 +2006,18 @@ function yeuCauKLCho(e) {
   const thong_so = {}; TS.forEach(([k]) => thong_so[k] = parseFloat($("ts-" + k).value));
   return {id:e.id, loai_layer:loaiLayer(e.loaiDung3D || e), thong_so, dieu_chinh:{}, du_an:$("du-an").value, vung:e.vung || []};
 }
+// Chưa gán layer kết cấu nào thì tự áp dụng đề xuất (tin cậy cao, hoặc vừa nếu cả bản vẽ chưa có layer kết cấu nào).
+async function tuGanKetCau(e) {
+  try {
+    const ds = (await (await goi("/api/de-xuat-layer/" + e.id)).json()).ds || [], chua = !coKetCau3D(e); let n = 0;
+    ds.forEach(x => { const l = e.layers.find(y => y.ten === x.ten);
+      if (l && (x.hanh_dong === "tu_dien" || (x.hanh_dong === "xac_nhan" && (x.tin_cay >= 0.8 || chua))) && x.loai && (KET_CAU.includes(x.loai) || x.loai === "coc") && l.loai !== x.loai) { l.loai = x.loai; n++; } });
+    if (n) { ve_layer(); lenh(`Tự gán ${n} layer kết cấu theo đề xuất.`); }
+  } catch (err) { /* không có đề xuất thì thôi */ }
+}
 async function dung3DCongTrinh(f, nhom) {
   try {
+    const da = new Set(); for (const e of nhom) { const g = e.loaiDung3D || e; if (!da.has(g.id) && !coKetCau3D(g)) { da.add(g.id); await tuGanKetCau(g); } }
     lenh(`Đang dựng 3D cả công trình từ ${nhom.length} mặt bằng ...`);
     const mb = []; let d0 = null, bang = null; const canh = [];
     for (const e of nhom) {
