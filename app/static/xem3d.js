@@ -1723,7 +1723,8 @@
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
       if (k === "escape") {
-        if (!gd.hidden) moGD(false);
+        if (lop.querySelector("#x3-xn")) lop.querySelector("#x3-xn").remove();
+        else if (!gd.hidden) moGD(false);
         else if (st.cc === "ve" && st.ve.pts.length) huyVe();
         else if (st.cc) datCC(false);
         else if (st.lv) thoatLamViec();
@@ -1741,7 +1742,22 @@
     addEventListener("keydown", phim);
     $("#x3-luu").onclick = luuBanVe;
     $("#x3-dong").onclick = () => thoat();
-    function thoat() { if (chuaLuuBV() && d.luuVe3d && !confirm("Còn thay đổi chưa lưu vào bản vẽ. Đóng 3D mà không lưu? (OK = đóng không lưu, Hủy = quay lại để bấm Lưu)")) return; dong(); }
+    // Đóng 3D: nếu còn thay đổi chưa lưu thì hỏi bằng hộp thoại riêng với 3 lựa chọn rõ ràng
+    function thoat() {
+      if (!(chuaLuuBV() && d.luuVe3d)) { dong(); return; }
+      if (lop.querySelector("#x3-xn")) return;
+      const hop = document.createElement("div"); hop.className = "x3-gd"; hop.id = "x3-xn";
+      hop.innerHTML = `<div style="width:min(440px,100%)"><h3>Lưu thay đổi trước khi đóng?</h3>
+        <p>Bạn đã chỉnh trong 3D (vẽ thêm, tim trục, cao độ, ghép mặt bằng...) nhưng chưa lưu vào bản vẽ. Nếu đóng ngay, các thay đổi này sẽ mất.</p>
+        <div class="bt" style="flex-wrap:wrap"><button id="x3-xn-ql">Quay lại</button><button id="x3-xn-kl">Đóng, không lưu</button><button class="cam" id="x3-xn-l">💾 Lưu rồi đóng</button></div></div>`;
+      lop.querySelector(".x3-main").appendChild(hop);
+      const dongHop = () => hop.remove();
+      hop.querySelector("#x3-xn-ql").onclick = dongHop;
+      hop.querySelector("#x3-xn-kl").onclick = () => { dongHop(); dong(); };
+      hop.querySelector("#x3-xn-l").onclick = () => { luuBanVe(); dongHop(); dong(); };
+      hop.addEventListener("click", e => { if (e.target === hop) dongHop(); });
+      hop.querySelector("#x3-xn-l").focus();
+    }
 
     // ---------- khởi động ----------
     dung(); datMoiTruong(); ap();
