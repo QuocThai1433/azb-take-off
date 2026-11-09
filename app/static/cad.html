@@ -2009,9 +2009,9 @@ function yeuCauKLCho(e) {
 // Chưa gán layer kết cấu nào thì tự áp dụng đề xuất (tin cậy cao, hoặc vừa nếu cả bản vẽ chưa có layer kết cấu nào).
 async function tuGanKetCau(e) {
   try {
-    const ds = (await (await goi("/api/de-xuat-layer/" + e.id)).json()).ds || [], chua = !coKetCau3D(e); let n = 0;
+    const ds = (await (await goi("/api/de-xuat-layer/" + e.id)).json()).ds || []; let n = 0;
     ds.forEach(x => { const l = e.layers.find(y => y.ten === x.ten);
-      if (l && (x.hanh_dong === "tu_dien" || (x.hanh_dong === "xac_nhan" && (x.tin_cay >= 0.8 || chua))) && x.loai && (KET_CAU.includes(x.loai) || x.loai === "coc") && l.loai !== x.loai) { l.loai = x.loai; n++; } });
+      if (l && (x.hanh_dong === "tu_dien" || (x.hanh_dong === "xac_nhan" && (x.tin_cay >= 0.8))) && x.loai && (KET_CAU.includes(x.loai) || x.loai === "coc") && l.loai !== x.loai) { l.loai = x.loai; n++; } });
     if (n) { ve_layer(); lenh(`Tự gán ${n} layer kết cấu theo đề xuất.`); }
   } catch (err) { /* không có đề xuất thì thôi */ }
 }
@@ -2900,7 +2900,7 @@ $("t-3d").onclick = async () => {
       const ds = (await (await goi("/api/de-xuat-layer/" + f.id)).json()).ds || [];
       let n = 0;
       ds.forEach(x => { const l = f.layers.find(y => y.ten === x.ten);
-        if (l && (x.hanh_dong === "tu_dien" || (x.hanh_dong === "xac_nhan" && (x.tin_cay >= 0.8 || !coKetCau3D(f)))) && x.loai && KET_CAU.includes(x.loai) && l.loai !== x.loai) { l.loai = x.loai; n++; } });
+        if (l && (x.hanh_dong === "tu_dien" || (x.hanh_dong === "xac_nhan" && (x.tin_cay >= 0.8))) && x.loai && KET_CAU.includes(x.loai) && l.loai !== x.loai) { l.loai = x.loai; n++; } });
       if (n) { ve_layer(); lenh(`Tự gán ${n} layer kết cấu theo đề xuất, đang dựng 3D ...`); d = await json("/api/tinh", yeuCauKL()); }
     }
     let og = [], cd = [];
