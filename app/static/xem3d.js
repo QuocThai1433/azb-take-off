@@ -1759,7 +1759,7 @@
     datLai(); addEventListener("resize", datLai);
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(datLai) : null; ro && ro.observe(kg);
     capNhatPn(); capLuu();
-    $("#x3-tt").textContent = `Cao tầng ${H} m · ${dsMB ? dsMB.length + " mặt bằng ghép" : (d.cau_kien || []).filter(c => c.loai_bo).length + " cấu kiện bị loại (xám mờ)"}` + (coOng ? ` · ${holes.length} lỗ khoét · ${vaCham.length + vaMep.length} va chạm` : "") + (tong.coc ? ` · ${tong.coc.n} cọc` : "") + ` · ${loiLK.length} chỗ liên kết cần kiểm tra`;
+    $("#x3-tt").textContent = `Bản 3D v9 · Cao tầng ${H} m · ${dsMB ? dsMB.length + " mặt bằng ghép" : (d.cau_kien || []).filter(c => c.loai_bo).length + " cấu kiện bị loại (xám mờ)"}` + (coOng ? ` · ${holes.length} lỗ khoét · ${vaCham.length + vaMep.length} va chạm` : "") + (tong.coc ? ` · ${tong.coc.n} cọc` : "") + ` · ${loiLK.length} chỗ liên kết cần kiểm tra`;
     $("#x3-ft").textContent = (khungNote ? khungNote + " · " : "") + "Chuột trái: xoay · Phải: dịch · Lăn: zoom · Bấm: chọn · Nhấp đúp: bay tới · Bấm ❔ Hướng dẫn hoặc phím ? để xem chi tiết. Khối dựng từ hình 2D và chiều cao đã tính, chưa phải mô hình BIM.";
     let chay = true;
     const bnd = new THREE.Vector3();

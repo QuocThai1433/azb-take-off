@@ -1994,12 +1994,17 @@ function gan3D(d, goc) {
   return d;
 }
 // Các mặt bằng (đã tách từ một file) có thể ghép thành một công trình: móng, tầng 1, tầng 2 ... xếp theo trục và cao độ
+const coKetCau3D = e => e.layers.some(l => KET_CAU.includes(l.loai) || l.loai === "coc");
+// Mọi mục "Mặt bằng" đã tách (có vùng cắt) của cùng file. Mục nào chưa gán layer thì dùng cách gán của mục đang có layer kết cấu (cùng file nên cùng tên layer)
 function nhomMatBang(f) {
-  return S.files.filter(x => x.id === f.id && x.vai_tro === "mat_bang" && x.vung && x.layers.some(l => KET_CAU.includes(l.loai) || l.loai === "coc"));
+  const ds = S.files.filter(x => x.id === f.id && x.vai_tro === "mat_bang" && x.vung);
+  const goc = coKetCau3D(f) ? f : ds.find(coKetCau3D);
+  ds.forEach(x => { x.loaiDung3D = coKetCau3D(x) ? x : goc; });
+  return goc ? ds : [];
 }
 function yeuCauKLCho(e) {
   const thong_so = {}; TS.forEach(([k]) => thong_so[k] = parseFloat($("ts-" + k).value));
-  return {id:e.id, loai_layer:loaiLayer(e), thong_so, dieu_chinh:{}, du_an:$("du-an").value, vung:e.vung || []};
+  return {id:e.id, loai_layer:loaiLayer(e.loaiDung3D || e), thong_so, dieu_chinh:{}, du_an:$("du-an").value, vung:e.vung || []};
 }
 async function dung3DCongTrinh(f, nhom) {
   try {
@@ -2871,6 +2876,7 @@ $("t-tk").onclick = capNhatThongKe;
 $("t-3d").onclick = async () => {
   const f = F(); if (!f) return lenh("Chưa mở bản vẽ.", "loi");
   const nhom = nhomMatBang(f); if (nhom.length >= 2) return dung3DCongTrinh(f, nhom);
+  lenh(nhom.length === 1 ? "Chỉ có 1 mặt bằng đã tách của file này nên dựng 3D riêng mặt bằng đang mở. Dùng Tách mặt bằng để tách móng, từng tầng thành các mục rồi bấm Xem 3D lại để ghép cả công trình." : "File này chưa tách thành nhiều mặt bằng nên dựng 3D riêng mặt bằng đang mở. Dùng Tách mặt bằng (móng, từng tầng) rồi bấm Xem 3D lại để ghép cả công trình.");
   try { lenh("Đang dựng 3D ..."); let d = await json("/api/tinh", yeuCauKL());
     if (!d.cau_kien.length) {
       // Chưa gán layer kết cấu: tự áp dụng các đề xuất tin cậy cao rồi tính lại
