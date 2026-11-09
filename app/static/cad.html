@@ -703,7 +703,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-<script src="/static/xem3d.js?v=6"></script>
+<script src="/static/xem3d.js?v=7"></script>
 <script>
 const LOAI = {cot:"Cột", dam:"Dầm", san:"Sàn", lo_san:"Lỗ mở sàn", mong:"Móng", coc:"Cọc", vach:"Vách/lõi", khung_dam:"Khung dầm (bao ngoài)",
   o_dam:"Ô trống giữa dầm", nhan:"Nhãn chữ", ong_gio:"Ống gió (MLINE+block)", ong_nuoc:"Ống nước (chỉ dựng 3D)", ong_pccc:"Ống PCCC (chỉ dựng 3D)", khay_cap:"Khay cáp (chỉ dựng 3D)", bo_qua:"Bỏ qua"};
@@ -2794,7 +2794,7 @@ $("t-3d").onclick = async () => {
     }
     cd.forEach(c => lenh(c, "loi"));
     d.chan_doan = cd;
-    if (!d.cau_kien.length && !og.length && !mep.length) return lenh("Chưa có cấu kiện để dựng 3D: gán layer cột/dầm/sàn/móng, Ống gió hoặc ống nước / PCCC / khay cáp ở cột trái rồi thử lại.", "loi");
+    if (!d.cau_kien.length && !(d.coc || []).length && !og.length && !mep.length) return lenh("Chưa có cấu kiện để dựng 3D: gán layer cột/dầm/sàn/móng, Ống gió hoặc ống nước / PCCC / khay cáp ở cột trái rồi thử lại.", "loi");
     d.ong_gio = og; d.mep = mep;
     window.xem3D(d); } catch (e) { lenh(e.message, "loi"); }
 };

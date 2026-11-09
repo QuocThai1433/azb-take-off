@@ -365,3 +365,21 @@ def test_canh_bao_layer_bo_qua_co_hinh(ban_ve_mau):
     kq = boc_khoi_luong(bv, loai, {"chieu_cao_tang": 3.6})
     chung = " ".join(kq["canh_bao_chung"])
     assert "đang gán 'Bỏ qua'" in chung and ten_cot in chung
+
+
+def test_coc_tra_ve_de_dung_3d(tmp_path):
+    """Layer gán Cọc không bóc khối lượng ở đây nhưng phải trả vị trí / đường kính để dựng 3D (cao độ đầu cọc, cắt cọc)."""
+    doc = ezdxf.new("R2010", setup=True)
+    doc.header["$INSUNITS"] = 4
+    doc.layers.add("COC")
+    msp = doc.modelspace()
+    for x, y in [(0, 0), (1000, 0), (0, 1000)]:
+        msp.add_circle((x, y), 150, dxfattribs={"layer": "COC"})
+    p = tmp_path / "coc.dxf"
+    doc.saveas(p)
+    bv = doc_ban_ve(p)
+    kq = boc_khoi_luong(bv, {"COC": "coc"}, {"chieu_cao_tang": 3.6})
+    assert len(kq["coc"]) == 3
+    c = kq["coc"][0]
+    assert abs(c["d"] - 0.3) < 0.01 and {"id", "ten", "x", "y", "layer"} <= set(c)
+    assert not kq["cau_kien"]

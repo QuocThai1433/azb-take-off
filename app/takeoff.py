@@ -112,6 +112,7 @@ class _BoTinh:
         self.canh_bao_chung = list(ban_ve.canh_bao)
         self.dong = []
         self.ck = []  # danh sách cấu kiện (dict)
+        self.coc = []  # hình cọc (tròn) để dựng 3D; không tham gia bóc khối lượng
 
     # ---------- tiện ích ----------
     def them_dong(self, cong_tac, ck, dien_giai, n, dai=None, rong=None, cao=None, dien_tich=None):
@@ -147,6 +148,11 @@ class _BoTinh:
             if loai == "coc":
                 if any(h.geom.area >= dt_min for h in ld.hinh_kin):
                     coc_layer.append(ten)
+                for h in ld.hinh_kin:
+                    x0, y0, x1, y1 = h.geom.bounds
+                    dk = max(x1 - x0, y1 - y0)
+                    if 0.05 <= dk <= 3.0 and h.geom.area >= 0.002:
+                        self.coc.append({"x": h.geom.centroid.x, "y": h.geom.centroid.y, "d": dk, "layer": ten, "handle": h.handle})
                 continue
             if loai not in theo_loai:
                 continue
@@ -535,12 +541,15 @@ class _BoTinh:
                 "canh_bao": c["canh_bao"], "loai_bo": c["id"] not in tinh,
                 "hinh": _toa_do(c["geom"]),
             })
+        coc = sorted(self.coc, key=lambda c: (-round(c["y"], 1), round(c["x"], 1)))
+        ds_coc = [{"id": f"coc-{i}", "ten": f"P{i}", "x": round(c["x"], 3), "y": round(c["y"], 3), "d": round(c["d"], 3),
+                   "layer": c["layer"], "handle": c["handle"]} for i, c in enumerate(coc, 1)]
         hinh_all = [c["geom"] for c in self.ck]
         khung = list(unary_union(hinh_all).bounds) if hinh_all else [0, 0, 1, 1]
         return {
             "don_vi": self.bv.don_vi, "ten_file": self.bv.ten_file, "thong_so": self.ts,
             "canh_bao_chung": self.canh_bao_chung, "nhan_khong_gan": self.nhan_khong_gan,
-            "cau_kien": ds_ck, "dong": self.dong, "tong_hop": tong_hop, "khung": khung,
+            "cau_kien": ds_ck, "coc": ds_coc, "dong": self.dong, "tong_hop": tong_hop, "khung": khung,
         }
 
 
