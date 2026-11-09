@@ -977,11 +977,78 @@
       const hit = ban(e), o = hit && objs.get(hit.object.userData.id);
       const id = o ? o.id : null;
       if (id !== st.ruoi) { st.ruoi = id; ap(); }
+      if (!st.cc) r.domElement.style.cursor = timTruc(e, hit) ? "grab" : "";
       if (o && st.cc !== "do") {
         const nl = o.lk ? o.lk.size : 0;
         tip.innerHTML = `<b>${esc(o.ten)}</b> · ${LOAI[o.loai].ten}<br><span class="x3-mut">đáy ${f2(o.dz[0])} → đỉnh ${f2(o.dz[1])} m` + (nl ? ` · ${nl} liên kết` : "") + (o.bo ? " · loại bỏ" : "") + (o.va ? ` · <span style='color:#ff7a45'>${o.vaGhi || "va chạm"}</span>` : "") + `</span>`;
         tip.style.left = (e.clientX - bb.left + 14) + "px"; tip.style.top = (e.clientY - bb.top + 14) + "px"; tip.style.display = "block";
       } else tip.style.display = "none";
+    });
+    // Kéo tim trục bằng chuột: bấm giữ vào trục rồi kéo, tự bắt vào mép / tâm cột, dầm, vách gần nhất
+    let keoTruc = null;
+    function giaTriBat(hx, v) {
+      const tol = Math.max(0.04, cam.position.distanceTo(dk.target) * 0.012), k = hx === "x" ? 0 : 1;
+      let best = null, bd = tol;
+      objs.forEach(o => {
+        if (!o.vongs || o.base || !o.hien) return;
+        o.vongs.forEach(P => {
+          let lo = 1e18, hi = -1e18;
+          P.forEach(p => { lo = Math.min(lo, p[k]); hi = Math.max(hi, p[k]); });
+          [lo, hi, (lo + hi) / 2].forEach(c => { const dd = Math.abs(c - v); if (dd < bd) { bd = dd; best = c; } });
+        });
+      });
+      return best != null ? best : Math.round(v / 0.01) * 0.01;
+    }
+    // Tìm trục gần con trỏ (trong 7 px màn hình) kể cả khi bị sàn / móng che phía trên
+    function timTruc(e, hit) {
+      const ho = hit && objs.get(hit.object.userData.id);
+      if (ho && ho.truc) return ho;
+      if (ho && !e.altKey && !["san", "mong", "coc"].includes(ho.loai)) return null;
+      const b = r.domElement.getBoundingClientRect(); let best = null, bd = 7;
+      objs.forEach(o => {
+        if (!o.truc || !o.hien) return;
+        const m = o.meshes[0], g = m.geometry.parameters, dai = o.truc.hx === "x" ? g.depth : g.width, c = m.position;
+        const e0 = o.truc.hx === "x" ? [c.x, c.y, c.z - dai / 2] : [c.x - dai / 2, c.y, c.z], e1 = o.truc.hx === "x" ? [c.x, c.y, c.z + dai / 2] : [c.x + dai / 2, c.y, c.z];
+        const pr = v => { const q = new THREE.Vector3(v[0], v[1], v[2]).project(cam); return [(q.x + 1) / 2 * b.width + b.left, (1 - q.y) / 2 * b.height + b.top, q.z]; };
+        const A = pr(e0), B = pr(e1); if (A[2] > 1 || B[2] > 1) return;
+        const dd = kcDoan([e.clientX, e.clientY], A, B); if (dd < bd) { bd = dd; best = o; }
+      });
+      return best;
+    }
+    function diemNen(e, y) {
+      const b = r.domElement.getBoundingClientRect();
+      pt.set(((e.clientX - b.left) / b.width) * 2 - 1, -((e.clientY - b.top) / b.height) * 2 + 1); ray.setFromCamera(pt, cam);
+      const q = new THREE.Vector3(); return ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -y), q) ? q : null;
+    }
+    function datTruc(o, v) {
+      const a = st.truc[o.truc.hx][o.truc.i]; a.v = +v.toFixed(3);
+      const m = o.meshes[0]; if (o.truc.hx === "x") m.position.x = a.v; else m.position.z = -a.v;
+      nhanPhu.forEach(n => { if (n.o === o) { if (o.truc.hx === "x") n.p.x = a.v; else n.p.z = -a.v; } });
+    }
+    r.domElement.addEventListener("pointerdown", e => {
+      if (e.button !== 0 || st.cc) return;
+      const o = timTruc(e, ban(e)); if (!o) return;
+      const id = o.id;
+      e.stopImmediatePropagation(); dk.enabled = false; keo = false; dnx = e.clientX; dny = e.clientY;
+      ghiLui(); keoTruc = {o, x0: e.clientX, y0: e.clientY, moved: false}; st.chon = id; ap();
+      try { r.domElement.setPointerCapture(e.pointerId); } catch (x) {}
+    }, true);
+    r.domElement.addEventListener("pointermove", e => {
+      if (!keoTruc) return;
+      e.stopImmediatePropagation();
+      if (Math.hypot(e.clientX - keoTruc.x0, e.clientY - keoTruc.y0) > 3) keoTruc.moved = true;
+      if (!keoTruc.moved) return;
+      const q = diemNen(e, 0.03); if (!q) return;
+      const hx = keoTruc.o.truc.hx; datTruc(keoTruc.o, giaTriBat(hx, hx === "x" ? q.x : -q.z));
+      const bb = r.domElement.getBoundingClientRect();
+      tip.innerHTML = `<b>Trục ${esc(st.truc[hx][keoTruc.o.truc.i].ten)}</b> = ${f2(st.truc[hx][keoTruc.o.truc.i].v, 3)} m`;
+      tip.style.left = (e.clientX - bb.left + 14) + "px"; tip.style.top = (e.clientY - bb.top + 14) + "px"; tip.style.display = "block";
+    }, true);
+    addEventListener("pointerup", () => {
+      if (!keoTruc) return;
+      const k = keoTruc; keoTruc = null; dk.enabled = true; tip.style.display = "none";
+      if (k.moved) { luu(); keo = true; } else lui.pop();
+      capNhatPn();
     });
     r.domElement.addEventListener("pointerleave", () => { tip.style.display = "none"; if (st.ruoi) { st.ruoi = null; ap(); } });
     r.domElement.addEventListener("click", e => {
@@ -1148,10 +1215,11 @@
 
     function trucHTML() {
       const hang = (hx, tieuDe, ghiChu) => `<div class="x3-sec"><h5>${tieuDe}</h5><div class="x3-mut" style="margin-bottom:4px">${ghiChu}</div>
-        ${st.truc[hx].map((a, i) => `<div class="x3-row"><input type="text" class="tt" data-tr="ten" data-hx="${hx}" data-i="${i}" value="${esc(a.ten)}" style="width:62px;height:28px;background:#0a0f19;color:#e6ebf5;border:1px solid #2a3957;border-radius:6px;padding:0 6px"><input type="number" data-tr="v" data-hx="${hx}" data-i="${i}" step="0.05" value="${f2(a.v, 3)}"><span class="x3-mut">m</span><button data-a="chon-truc" data-hx="${hx}" data-i="${i}" style="height:24px">⌖</button><button data-a="xoa-truc" data-hx="${hx}" data-i="${i}" style="height:24px">✕</button></div>`).join("") || '<div class="x3-mut">Chưa có.</div>'}
-        <div class="x3-row"><button data-a="them-truc" data-hx="${hx}">+ Thêm trục</button></div></div>`;
+        ${st.truc[hx].map((a, i) => `<div class="x3-row"><input type="text" class="tt" data-tr="ten" data-hx="${hx}" data-i="${i}" value="${esc(a.ten)}" style="width:62px;height:28px;background:#0a0f19;color:#e6ebf5;border:1px solid #2a3957;border-radius:6px;padding:0 6px"><input type="number" data-tr="v" data-hx="${hx}" data-i="${i}" step="0.05" value="${f2(a.v, 3)}"><span class="x3-mut">m</span><button data-a="chon-truc" data-hx="${hx}" data-i="${i}" style="height:24px" title="Bay tới trục">⌖</button><button data-a="truc-tam" data-hx="${hx}" data-i="${i}" style="height:24px" title="Đặt trục vào tâm cấu kiện đang chọn">◎</button><button data-a="xoa-truc" data-hx="${hx}" data-i="${i}" style="height:24px">✕</button></div>`).join("") || '<div class="x3-mut">Chưa có.</div>'}
+        <div class="x3-row"><button data-a="them-truc" data-hx="${hx}">+ Thêm trục</button></div>
+        <div class="x3-row" style="flex-wrap:wrap;gap:6px"><span class="x3-mut">Lưới nhanh: từ</span><input type="number" data-lbd="${hx}" step="0.5" value="${f2(hx === "x" ? khungMo[0] : khungMo[1], 3)}" style="width:70px"><span class="x3-mut">m, cách (mm)</span><input type="text" data-lk="${hx}" placeholder="vd 3x6000 7200" style="width:120px;height:28px;background:#0a0f19;color:#e6ebf5;border:1px solid #2a3957;border-radius:6px;padding:0 6px"><button data-a="luoi-nhanh" data-hx="${hx}" style="height:26px">Tạo</button></div></div>`;
       const tg = tong.coc || {n: 0, v: 0, cat: 0}, cf = st.cocCfg;
-      return `<div class="x3-sec"><h5>Khai báo tim trục</h5><div class="x3-mut">Trục hiển thị trên mô hình (nét đỏ + bong bóng tên), chọn được, bắt điểm khi vẽ. Lưu theo bản vẽ trong trình duyệt.</div>
+      return `<div class="x3-sec"><h5>Khai báo tim trục</h5><div class="x3-mut"><b>Chỉnh nhanh:</b> kéo trục trực tiếp trên mô hình (bấm giữ vào phần đầu trục nhô ra ngoài công trình, hoặc giữ <kbd>Alt</kbd> rồi kéo ở bất kỳ đâu; tự bắt mép / tâm cột, dầm); bấm ◎ để đặt trục vào tâm cấu kiện đang chọn; hoặc gõ dãy khoảng cách ở <i>Lưới nhanh</i> (vd <kbd>3x6000 7200</kbd> = 3 nhịp 6 m rồi 1 nhịp 7,2 m).</div><div class="x3-mut" style="margin-top:4px">Trục hiển thị trên mô hình (nét đỏ + bong bóng tên), chọn được, bắt điểm khi vẽ. Lưu theo bản vẽ trong trình duyệt.</div>
         <div class="x3-row" style="flex-wrap:wrap;margin-top:6px"><button class="cam" data-a="do-truc">⚙ Dò từ vị trí cột</button><button data-a="xoa-het-truc" ${st.truc.x.length + st.truc.y.length ? "" : "disabled"}>Xóa hết trục</button></div></div>
         ${hang("x", "Trục số (đường đứng, x = const)", "Ví dụ 1, 2, 3 ... chạy theo phương X.")}${hang("y", "Trục chữ (đường ngang, y = const)", "Ví dụ A, B, C ... chạy theo phương Y.")}
         <div class="x3-sec"><h5>Cọc · cao độ đầu cọc &amp; cắt cọc</h5>
@@ -1357,6 +1425,21 @@
         luu(); dungTruc(); ap(); capNhatPn();
       }
       else if (k === "do-truc") doTruc();
+      else if (k === "truc-tam") {
+        const c = st.chon && objs.get(st.chon);
+        if (!c || !c.vongs || !c.vongs[0]) { alert("Chọn một cấu kiện (cột, dầm, cọc...) trước rồi bấm ◎."); return; }
+        const t = tamVong(c.vongs[0]), a = st.truc[dd.hx][+dd.i]; if (!a) return;
+        ghiLui(); a.v = +t[dd.hx === "x" ? 0 : 1].toFixed(3); luu(); dungTruc(); ap(); capNhatPn();
+      }
+      else if (k === "luoi-nhanh") {
+        const hx = dd.hx, gt = pn.querySelector(`[data-lk="${hx}"]`).value, bd = parseFloat(pn.querySelector(`[data-lbd="${hx}"]`).value);
+        const bc = []; gt.split(/[\s,;]+/).filter(Boolean).forEach(tk => { const m = tk.match(/^(\d+)[x*×](\d+(?:\.\d+)?)$/i); if (m) for (let i = 0; i < Math.min(+m[1], 60); i++) bc.push(+m[2]); else if (isFinite(+tk)) bc.push(+tk); });
+        if (!bc.length || !isFinite(bd)) { alert("Gõ khoảng cách (mm), ví dụ: 3x6000 7200"); return; }
+        if (st.truc[hx].length && !confirm("Thay các trục hiện có của hướng này bằng lưới mới?")) return;
+        ghiLui(); let v = bd; const arr = [{ten: hx === "x" ? "1" : "A", v: +v.toFixed(3)}];
+        bc.forEach((b, i) => { v += b / 1000; arr.push({ten: hx === "x" ? String(i + 2) : chuCai(i + 1), v: +v.toFixed(3)}); });
+        st.truc[hx] = arr; luu(); dungTruc(); ap(); capNhatPn();
+      }
       else if (k === "xoa-het-truc") { if (confirm("Xóa toàn bộ tim trục đã khai báo?")) { ghiLui(); st.truc = {x: [], y: []}; luu(); dungTruc(); ap(); capNhatPn(); } }
       else if (k.startsWith("ve-")) { st.ve.tool = k.slice(3); huyVe(); capNhatPn(); }
       else if (k === "bat-ve") datCC(st.cc !== "ve", "ve");
@@ -1376,7 +1459,7 @@
     }
     // Dò tim trục từ tâm các cột (gom các cột thẳng hàng trong 150 mm)
     function doTruc() {
-      const tam = []; objs.forEach(o => { if (o.loai === "cot" && !o.base && !o.bo && o.vongs && o.vongs[0]) tam.push(tamVong(o.vongs[0])); });
+      const tam = []; objs.forEach(o => { if (o.loai === "cot" && !o.base && !o.bo && o.hien && o.vongs && o.vongs[0]) tam.push(tamVong(o.vongs[0])); });
       if (tam.length < 2) { alert("Cần ít nhất 2 cột để dò tim trục."); return; }
       if ((st.truc.x.length || st.truc.y.length) && !confirm("Thay các tim trục hiện có bằng kết quả dò từ cột?")) return;
       ghiLui();
