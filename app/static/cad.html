@@ -703,7 +703,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-<script src="/static/xem3d.js?v=7"></script>
+<script src="/static/xem3d.js?v=8"></script>
 <script>
 const LOAI = {cot:"Cột", dam:"Dầm", san:"Sàn", lo_san:"Lỗ mở sàn", mong:"Móng", coc:"Cọc", vach:"Vách/lõi", khung_dam:"Khung dầm (bao ngoài)",
   o_dam:"Ô trống giữa dầm", nhan:"Nhãn chữ", ong_gio:"Ống gió (MLINE+block)", ong_nuoc:"Ống nước (chỉ dựng 3D)", ong_pccc:"Ống PCCC (chỉ dựng 3D)", khay_cap:"Khay cáp (chỉ dựng 3D)", bo_qua:"Bỏ qua"};
@@ -880,7 +880,7 @@ async function moLai(id) {
     S.mac_dinh = t.mac_dinh; S.loaiHopLe = t.loai_hop_le;
     S.daDong = S.daDong.filter(f => f.id !== id);
     S.files.push({id, ten:t.ten_file, vai_tro:cu?.vai_tro || doanVaiTro(t.ten_file), layers:cu?.layers?.length ? cu.layers : layerMacDinh(t),
-                  hinh:h, vung:cu?.vung ?? null, kl:null});
+                  hinh:h, vung:cu?.vung ?? null, ve3d:cu?.ve3d ?? null, kl:null});
     if (S.files.length === 1) veTabKL();
     moFile(S.files.length - 1); taiThuVien();
     lenh(`Đã mở lại ${t.ten_file}.`, "ok");
@@ -991,7 +991,7 @@ function dongFile(i) {
   // Đóng chỉ gỡ khỏi màn hình làm việc. File vẫn nằm trong data/uploads; thiết lập (layer, vùng, vai trò) được nhớ để mở lại.
   const conDung = S.files.some((f, j) => j !== i && f.id === g.id);   // còn mục nhân bản dùng chung file thì chưa tính là đã đóng
   S.files.splice(i, 1);
-  if (!conDung) S.daDong = S.daDong.filter(f => f.id !== g.id).concat({id:g.id, ten:g.ten, vai_tro:g.vai_tro, layers:g.layers, vung:g.vung});
+  if (!conDung) S.daDong = S.daDong.filter(f => f.id !== g.id).concat({id:g.id, ten:g.ten, vai_tro:g.vai_tro, layers:g.layers, vung:g.vung, ve3d:g.ve3d});
   S.act = S.files.length ? Math.min(i, S.files.length - 1) : -1;
   ve_ds(); ve_layer(); ve_tab(); dongBoVung(); if (S.act >= 0) zoomToanBo(); veLai();
   if (!conDung) { lenh(`Đã đóng ${g.ten}. File vẫn được giữ, mở lại ở mục "Bản vẽ đã tải".`, "ok"); taiThuVien(); }
@@ -1201,7 +1201,7 @@ function ve() {
   if (phuBan) {
     phuBan = false; ctx = phu.ctx; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, phu.cv.width, phu.cv.height);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.lineWidth = 1; ctx.lineJoin = "round"; ctx.setLineDash([]);
-    try { if (f) { veNhanCC(f); veDoiTuong(f); veTim(f); } } finally { ctx = ctxChinh; }
+    try { if (f) { veNhanCC(f); veDoiTuong(f); veTim(f); veThem3D(f); } } finally { ctx = ctxChinh; }
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(canh.cv, 0, 0); ctx.drawImage(phu.cv, 0, 0);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.lineWidth = 1; ctx.lineJoin = "round"; ctx.setLineDash([]);
@@ -1939,6 +1939,38 @@ async function chayTinhCC() {
   veCCKQ();
 }
 
+// ---------- Phần vẽ thêm trong 3D (lưu theo từng bản vẽ ở f.ve3d, hiện lại trên bản vẽ 2D) ----------
+function gan3D(d) {
+  const f = F(); if (!f) return d;
+  d.ve3d = f.ve3d || null;
+  d.luuVe3d = v => { f.ve3d = v; veLai(); if (window.AZBLuu) window.AZBLuu.luuNgay(); };
+  return d;
+}
+function veThem3D(f) {
+  const v = f.ve3d; if (!v || (!(v.them || []).length && !((v.truc || {}).x || []).length && !((v.truc || {}).y || []).length)) return;
+  const vong = (P, mau, fill) => { ctx.beginPath(); P.forEach((p, i) => i ? ctx.lineTo(sx(p[0]), sy(p[1])) : ctx.moveTo(sx(p[0]), sy(p[1]))); ctx.closePath(); if (fill) { ctx.fillStyle = fill; ctx.fill(); } ctx.strokeStyle = mau; ctx.lineWidth = 2; ctx.stroke(); };
+  const chu = (t, x, y, mau) => { ctx.fillStyle = mau; ctx.font = "bold 12px 'Segoe UI', Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(t, sx(x), sy(y)); };
+  const tam = P => [P.reduce((t, p) => t + p[0], 0) / P.length, P.reduce((t, p) => t + p[1], 0) / P.length];
+  ctx.save(); ctx.setLineDash([]); ctx.lineJoin = "round";
+  const kh = f.hinh.khung, tr = v.truc || {};
+  (tr.x || []).forEach(a => { ctx.strokeStyle = "#e14b4b"; ctx.lineWidth = 1; ctx.setLineDash([14, 4, 3, 4]); ctx.beginPath(); ctx.moveTo(sx(a.v), sy(kh[1])); ctx.lineTo(sx(a.v), sy(kh[3])); ctx.stroke(); ctx.setLineDash([]); ctx.beginPath(); ctx.arc(sx(a.v), sy(kh[3]) - 14, 11, 0, 7); ctx.stroke(); });
+  (tr.x || []).forEach(a => { ctx.save(); ctx.fillStyle = "#ff9a9a"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(a.ten, sx(a.v), sy(kh[3]) - 14); ctx.restore(); });
+  (tr.y || []).forEach(a => { ctx.strokeStyle = "#e14b4b"; ctx.lineWidth = 1; ctx.setLineDash([14, 4, 3, 4]); ctx.beginPath(); ctx.moveTo(sx(kh[0]), sy(a.v)); ctx.lineTo(sx(kh[2]), sy(a.v)); ctx.stroke(); ctx.setLineDash([]); ctx.beginPath(); ctx.arc(sx(kh[0]) - 14, sy(a.v), 11, 0, 7); ctx.stroke(); ctx.fillStyle = "#ff9a9a"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(a.ten, sx(kh[0]) - 14, sy(a.v)); });
+  const rect = (cx, cy, b, h) => [[cx - b / 2, cy - h / 2], [cx + b / 2, cy - h / 2], [cx + b / 2, cy + h / 2], [cx - b / 2, cy + h / 2]];
+  (v.them || []).forEach(m => {
+    if (m.k === "cot") { const P = rect(m.x, m.y, m.b, m.h); vong(P, "#ff6b5e", "rgba(255,107,94,.35)"); chu(m.ten, m.x, m.y, "#fff"); }
+    else if (m.k === "dam") {
+      const dx = m.b[0] - m.a[0], dy = m.b[1] - m.a[1], L = Math.hypot(dx, dy) || 1, nx = -dy / L * m.w / 2, ny = dx / L * m.w / 2;
+      const P = [[m.a[0] + nx, m.a[1] + ny], [m.b[0] + nx, m.b[1] + ny], [m.b[0] - nx, m.b[1] - ny], [m.a[0] - nx, m.a[1] - ny]];
+      vong(P, "#ffc447", "rgba(255,196,71,.3)"); chu(`${m.ten} ${Math.round(m.w * 1000)}x${Math.round(m.h * 1000)}`, ...tam(P), "#fff");
+    }
+    else if (m.k === "san") { const P = [[m.x0, m.y0], [m.x1, m.y0], [m.x1, m.y1], [m.x0, m.y1]]; vong(P, "#6fb4ff", "rgba(111,180,255,.18)"); chu(`${m.ten} d${Math.round(m.t * 1000)}`, ...tam(P), "#cfe6ff"); }
+    else if (m.k === "coc") { ctx.beginPath(); ctx.arc(sx(m.x), sy(m.y), Math.max(m.d / 2 * S.v.s, 3), 0, 7); ctx.fillStyle = "rgba(196,150,110,.45)"; ctx.fill(); ctx.strokeStyle = "#d9b38c"; ctx.lineWidth = 2; ctx.stroke(); chu(m.ten, m.x, m.y - m.d / 2 - 10 / S.v.s, "#ffe2c4"); }
+    else if (m.k === "duong") { ctx.beginPath(); m.pts.forEach((p, i) => i ? ctx.lineTo(sx(p[0]), sy(p[1])) : ctx.moveTo(sx(p[0]), sy(p[1]))); ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 2; ctx.stroke(); }
+    else if (m.k === "chu") chu(m.text, m.x, m.y, "#ffd166");
+  });
+  ctx.restore(); ctx.lineWidth = 1; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+}
 function veNhanCC(f) {  // lớp phủ: hình đã phân loại tô theo loại, kèm ký hiệu
   const tt = S.cc.ma && ttCC(); if (!tt || !tt.nhom.length || tt.fileId !== f.id) return;
   const xmin = wx(0), xmax = wx(W), ymin = wy(H), ymax = wy(0); let dem = 0;
@@ -2796,7 +2828,7 @@ $("t-3d").onclick = async () => {
     d.chan_doan = cd;
     if (!d.cau_kien.length && !(d.coc || []).length && !og.length && !mep.length) return lenh("Chưa có cấu kiện để dựng 3D: gán layer cột/dầm/sàn/móng, Ống gió hoặc ống nước / PCCC / khay cáp ở cột trái rồi thử lại.", "loi");
     d.ong_gio = og; d.mep = mep;
-    window.xem3D(d); } catch (e) { lenh(e.message, "loi"); }
+    window.xem3D(gan3D(d)); } catch (e) { lenh(e.message, "loi"); }
 };
 $("t-tk-xlsx").onclick = async () => {
   try { await taiXuong("/api/xuat-thong-ke", yeuCauTK(), "thong_ke_cau_kien.xlsx"); lenh("Đã xuất Excel thống kê.", "ok"); }
@@ -2835,7 +2867,7 @@ async function tinhKetCau(k) {
         <div class="hang"><button id="kl-xlsx">Xuất Excel khối lượng</button><button id="kl-bang">Thêm vào bảng bóc tổng</button><button id="kl-3d">Xem 3D</button></div>
         ${[...d.canh_bao_chung, ...d.cau_kien.flatMap(c => c.canh_bao.filter(x => x.muc !== "thong_tin").map(x => `${c.id}: ${x.noi_dung}`))].slice(0, 30).map(c => `<div class="cb">${esc(c)}</div>`).join("")}`;
       $("kl-xlsx").onclick = () => taiXuong("/api/xuat-excel", yeuCauKL(), "khoi_luong.xlsx").catch(e => lenh(e.message, "loi"));
-      $("kl-3d").onclick = () => window.xem3D(d);
+      $("kl-3d").onclick = () => window.xem3D(gan3D(d));
       $("kl-bang").onclick = () => themKLVaoBang(d);
   } catch (e) { k.innerHTML = `<div class="cb">${esc(e.message)}</div>`; lenh(e.message, "loi"); }
 }
@@ -2885,7 +2917,7 @@ window.themBanVe = themBanVe;  // dùng khi kiểm thử
   const chup = () => ({
     phien_ban: 1, du_an: $("du-an").value, don_vi: $("don-vi").value, act: S.act,
     ts: Object.fromEntries(TS.map(([k]) => [k, ($("ts-" + k) || {}).value ?? ""])),
-    files: S.files.map(f => ({id:f.id, ten:f.ten, vai_tro:f.vai_tro, layers:f.layers.filter(l => l.ten !== TEN_NHAN), vung:f.vung})).concat(giu),
+    files: S.files.map(f => ({id:f.id, ten:f.ten, vai_tro:f.vai_tro, layers:f.layers.filter(l => l.ten !== TEN_NHAN), vung:f.vung, ve3d:f.ve3d})).concat(giu),
     da_dong: S.daDong,   // bản vẽ đã đóng: file còn trong data/uploads, nhớ thiết lập để mở lại
   });
 
@@ -2945,7 +2977,7 @@ window.themBanVe = themBanVe;  // dùng khi kiểm thử
         }
         const x = tin[f.id]; if (!x) continue;
         S.mac_dinh = x.t.mac_dinh; S.loaiHopLe = x.t.loai_hop_le;
-        S.files.push({id:f.id, ten:f.ten, vai_tro:f.vai_tro, layers:f.layers || [], hinh:x.h, vung:f.vung ?? null, kl:null});
+        S.files.push({id:f.id, ten:f.ten, vai_tro:f.vai_tro, layers:f.layers || [], hinh:x.h, vung:f.vung ?? null, ve3d:f.ve3d ?? null, kl:null});
       }
       $("du-an").value = tt.du_an || ""; if (tt.don_vi) $("don-vi").value = tt.don_vi;
       veTabKL();

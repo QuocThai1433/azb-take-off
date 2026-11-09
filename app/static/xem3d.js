@@ -211,18 +211,31 @@
     };
     st.loc.coc = st.loc.truc = st.loc.ve = st.loc.chu = true;
     const KHOA = "azb-3d-" + (d.ten_file || "");
+    const goiY = () => ({sua: st.sua, truc: st.truc, them: st.them, cocCfg: st.cocCfg, tang: st.tang, noi: st.noi});
+    let daLuuBV = JSON.stringify(goiY());      // bản đã lưu vào bản vẽ (so để biết còn thay đổi chưa lưu)
     function nap() {
       try {
-        const j = JSON.parse(localStorage.getItem(KHOA) || "null"); if (!j) return;
+        const j = d.ve3d || JSON.parse(localStorage.getItem(KHOA) || "null"); if (!j) return;
         ["sua", "truc", "them", "cocCfg"].forEach(k => { if (j[k]) st[k] = j[k]; });
         if (j.tang) st.tang = j.tang;
         if (j.noi != null) st.noi = j.noi;
       } catch (e) {}
     }
-    function luu() { try { localStorage.setItem(KHOA, JSON.stringify({sua: st.sua, truc: st.truc, them: st.them, cocCfg: st.cocCfg, tang: st.tang, noi: st.noi})); } catch (e) {} }
+    function luu() { try { localStorage.setItem(KHOA, JSON.stringify(goiY())); } catch (e) {} capLuu(); }
+    const chuaLuuBV = () => JSON.stringify(goiY()) !== daLuuBV;
+    function capLuu() {
+      const b = lop.querySelector("#x3-luu"); if (!b) return;
+      const dirty = chuaLuuBV();
+      b.className = dirty ? "cam" : ""; b.textContent = dirty ? "💾 Lưu vào bản vẽ ●" : "✓ Đã lưu vào bản vẽ"; b.disabled = !d.luuVe3d;
+    }
+    function luuBanVe() {
+      if (!d.luuVe3d) { alert("Không lưu được: 3D này không mở từ một bản vẽ trong dự án."); return; }
+      d.luuVe3d(JSON.parse(JSON.stringify(goiY()))); daLuuBV = JSON.stringify(goiY()); capLuu();
+    }
     const lui = []; let seq = 0;
     function ghiLui() { lui.push(JSON.stringify({sua: st.sua, truc: st.truc, them: st.them, cocCfg: st.cocCfg})); if (lui.length > 60) lui.shift(); }
     nap();
+    if (d.ve3d) daLuuBV = JSON.stringify(goiY());
     st.them.forEach(m => { const n = parseInt(String(m.id).replace(/\D/g, ""), 10); if (n > seq) seq = n; });
     let objs = new Map(), holes = [], vaCham = [], vaMep = [], khongKhoet = [], thongThuy = null, nhomMain = null, nhomHo = null, nhomTruc = null, nhomMB = null, tong = {};
     let loiLK = [], soNoi = 0, khungMo = [0, 0, 1, 1], nhanPhu = [];
@@ -304,6 +317,7 @@
     </style>
     <div class="x3-top">
       <b>AZB <em>3D</em> · Xem kết cấu</b><span class="tt" id="x3-tt"></span><span style="flex:1"></span>
+      <button id="x3-luu" title="Lưu phần vẽ thêm, tim trục, cao độ đã chỉnh vào bản vẽ (Ctrl+S). Bản vẽ 2D sẽ hiện lại các phần này.">💾 Lưu vào bản vẽ</button>
       <button id="x3-bg" title="Hiện / ẩn bảng điều khiển bên phải">☰ Bảng điều khiển</button>
       <button id="x3-hd" title="Hướng dẫn sử dụng (phím ?)">❔ Hướng dẫn</button>
       <button id="x3-dong" title="Đóng (Esc)">✕ Đóng</button>
@@ -1166,8 +1180,9 @@
         ${st.cc === "ve" ? `<div class="x3-cb" style="border-color:#4cffb0;background:rgba(76,255,176,.08)">${HUONG_DAN_VE[v.tool]}</div>` : ""}</div>
         <div class="x3-sec"><h5>Đã vẽ thêm (${n})</h5>
         ${n ? `<div style="max-height:200px;overflow:auto">${st.them.map(m => `<div class="x3-ho ${st.chon === m.id ? "sel" : ""}" data-go="${esc(m.id)}"><span><b>${esc(m.k === "chu" ? m.text : m.ten)}</b></span><span class="x3-chip" style="background:${m.k === "duong" || m.k === "chu" ? "#ffd166" : MAU_HEX(m.k === "dam" ? "dam" : m.k)}">${{cot: "Cột", dam: "Dầm", san: "Sàn", coc: "Cọc", duong: "Đường", chu: "Ghi chú"}[m.k]}</span></div>`).join("")}</div>` : '<div class="x3-mut">Chưa có.</div>'}
-        <div class="x3-row" style="flex-wrap:wrap;margin-top:6px"><button data-a="dxf" ${n || st.truc.x.length + st.truc.y.length ? "" : "disabled"}>⬇ Xuất DXF phần vẽ thêm &amp; trục</button><button data-a="xoa-het-moi" ${n ? "" : "disabled"}>Xóa hết phần vẽ thêm</button></div>
-        <div class="x3-mut" style="margin-top:4px">DXF dùng đúng đơn vị bản vẽ (${esc(d.don_vi || "mm")}), mở được trong AutoCAD để ghép vào bản vẽ gốc. Bản vẽ gốc không bị sửa.</div></div>`;
+        <div class="x3-row" style="flex-wrap:wrap;margin-top:6px"><button class="cam" data-a="luu-bv" ${d.luuVe3d ? "" : "disabled"}>💾 Lưu vào bản vẽ (Ctrl+S)</button><button data-a="dxf" ${n || st.truc.x.length + st.truc.y.length ? "" : "disabled"}>⬇ Xuất DXF phần vẽ thêm &amp; trục</button><button data-a="xoa-het-moi" ${n ? "" : "disabled"}>Xóa hết phần vẽ thêm</button></div>
+        <div class="x3-mut" style="margin-top:4px">DXF dùng đúng đơn vị bản vẽ (${esc(d.don_vi || "mm")}), mở được trong AutoCAD để ghép vào bản vẽ gốc. Bản vẽ gốc không bị sửa.</div>
+        <div class="x3-mut" style="margin-top:4px"><b>Lưu vào bản vẽ</b>: ghi vào dự án và hiện lại trên bản vẽ 2D (cột, dầm, sàn, cọc, trục, đường, ghi chú), lần sau mở 3D vẫn còn.</div></div>`;
     }
 
     function mepHTML() {
@@ -1349,6 +1364,7 @@
       else if (k === "hoan-tac") hoanTac();
       else if (k === "muc-chon") { if (o) { st.ve.muc = +o.dz[1].toFixed(3); capNhatPn(); } }
       else if (k === "dxf") xuatDXF();
+      else if (k === "luu-bv") luuBanVe();
       else if (k === "xoa-het-moi") { if (confirm("Xóa hết cấu kiện và nét đã vẽ thêm?")) { ghiLui(); st.them = []; st.chon = null; luu(); dung(); ap(); capNhatPn(); } }
     }
     function xoaChon() {
@@ -1491,6 +1507,7 @@
     // ---------- phím tắt ----------
     function phim(e) {
       if (e.target.tagName === "INPUT" && e.target.type !== "checkbox" && e.target.type !== "range") return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); luuBanVe(); return; }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); hoanTac(); return; }
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
@@ -1499,7 +1516,7 @@
         else if (st.cc === "ve" && st.ve.pts.length) huyVe();
         else if (st.cc) datCC(false);
         else if (st.lv) thoatLamViec();
-        else if (st.chon) { st.chon = null; ap(); capNhatPn(); } else dong();
+        else if (st.chon) { st.chon = null; ap(); capNhatPn(); } else thoat();
         return;
       }
       if (k === "enter" && st.cc === "ve") { xongDuong(); return; }
@@ -1511,7 +1528,9 @@
       else if (k === "h") hanhDong("an"); else if (k === "i") hanhDong("co"); else if (k === "a") hanhDong("hien-het");
     }
     addEventListener("keydown", phim);
-    $("#x3-dong").onclick = () => dong();
+    $("#x3-luu").onclick = luuBanVe;
+    $("#x3-dong").onclick = () => thoat();
+    function thoat() { if (chuaLuuBV() && d.luuVe3d && !confirm("Còn thay đổi chưa lưu vào bản vẽ. Đóng 3D mà không lưu? (OK = đóng không lưu, Hủy = quay lại để bấm Lưu)")) return; dong(); }
 
     // ---------- khởi động ----------
     dung(); datMoiTruong(); ap();
@@ -1539,7 +1558,7 @@
     }
     datLai(); addEventListener("resize", datLai);
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(datLai) : null; ro && ro.observe(kg);
-    capNhatPn();
+    capNhatPn(); capLuu();
     $("#x3-tt").textContent = `Cao tầng ${H} m · ${(d.cau_kien || []).filter(c => c.loai_bo).length} cấu kiện bị loại (xám mờ)` + (coOng ? ` · ${holes.length} lỗ khoét · ${vaCham.length + vaMep.length} va chạm` : "") + (tong.coc ? ` · ${tong.coc.n} cọc` : "") + ` · ${loiLK.length} chỗ liên kết cần kiểm tra`;
     $("#x3-ft").textContent = (khungNote ? khungNote + " · " : "") + "Chuột trái: xoay · Phải: dịch · Lăn: zoom · Bấm: chọn · Nhấp đúp: bay tới · Bấm ❔ Hướng dẫn hoặc phím ? để xem chi tiết. Khối dựng từ hình 2D và chiều cao đã tính, chưa phải mô hình BIM.";
     let chay = true;
