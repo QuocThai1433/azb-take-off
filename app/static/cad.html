@@ -92,6 +92,13 @@
   .tieu:has(.dong-x) { display:flex; align-items:center; gap:4px; }
   .tab-phai .tab-cuon { padding:0; display:flex; align-items:stretch; flex:1 1 auto; min-width:0; overflow-x:auto; scrollbar-width:none; }
   .tab-phai .dong-x { margin:0 6px; align-self:center; position:static; flex:none; width:22px; height:22px; font-size:13px; }
+  .chia-nut { position:absolute; z-index:6; border:0; padding:0; margin:0; background:#F47A20 !important; color:#fff !important; font-size:11px; font-weight:700; height:auto; line-height:1; cursor:pointer; opacity:0; pointer-events:none; transition:opacity .12s; box-shadow:0 2px 8px rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; }
+  .chia-v .chia-nut { top:50%; left:50%; width:16px; height:48px !important; transform:translate(-50%,-50%); border-radius:8px; }
+  .chia-h .chia-nut { left:50%; top:50%; width:48px; height:16px !important; transform:translate(-50%,-50%); border-radius:8px; }
+  .chia:hover .chia-nut, .chia.dong .chia-nut { opacity:1; pointer-events:auto; }
+  .chia.dong .chia-nut { opacity:.7; } .chia.dong:hover .chia-nut { opacity:1; }
+  .chia.dong { cursor:default; }
+  .chia-nut:hover { filter:brightness(1.15); }
   .chia:hover, .chia.keo { background:var(--cam); }
   #than.dang-keo { cursor:col-resize; user-select:none; }
   .cot { background:var(--sf); overflow:auto; min-width:0; border-right:1px solid var(--vien); }
@@ -775,8 +782,10 @@ function xepBoCuc() {
   }
   for (const z of ["l", "r", "b"]) {
     const co = ["t", "p"].some(k => DK[k] === z && !AN[k]), c = CO[z];
-    than.style.setProperty(c.bien, co ? KT[z] + "px" : "0px"); than.style.setProperty(c.chia, co ? "4px" : "0px");
-    $("chia-" + c.id).style.display = co ? "" : "none";
+    const dock = ["t", "p"].some(k => DK[k] === z), ch = $("chia-" + c.id);   // còn bảng gắn ở vùng này (dù đang thu gọn) thì giữ thanh chia để có mũi tên mở lại
+    than.style.setProperty(c.bien, co ? KT[z] + "px" : "0px"); than.style.setProperty(c.chia, dock ? "4px" : "0px");
+    ch.style.display = dock ? "" : "none"; ch.classList.toggle("dong", dock && !co);
+    const nut = ch.querySelector(".chia-nut"); if (nut) { nut.textContent = (z === "b" ? ["▼", "▲"] : z === "l" ? ["◀", "▶"] : ["▶", "◀"])[co ? 0 : 1]; nut.title = co ? "Thu gọn bảng này" : "Mở bảng ra"; }
   }
   dung("azb-bo-cuc", JSON.stringify({dk:DK, an:AN, kt:KT}));
 }
@@ -786,7 +795,16 @@ for (const k of ["t", "p"]) {
 }
 for (const z of ["l", "r", "b"]) {
   const c = CO[z], ch = $("chia-" + c.id);
+  ch.classList.add(z === "b" ? "chia-h" : "chia-v");
+  const nut = document.createElement("button"); nut.type = "button"; nut.className = "chia-nut"; ch.appendChild(nut);
+  nut.addEventListener("mousedown", e => e.stopPropagation());
+  nut.addEventListener("dblclick", e => e.stopPropagation());
+  nut.addEventListener("click", e => {   // mũi tên: thu gọn các bảng của vùng này, hoặc mở lại nếu đang thu gọn
+    e.stopPropagation(); const ks = ["t", "p"].filter(k => DK[k] === z), co = ks.some(k => !AN[k]);
+    ks.forEach(k => AN[k] = co); xepBoCuc();
+  });
   ch.addEventListener("mousedown", e => {
+    if (ch.classList.contains("dong")) return;
     e.preventDefault(); const p0 = z === "b" ? e.clientY : e.clientX, r0 = KT[z]; ch.classList.add("keo"); $("than").classList.add("dang-keo");
     const di = ev => {
       const d = z === "b" ? p0 - ev.clientY : z === "l" ? ev.clientX - p0 : p0 - ev.clientX, v = r0 + d;
