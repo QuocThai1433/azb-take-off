@@ -2876,6 +2876,13 @@ $("t-tk").onclick = capNhatThongKe;
 $("t-3d").onclick = async () => {
   const f = F(); if (!f) return lenh("Chưa mở bản vẽ.", "loi");
   const nhom = nhomMatBang(f); if (nhom.length >= 2) return dung3DCongTrinh(f, nhom);
+  if (nhom.length < 2 && coKetCau3D(f)) {   // chưa tách: tự dò các mặt bằng trong file rồi ghép, không bắt người dùng tách tay
+    try {
+      lenh("Đang dò các mặt bằng trong file để ghép thành công trình ...");
+      const r = await json("/api/tach-mat-bang", {id:f.id, khoang_cach:null}), ds = r.ds.filter(x => x.vai_tro === "mat_bang");
+      if (ds.length >= 2) return dung3DCongTrinh(f, ds.map(x => ({id:f.id, ten:x.ten || ("Vùng " + x.id), vung:x.khung.slice(), tang_tm:x.tang || "", layers:f.layers, loaiDung3D:f})));
+    } catch (e) { lenh("Không tự dò được các mặt bằng: " + e.message); }
+  }
   lenh(nhom.length === 1 ? "Chỉ có 1 mặt bằng đã tách của file này nên dựng 3D riêng mặt bằng đang mở. Dùng Tách mặt bằng để tách móng, từng tầng thành các mục rồi bấm Xem 3D lại để ghép cả công trình." : "File này chưa tách thành nhiều mặt bằng nên dựng 3D riêng mặt bằng đang mở. Dùng Tách mặt bằng (móng, từng tầng) rồi bấm Xem 3D lại để ghép cả công trình.");
   try { lenh("Đang dựng 3D ..."); let d = await json("/api/tinh", yeuCauKL());
     if (!d.cau_kien.length) {
