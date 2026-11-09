@@ -52,6 +52,15 @@ app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
 @app.middleware("http")
+async def _khong_nho_dem_giao_dien(request: Request, call_next):
+    """Trang và script giao diện luôn tải bản mới, tránh trình duyệt giữ bản cũ sau khi cập nhật."""
+    resp = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static/"):
+        resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
+@app.middleware("http")
 async def _ghi_nhat_ky(request: Request, call_next):
     """Ghi lại lỗi và yêu cầu chậm. Lỗi không lường trước trả về mã lỗi ngắn để tra trong nhật ký, không lộ traceback ra giao diện."""
     t0 = time.time()
