@@ -541,7 +541,13 @@ class _BoTinh:
                 "canh_bao": c["canh_bao"], "loai_bo": c["id"] not in tinh,
                 "hinh": _toa_do(c["geom"]),
             })
-        coc = sorted(self.coc, key=lambda c: (-round(c["y"], 1), round(c["x"], 1)))
+        giu, thay = [], set()   # cọc vẽ hai lần chồng nhau (hai vòng tròn cùng tâm) chỉ tính một
+        for c in self.coc:
+            k = (round(c["x"], 2), round(c["y"], 2))
+            if k not in thay:
+                thay.add(k)
+                giu.append(c)
+        coc = sorted(giu, key=lambda c: (-round(c["y"], 1), round(c["x"], 1)))
         ds_coc = [{"id": f"coc-{i}", "ten": f"P{i}", "x": round(c["x"], 3), "y": round(c["y"], 3), "d": round(c["d"], 3),
                    "layer": c["layer"], "handle": c["handle"]} for i, c in enumerate(coc, 1)]
         hinh_all = [c["geom"] for c in self.ck]

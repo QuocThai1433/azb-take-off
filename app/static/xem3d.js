@@ -237,17 +237,21 @@
 
     // ---------- ghép nhiều mặt bằng thành một công trình (móng, tầng 1, tầng 2 ...) ----------
     const khongDau = t => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/gi, "d").toLowerCase();
+    // Đoán loại mặt bằng: tên ghi rõ "tầng n" thì là tầng n; có móng / cọc / đà kiềng thì là mặt bằng móng; còn lại tính theo thứ tự
     function doanMB(p) {
       const t = khongDau((p.ten || "") + " " + (p.tang_goi_y || ""));
-      if (/mong|foundation|\bfnd\b|dai coc|pile/.test(t)) return {loai: "mong", tang: 0};
-      if (/\bmai\b|roof/.test(t)) return {loai: "mai", tang: null};
       const m = t.match(/(?:tang|floor|level|lvl|\bt)\s*[-_.:]?\s*(\d+)/);
-      return {loai: "tang", tang: m ? +m[1] : null};
+      if (m) return {loai: "tang", tang: +m[1]};
+      const coMong = p.ck.some(c => c.loai === "mong") || (p.coc || []).length > 0;
+      if (coMong || /mong|foundation|\bfnd\b|dai coc|pile|da kieng|giang/.test(t)) return {loai: "mong", tang: 0};
+      if (/\bmai\b|roof/.test(t)) return {loai: "mai", tang: null};
+      return {loai: "tang", tang: null};
     }
-    const tamCotMB = p => {
+    const tamCotMB = p => {   // điểm neo để căn: tâm cột, cọc (đã gộp trùng), móng
       const lay = lo => p.ck.filter(c => c.loai === lo && c.hinh.length && c.hinh[0][0].length > 2).map(c => tamVong(lamSach(c.hinh[0][0])));
-      let a = lay("cot"); if (a.length < 2) a = a.concat(lay("mong")); if (a.length < 2) a = a.concat(lay("vach"));
-      return a;
+      const coc = (p.coc || []).map(c => [c.x, c.y]), seen = new Set();
+      const uniq = a => a.filter(q => { const k = Math.round(q[0] * 50) + "," + Math.round(q[1] * 50); if (seen.has(k)) return false; seen.add(k); return true; });
+      return uniq(lay("cot").concat(coc, lay("mong"), lay("vach")));
     };
     // Căn mặt bằng p vào mặt bằng chuẩn theo vị trí cột: bỏ phiếu các độ dịch (a - b) và lấy độ dịch có nhiều cột trùng nhất
     function canTheoCot(pRef, p) {
@@ -302,9 +306,12 @@
         const k = Zs.indexOf(x.c.Z), Hc = k > 0 ? x.c.Z - Zs[k - 1] : (x.c.Z > 0 ? x.c.Z : H), dx = x.c.dx || 0, dy = x.c.dy || 0;
         const nhan = x.c.loai === "mong" ? "" : ` · T${x.c.tang}`;
         const tt = h => h.map(poly => poly.map(r => r.map(q => [q[0] + dx, q[1] + dy])));
+        const coTang = ds.some(y => y.c.loai !== "mong" && y.p.ck.some(k => k.loai === "cot"));
         x.p.ck.forEach(c => {
-          if (x.c.loai === "mong" && c.loai === "cot") return;   // cột trong mặt bằng móng chỉ là cột chờ, cột thật lấy ở mặt bằng tầng
-          ck.push(Object.assign({}, c, {id: `${x.i}:${c.id}`, ten: c.ten + nhan, hinh: tt(c.hinh), Z: x.c.Z, Hc, mbi: x.i}));
+          const cotMong = x.c.loai === "mong" && c.loai === "cot";
+          if (cotMong && coTang) return;   // đã có mặt bằng tầng chứa cột thật: cột trong mặt bằng móng chỉ là cột chờ
+          // chưa có mặt bằng tầng: giữ cột của mặt bằng móng, dựng từ cao độ 0 lên một tầng
+          ck.push(Object.assign({}, c, {id: `${x.i}:${c.id}`, ten: c.ten + nhan, hinh: tt(c.hinh), Z: cotMong ? H : x.c.Z, Hc: cotMong ? H : Hc, mbi: x.i}));
         });
         (x.p.coc || []).forEach(c => coc.push(Object.assign({}, c, {id: `${x.i}:${c.id}`, x: c.x + dx, y: c.y + dy, mbi: x.i})));
       });
@@ -1304,7 +1311,7 @@
     function mbHTML() {
       const hang = dsMB.map((p, i) => {
         const c = st.mb[p.key], chuan = p.key === st.mbRef, nOb = p.ck.length, nc = (p.coc || []).length;
-        const kq = chuan ? '<span class="x3-chip" style="background:#3ecf8e">Mặt bằng chuẩn</span>' : c.canh ? (c.canh.n >= 2 ? `<span class="x3-chip" style="background:#3ecf8e">Khớp ${c.canh.n} cột</span>` : '<span class="x3-chip" style="background:#ffb020">Chưa khớp cột: căn tạm theo góc</span>') : "";
+        const kq = chuan ? '<span class="x3-chip" style="background:#3ecf8e">Mặt bằng chuẩn</span>' : c.canh ? (c.canh.n >= 4 ? `<span class="x3-chip" style="background:#3ecf8e">Khớp ${c.canh.n} điểm (cột / cọc / móng)</span>` : c.canh.n >= 2 ? `<span class="x3-chip" style="background:#ffb020">Chỉ khớp ${c.canh.n} điểm: kiểm tra lại độ dịch</span>` : '<span class="x3-chip" style="background:#ffb020">Chưa khớp cột: căn tạm theo góc</span>') : "";
         return `<div class="x3-sec" style="${c.hien ? "" : "opacity:.55"}"><div class="x3-row"><label><input type="checkbox" data-mbh="${i}" ${c.hien ? "checked" : ""}><b>${esc(p.ten)}</b></label></div>
           <div class="x3-mut" style="margin-bottom:4px">${nOb} cấu kiện${nc ? ` · ${nc} cọc` : ""} ${kq}</div>
           <div class="x3-kv">${kvr("Loại", `<select data-mb="loai" data-i="${i}"><option value="mong" ${c.loai === "mong" ? "selected" : ""}>Móng / cọc</option><option value="tang" ${c.loai === "tang" || c.loai === "mai" ? "selected" : ""}>Tầng</option><option value="bo" ${c.loai === "bo" ? "selected" : ""}>Bỏ qua</option></select>`)}
@@ -1314,7 +1321,7 @@
           <div class="x3-row" style="flex-wrap:wrap;margin-top:6px"><button data-a="mb-can" data-i="${i}" ${chuan ? "disabled" : ""}>⚙ Căn theo cột</button><button data-a="mb-chuan" data-i="${i}" ${chuan ? "disabled" : ""}>Đặt làm chuẩn</button><button data-a="mb-chi" data-i="${i}">Chỉ hiện tầng này</button></div></div>`;
       }).join("");
       return `<div class="x3-sec"><h5>Ghép các mặt bằng thành công trình</h5>
-        <div class="x3-mut">Mỗi mặt bằng (móng, tầng 1, tầng 2...) đã được dựng riêng rồi <b>dịch cho thẳng trục</b> với mặt bằng chuẩn và <b>xếp lên đúng cao độ sàn</b>. Cột tầng trên nối cột tầng dưới; cột tầng 1 đứng trên móng. Tầng n mặc định có cao độ sàn = n × cao tầng (${f2(H, 2)} m): sửa nếu khác. Ở mỗi mặt bằng, cột trong bản vẽ móng chỉ là cột chờ nên không dựng.</div>
+        <div class="x3-mut">Mỗi mặt bằng (móng, tầng 1, tầng 2...) đã được dựng riêng rồi <b>dịch cho thẳng trục</b> với mặt bằng chuẩn và <b>xếp lên đúng cao độ sàn</b>. Cột tầng trên nối cột tầng dưới; cột tầng 1 đứng trên móng. Tầng n mặc định có cao độ sàn = n × cao tầng (${f2(H, 2)} m): sửa nếu khác. Mặt bằng có móng / cọc / đà kiềng được xếp ở cao độ ±0,00; nếu đã có mặt bằng tầng thì cột trong mặt bằng móng chỉ là cột chờ nên không dựng.</div>
         <div class="x3-row" style="flex-wrap:wrap;margin-top:6px"><button class="cam" data-a="mb-can-het">⚙ Căn lại tất cả theo cột</button><button data-a="mb-hien-het">Hiện mọi mặt bằng</button></div></div>${hang}`;
     }
     function trucHTML() {
