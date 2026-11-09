@@ -271,11 +271,27 @@ class _BoTinh:
         self.ck = [c for c in self.ck if not (c["loai"] == "tuong" and c["geom"].is_empty)]
         self.ck += moi
         nen = unary_union([c["geom"] for c in tuong if not c["geom"].is_empty] + [m["geom"] for m in moi if m["loai"] == "tuong"])
+        # Mái: gom các đoạn tường cách nhau <= 1,5 m thành một công trình, phủ một tấm mái phẳng lên bao lồi của cụm
+        manh = _manh(nen)
+        cha = list(range(len(manh)))
+
+        def goc(i):
+            while cha[i] != i:
+                cha[i] = cha[cha[i]]
+                i = cha[i]
+            return i
+        for i in range(len(manh)):
+            for j in range(i + 1, len(manh)):
+                if manh[i].distance(manh[j]) <= 1.5:
+                    cha[goc(i)] = goc(j)
+        cum = {}
+        for i, p in enumerate(manh):
+            cum.setdefault(goc(i), []).append(p)
         ds = []
-        for p in _manh(nen):
-            f = shapely.geometry.Polygon(p.exterior).buffer(VUON_MAI, join_style=2)
-            if f.area > 0.5:
-                ds.append(f)
+        for ps in cum.values():
+            hull = unary_union(ps).convex_hull
+            if hull.geom_type == "Polygon" and hull.area >= 6.0 and _dai_rong_min(hull) >= 2.0:
+                ds.append(hull.buffer(VUON_MAI, join_style=2))
         for i, f in enumerate(ds, 1):
             self.ck.append({"id": f"mai-{i}", "loai": "mai", "ten": f"Mái {i}", "nhan": "", "layer": tuong[0]["layer"], "handle": "", "nguon": "TU_SINH", "geom": f,
                             "thong_so": {"day": DAY_MAI}, "canh_bao": []})
