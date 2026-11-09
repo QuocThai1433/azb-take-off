@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 from . import config, cot_thep, ho_so_layer, kiem_tra_layer, luu_tru, nhat_ky
 from .excel_thep import xuat_excel_thep
+from .goi_y_hinh_hoc import do_layer_tuong
 from .tach_mat_bang import do_mat_bang
 from .dxf_reader import _doc_file, cat_vung, doc_ban_ve, doc_ban_ve_cache, hinh_xem, nap_doc, tom_tat_layer, tong_quan
 from . import cong_cu
@@ -128,6 +129,13 @@ def _thong_tin_ban_ve(pid, ten, bv):
     for l in layers:
         l["goi_y"] = config.goi_y_loai_layer(l["ten"])
         l["goi_y_ly_do"] = config.phan_tich_ten(l["ten"])[2]
+    # Tên layer không cho biết gì: dò theo hình học (cặp nét song song = hai mặt tường)
+    chua_ro = {l["ten"] for l in layers if config.phan_tich_ten(l["ten"])[0] is None}
+    for ten, dai in do_layer_tuong(bv, bo_qua={l["ten"] for l in layers} - chua_ro).items():
+        for l in layers:
+            if l["ten"] == ten:
+                l["goi_y"] = "tuong"
+                l["goi_y_ly_do"] = f"Có nhiều cặp nét song song cách nhau 8 đến 45 cm (tổng {dai:.0f} m), thường là hai mặt tường"
     meta = luu_tru.doc_meta(pid)
     return {
         "id": pid, "ten_file": ten, "don_vi": bv.don_vi, "canh_bao": list(meta.get("canh_bao_nguon", [])) + list(bv.canh_bao),
