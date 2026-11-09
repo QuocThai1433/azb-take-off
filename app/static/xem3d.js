@@ -9,6 +9,9 @@
     mong:   {ten: "Móng",     mau: 0x9aa3ad},
     coc:    {ten: "Cọc",      mau: 0xb08968},
     vach:   {ten: "Vách/lõi", mau: 0xa982e0},
+    tuong:  {ten: "Tường",    mau: 0xe3d5b8},
+    cua:    {ten: "Cửa",      mau: 0x7ec8e3},
+    mai:    {ten: "Mái",      mau: 0xb5654a},
     ong_gio:{ten: "Ống gió",  mau: 0x2fd0c8},
     ong_nuoc:{ten: "Ống nước", mau: 0x3d8bff},
     ong_pccc:{ten: "Ống PCCC", mau: 0xd946a8},
@@ -17,7 +20,7 @@
     ve:     {ten: "Nét vẽ thêm", mau: 0xffd166},
     chu:    {ten: "Ghi chú",  mau: 0xffffff},
   };
-  const THEM_LOAI = ["cot", "dam", "san", "vach"];          // cấu kiện được nhân theo số tầng
+  const THEM_LOAI = ["cot", "dam", "san", "vach", "tuong", "cua"];          // cấu kiện được nhân theo số tầng
   const NHAN_VAI = {cot: "Cột", dam: "Dầm", san: "Sàn", mong: "Móng", coc: "Cọc", vach: "Vách/lõi"};
   const MEPK = ["ong_gio", "ong_nuoc", "ong_pccc", "khay_cap"];
   const NHAT_XUONG = {ong_gio: 0.2, ong_nuoc: 0.3, ong_pccc: 0.3, khay_cap: 0.45};   // đỉnh ống thấp hơn đỉnh sàn (m), mặc định
@@ -155,6 +158,9 @@
     if (ck.loai === "cot" || ck.loai === "vach") return [Z - Hc, Z - Hc + (ts.cao || Hc)];
     if (ck.loai === "dam") { const h = ts.h || 0.5, ht = ts.h_tinh != null ? ts.h_tinh : h; return [Z - h, Z - h + ht]; }
     if (ck.loai === "san") { const t = ts.t || 0.12; return [Z - t, Z]; }
+    if (ck.loai === "tuong") { const z0 = ts.z0 || 0; return [Z - Hc + z0, Z - Hc + z0 + (ts.cao || Hc - z0)]; }
+    if (ck.loai === "cua") return [Z - Hc, Z - Hc + (ts.cao || 2.1)];
+    if (ck.loai === "mai") return [Z, Z + (ts.day || 0.15)];
     if (ck.loai === "mong") { const d0 = ts.day || 0.8, z0 = ck.Z != null ? ck.Z : 0; return [z0 - d0, z0]; }
     return null;
   }
@@ -199,7 +205,7 @@
     const macDinh = d.mep_mac_dinh || {};
     const H = parseFloat((d.thong_so || {}).chieu_cao_tang) || 3.6;
     const st = {
-      loc: {cot: true, dam: true, san: true, mong: true, vach: true, ong_gio: true, ong_nuoc: true, ong_pccc: true, khay_cap: true},
+      loc: {cot: true, dam: true, san: true, mong: true, vach: true, tuong: true, cua: true, mai: true, ong_gio: true, ong_nuoc: true, ong_pccc: true, khay_cap: true},
       xray: false, bong: true, luoi: true, xoay: false, canhBao: false, ten: false,
       khoet: true, hoMm: 25, tt: 2.4, mep: {},
       cat: false, catY: 0, an: new Set(), co: null, chon: null, ruoi: null, cc: null,
@@ -855,6 +861,7 @@
         const tr0 = mat.transparent;
         if (st.xray) { mat.transparent = true; mat.opacity = 0.22; mat.depthWrite = false; }
         else if (o.loai === "san") { mat.transparent = true; mat.opacity = 0.42; mat.depthWrite = false; }
+        else if (o.loai === "cua") { mat.transparent = true; mat.opacity = 0.45; mat.depthWrite = false; }
         else if (o.bo) { mat.transparent = true; mat.opacity = 0.25; mat.depthWrite = false; }
         else if (MEPK.includes(o.loai)) { mat.transparent = true; mat.opacity = 0.88; mat.depthWrite = true; }
         else { mat.transparent = false; mat.opacity = 1; mat.depthWrite = true; }

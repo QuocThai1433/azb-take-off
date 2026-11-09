@@ -18,6 +18,7 @@ from shapely.ops import unary_union
 
 from . import config
 from .dam_suy_ra import suy_dam
+from .dxf_reader import HinhKin
 
 TOL = 1e-4  # m, dải đo chiều dài tiếp giáp giữa hai hình
 HO_TIEP_XUC = 0.002  # m, hai hình hở nhau dưới 2 mm vẫn coi là tiếp giáp
@@ -97,6 +98,12 @@ def _tiep_xuc(a, b):
     return L
 
 
+DAY_TUONG_MAC_DINH = 0.2    # m - bề dày tường khi chỉ có nét đơn
+CAO_CUA = 2.1               # m - chiều cao ô cửa; phía trên là lanh tô
+DAY_MAI = 0.15              # m
+VUON_MAI = 0.3              # m - mái đua ra khỏi tường
+
+
 def _r(x):
     return None if x is None else round(x, 4)
 
@@ -133,7 +140,7 @@ class _BoTinh:
 
     # ---------- bước 1: gom hình theo loại ----------
     def gom_hinh(self):
-        theo_loai = {k: [] for k in ("cot", "dam", "san", "lo_san", "mong", "vach")}
+        theo_loai = {k: [] for k in ("cot", "dam", "san", "lo_san", "mong", "vach", "tuong", "cua")}
         nguong = self.kt["nguong_trung_lap"]
         dt_min = self.kt["dien_tich_toi_thieu"]
         bo_qua_co_hinh = []  # (tên layer, số hình kín đủ lớn) của layer đang bị bỏ qua
@@ -171,6 +178,14 @@ class _BoTinh:
                 if h.geom.area < dt_min:
                     continue
                 theo_loai[loai].append((h, ten))
+            if loai == "tuong":
+                # Tường vẽ bằng nét rời / polyline hở: bù hai bên thành dải rộng bằng bề dày tường mặc định
+                for i, ln in enumerate(ld.net_ho):
+                    if ln.length < 0.3:
+                        continue
+                    g = ln.buffer(DAY_TUONG_MAC_DINH / 2, cap_style=2, join_style=2)
+                    if g.area >= dt_min and not g.is_empty:
+                        theo_loai[loai].append((HinhKin(g, f"net{i}", "NET_TUONG"), ten))
 
         if coc_layer:
             self.canh_bao_chung.append(
@@ -212,6 +227,39 @@ class _BoTinh:
         for ten, n in so_trung.items():
             self.canh_bao_chung.append(
                 f"Layer {ten}: {n} hình vẽ trùng nhau (thường là hatch + polyline cùng một hình), mỗi hình chỉ tính một lần.")
+        self._tuong_cua_mai()
+
+    def _tuong_cua_mai(self):
+        """Tường (extrude theo cao tầng), khoét ô cửa (cửa = hộp bao của hình cửa, chỉ chỗ giao với tường), lanh tô phía trên, mái phẳng."""
+        tuong = [c for c in self.ck if c["loai"] == "tuong"]
+        cua = [c for c in self.ck if c["loai"] == "cua"]
+        if not tuong:
+            return
+        H = float(self.ts["chieu_cao_tang"])
+        hop = [shapely.geometry.box(*c["geom"].bounds).buffer(0.02) for c in cua if max(c["geom"].bounds[2] - c["geom"].bounds[0], c["geom"].bounds[3] - c["geom"].bounds[1]) <= 4.0]
+        cac_cua = unary_union(hop) if hop else None
+        moi = []
+        for c in tuong:
+            g = c["geom"]
+            if cac_cua is not None and g.intersects(cac_cua):
+                lo, trong = g.difference(cac_cua), g.intersection(cac_cua)
+                c["geom"] = lo
+                for j, p in enumerate(x for x in _manh(trong) if x.area > 1e-4):
+                    base = {"layer": c["layer"], "handle": c["handle"], "nguon": c["nguon"], "nhan": "", "canh_bao": [], "ten": ""}
+                    moi.append(dict(base, id=f"{c['id']}-lt{j + 1}", loai="tuong", geom=p, ten=f"Lanh tô {c['id']}-{j + 1}", thong_so={"z0": CAO_CUA, "cao": max(H - CAO_CUA, 0.05)}))
+                    moi.append(dict(base, id=f"{c['id']}-cua{j + 1}", loai="cua", geom=p, ten=f"Cửa {c['id']}-{j + 1}", thong_so={"cao": CAO_CUA}))
+        self.ck = [c for c in self.ck if c["loai"] != "cua"]
+        self.ck = [c for c in self.ck if not (c["loai"] == "tuong" and c["geom"].is_empty)]
+        self.ck += moi
+        nen = unary_union([c["geom"] for c in tuong if not c["geom"].is_empty] + [m["geom"] for m in moi if m["loai"] == "tuong"])
+        ds = []
+        for p in _manh(nen):
+            f = shapely.geometry.Polygon(p.exterior).buffer(VUON_MAI, join_style=2)
+            if f.area > 0.5:
+                ds.append(f)
+        for i, f in enumerate(ds, 1):
+            self.ck.append({"id": f"mai-{i}", "loai": "mai", "ten": f"Mái {i}", "nhan": "", "layer": tuong[0]["layer"], "handle": "", "nguon": "TU_SINH", "geom": f,
+                            "thong_so": {"day": DAY_MAI}, "canh_bao": []})
 
     # ---------- bước 2: gán nhãn ----------
     def gan_nhan(self):

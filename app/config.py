@@ -11,7 +11,7 @@ CONFIG_DIR = ROOT / "config"
 # Mặc định data/ trong thư mục app. Đặt biến AZB_DATA_DIR để dùng thư mục dữ liệu riêng (vd: bản dùng thử qua tunnel).
 DATA_DIR = Path(os.environ.get("AZB_DATA_DIR") or ROOT / "data")
 
-LOAI_CAU_KIEN = ["cot", "dam", "san", "lo_san", "mong", "coc", "vach", "khung_dam", "o_dam", "nhan", "ong_gio", "ong_nuoc", "ong_pccc", "khay_cap", "bo_qua"]
+LOAI_CAU_KIEN = ["cot", "dam", "san", "lo_san", "mong", "coc", "vach", "khung_dam", "o_dam", "nhan", "ong_gio", "ong_nuoc", "ong_pccc", "khay_cap", "tuong", "cua", "bo_qua"]
 LOAI_MEP = {"ong_gio", "ong_nuoc", "ong_pccc", "khay_cap"}   # hệ thống cơ điện: không tính bê tông, chỉ dựng 3D / bóc riêng
 
 

@@ -715,9 +715,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-<script src="/static/xem3d.js?v=9"></script>
+<script src="/static/xem3d.js?v=10"></script>
 <script>
-const LOAI = {cot:"Cột", dam:"Dầm", san:"Sàn", lo_san:"Lỗ mở sàn", mong:"Móng", coc:"Cọc", vach:"Vách/lõi", khung_dam:"Khung dầm (bao ngoài)",
+const LOAI = {cot:"Cột", dam:"Dầm", san:"Sàn", lo_san:"Lỗ mở sàn", mong:"Móng", coc:"Cọc", vach:"Vách/lõi", tuong:"Tường (chỉ dựng 3D)", cua:"Cửa (chỉ dựng 3D, khoét tường)", khung_dam:"Khung dầm (bao ngoài)",
   o_dam:"Ô trống giữa dầm", nhan:"Nhãn chữ", ong_gio:"Ống gió (MLINE+block)", ong_nuoc:"Ống nước (chỉ dựng 3D)", ong_pccc:"Ống PCCC (chỉ dựng 3D)", khay_cap:"Khay cáp (chỉ dựng 3D)", bo_qua:"Bỏ qua"};
 const VAI_TRO = {mat_bang:"Mặt bằng", chi_tiet:"Chi tiết cấu kiện", ghi_chu:"Ghi chú chung"};
 const MAU = ["#ff3b30","#ffd60a","#30d158","#32d4e8","#4a8cff","#e061ff","#ffffff","#9b9b9b","#ff9f0a","#a3e635","#2dd4bf","#60a5fa","#a78bfa","#f472b6","#fb7185"];
@@ -1994,7 +1994,7 @@ function gan3D(d, goc) {
   return d;
 }
 // Các mặt bằng (đã tách từ một file) có thể ghép thành một công trình: móng, tầng 1, tầng 2 ... xếp theo trục và cao độ
-const coKetCau3D = e => e.layers.some(l => KET_CAU.includes(l.loai) || l.loai === "coc");
+const coKetCau3D = e => e.layers.some(l => KET_CAU.includes(l.loai) || l.loai === "coc" || l.loai === "tuong");
 // Mọi mục "Mặt bằng" đã tách (có vùng cắt) của cùng file. Mục nào chưa gán layer thì dùng cách gán của mục đang có layer kết cấu (cùng file nên cùng tên layer)
 function nhomMatBang(f) {
   const ds = S.files.filter(x => x.id === f.id && x.vai_tro === "mat_bang" && x.vung);
@@ -2951,7 +2951,7 @@ async function tinhKL() {
   const f = F(); if (!f) return lenh("Chưa mở bản vẽ.", "loi");
   const k = $("kl-kq"); k.innerHTML = '<div class="nho">Đang tính ...</div>';
   const loai = Object.values(loaiLayer(f));
-  const coOng = loai.includes("ong_gio"), coKetCau = loai.some(l => KET_CAU.includes(l)) || !coOng;
+  const coOng = loai.includes("ong_gio"), coKetCau = loai.some(l => KET_CAU.includes(l) || l === "tuong") || !coOng;
   k.innerHTML = '<div id="kl-kc"></div><div id="kl-og"></div>';
   if (coKetCau) await tinhKetCau($("kl-kc"));
   if (coOng) await tinhOngGio($("kl-og"));

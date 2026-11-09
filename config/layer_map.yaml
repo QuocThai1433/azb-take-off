@@ -14,7 +14,7 @@
 # không còn ghi vào file này.
 #
 # Các loại hợp lệ:
-#   cot, dam, san, lo_san (trừ vào sàn), mong, coc, vach, nhan (chữ ghi tên cấu kiện),
+#   cot, dam, san, lo_san (trừ vào sàn), mong, coc, vach, tuong, cua (chỉ dựng 3D), nhan (chữ ghi tên cấu kiện),
 #   ong_gio, ong_nuoc, ong_pccc, khay_cap (cơ điện: chỉ dựng 3D), bo_qua (không tính)
 
 rules:
@@ -23,6 +23,14 @@ rules:
     type: bo_qua
     conf: 0.99
     ly_do: "Layer hệ thống Defpoints của CAD"
+  - pattern: '(?<![a-z])(door|doors|window|windows|cua di|cua so|cua)(?![a-z])'
+    type: cua
+    conf: 0.8
+    ly_do: "Layer cửa đi / cửa sổ (chỉ dựng 3D, khoét tường)"
+  - pattern: '(?<![a-z])(tuong|tuong xay|brick ?wall)(?![a-z])'
+    type: tuong
+    conf: 0.6
+    ly_do: "Tên layer là tường, cần xác nhận (chỉ dựng 3D)"
   - pattern: '^a( |$)'
     type: bo_qua
     conf: 0.92
