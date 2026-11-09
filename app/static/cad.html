@@ -2890,7 +2890,7 @@ $("t-3d").onclick = async () => {
       const ds = (await (await goi("/api/de-xuat-layer/" + f.id)).json()).ds || [];
       let n = 0;
       ds.forEach(x => { const l = f.layers.find(y => y.ten === x.ten);
-        if (l && (x.hanh_dong === "tu_dien" || (x.hanh_dong === "xac_nhan" && x.tin_cay >= 0.8)) && x.loai && KET_CAU.includes(x.loai) && l.loai !== x.loai) { l.loai = x.loai; n++; } });
+        if (l && (x.hanh_dong === "tu_dien" || (x.hanh_dong === "xac_nhan" && (x.tin_cay >= 0.8 || !coKetCau3D(f)))) && x.loai && KET_CAU.includes(x.loai) && l.loai !== x.loai) { l.loai = x.loai; n++; } });
       if (n) { ve_layer(); lenh(`Tự gán ${n} layer kết cấu theo đề xuất, đang dựng 3D ...`); d = await json("/api/tinh", yeuCauKL()); }
     }
     let og = [], cd = [];
@@ -2907,13 +2907,13 @@ $("t-3d").onclick = async () => {
       catch (e) { cd.push("MEP: " + e.message); }
     }
     if (!og.length && !mep.length) {
-      const nghi = f.layers.map(l => l.ten).filter(n => /ong|gio|duct|hvac|nuoc|water|pccc|khay|pipe|drain|sprinkler|cap ?nuoc/i.test(n.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/gi, "d")) && !["ong_gio", ...loaiMep].includes(gl[n]));
+      const nghi = f.layers.map(l => l.ten).filter(n => /(ong|gio|duct|hvac|nuoc|water|pccc|khay|pipe|drain|sprinkler)|cap ?nuoc/i.test(n.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/gi, "d")) && !["ong_gio", ...loaiMep].includes(gl[n]));
       cd.push(nghi.length ? `Chưa có ống nào được dựng. Các layer có vẻ là MEP nhưng chưa gán loại: ${nghi.slice(0, 6).join(", ")}. Gán ở cột trái (Ống gió / Ống nước / Ống PCCC / Khay cáp) rồi bấm Xem 3D lại.`
         : "Chưa có ống nào được dựng: bản vẽ đang mở chưa có layer nào gán loại Ống gió / Ống nước / Ống PCCC / Khay cáp. Nếu ống nằm ở bản vẽ khác thì cần đưa vào cùng file.");
     }
     cd.forEach(c => lenh(c, "loi"));
     d.chan_doan = cd;
-    if (!d.cau_kien.length && !(d.coc || []).length && !og.length && !mep.length) return lenh("Chưa có cấu kiện để dựng 3D: gán layer cột/dầm/sàn/móng, Ống gió hoặc ống nước / PCCC / khay cáp ở cột trái rồi thử lại.", "loi");
+    if (!d.cau_kien.length && !(d.coc || []).length && !og.length && !mep.length) return lenh("Chưa có cấu kiện để dựng 3D: bản vẽ này chưa có layer nào gán Cột / Dầm / Sàn / Móng / Vách (đang để hết \"Bỏ qua\"). Gán loại cho layer cột, dầm, sàn, tường ở cột trái (hoặc mở đúng bản mặt bằng kết cấu, không phải bản chi tiết) rồi bấm Xem 3D lại.", "loi");
     d.ong_gio = og; d.mep = mep;
     window.xem3D(gan3D(d)); } catch (e) { lenh(e.message, "loi"); }
 };
