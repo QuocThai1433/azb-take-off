@@ -19,6 +19,7 @@ from shapely.ops import unary_union
 from . import config
 from .dam_suy_ra import suy_dam
 from .dxf_reader import HinhKin
+from .nha_tu_ban_ve import cua_tu_mat_dung, doc_cao_do
 
 TOL = 1e-4  # m, dải đo chiều dài tiếp giáp giữa hai hình
 HO_TIEP_XUC = 0.002  # m, hai hình hở nhau dưới 2 mm vẫn coi là tiếp giáp
@@ -107,7 +108,10 @@ def _tiep_xuc(a, b):
 DAY_TUONG_MAC_DINH = 0.2    # m - bề dày tường khi chỉ có nét đơn
 CAO_CUA = 2.1               # m - chiều cao ô cửa; phía trên là lanh tô
 DAY_MAI = 0.15              # m
-VUON_MAI = 0.3              # m - mái đua ra khỏi tường
+VUON_MAI = 0.3              # m - mái đua khi hình không phải chữ nhật
+VUON_MAI_DAI = 0.3          # m - mái đua theo chiều dài nhà
+VUON_MAI_NGAN = 1.0         # m - mái đua theo bề rộng nhà (mặt cắt ghi 1000 hai bên)
+DAY_VACH_NGAN = 0.1         # m - vách ngăn ốp tôn
 
 
 def _r(x):
@@ -115,8 +119,9 @@ def _r(x):
 
 
 class _BoTinh:
-    def __init__(self, ban_ve, loai_layer, thong_so, dieu_chinh):
+    def __init__(self, ban_ve, loai_layer, thong_so, dieu_chinh, ban_ve_goc=None):
         self.bv = ban_ve
+        self.goc = ban_ve_goc or ban_ve     # bản vẽ đầy đủ (chưa cắt vùng): đọc cao độ, cửa ở các hình khác
         self.loai_layer = loai_layer
         self.ts = thong_so
         self.dc = dieu_chinh or {}
@@ -257,53 +262,116 @@ class _BoTinh:
                 f"Layer {ten}: {so_vanh} hình kín lớn (đường bao nhà) được dựng thành vành tường dày {DAY_TUONG_MAC_DINH * 1000:.0f} mm. "
                 "Nếu layer này lẫn mặt đứng / mặt cắt thì Sếp chọn vùng quanh đúng mặt bằng.")
 
-    def _tuong_cua_mai(self):
-        """Tường (extrude theo cao tầng), khoét ô cửa (cửa = hộp bao của hình cửa, chỉ chỗ giao với tường), lanh tô phía trên, mái phẳng."""
-        tuong = [c for c in self.ck if c["loai"] == "tuong"]
-        cua = [c for c in self.ck if c["loai"] == "cua"]
-        if not tuong:
-            return
-        H = float(self.ts["chieu_cao_tang"])
-        hop = [shapely.geometry.box(*c["geom"].bounds).buffer(0.02) for c in cua if max(c["geom"].bounds[2] - c["geom"].bounds[0], c["geom"].bounds[3] - c["geom"].bounds[1]) <= 4.0]
-        cac_cua = unary_union(hop) if hop else None
-        moi = []
-        for c in tuong:
-            g = c["geom"]
-            if cac_cua is not None and g.intersects(cac_cua):
-                lo, trong = g.difference(cac_cua), g.intersection(cac_cua)
-                c["geom"] = lo
-                for j, p in enumerate(x for x in _manh(trong) if x.area > 1e-4):
-                    base = {"layer": c["layer"], "handle": c["handle"], "nguon": c["nguon"], "nhan": "", "canh_bao": [], "ten": ""}
-                    moi.append(dict(base, id=f"{c['id']}-lt{j + 1}", loai="tuong", geom=p, ten=f"Lanh tô {c['id']}-{j + 1}", thong_so={"z0": CAO_CUA, "cao": max(H - CAO_CUA, 0.05)}))
-                    moi.append(dict(base, id=f"{c['id']}-cua{j + 1}", loai="cua", geom=p, ten=f"Cửa {c['id']}-{j + 1}", thong_so={"cao": CAO_CUA}))
-        self.ck = [c for c in self.ck if c["loai"] != "cua"]
-        self.ck = [c for c in self.ck if not (c["loai"] == "tuong" and c["geom"].is_empty)]
-        self.ck += moi
-        nen = unary_union([c["geom"] for c in tuong if not c["geom"].is_empty] + [m["geom"] for m in moi if m["loai"] == "tuong"])
-        # Mái: gom các đoạn tường cách nhau <= 1,5 m thành một công trình, phủ một tấm mái phẳng lên bao lồi của cụm
-        manh = _manh(nen)
-        cha = list(range(len(manh)))
+    def _cum_tuong(self, tuong, khoang=1.5):
+        """Gom các mảnh tường cách nhau <= khoang thành từng công trình. Trả list các list chỉ số vào `tuong`."""
+        n = len(tuong)
+        cha = list(range(n))
 
         def goc(i):
             while cha[i] != i:
                 cha[i] = cha[cha[i]]
                 i = cha[i]
             return i
-        for i in range(len(manh)):
-            for j in range(i + 1, len(manh)):
-                if manh[i].distance(manh[j]) <= 1.5:
+        for i in range(n):
+            for j in range(i + 1, n):
+                if tuong[i]["geom"].distance(tuong[j]["geom"]) <= khoang:
                     cha[goc(i)] = goc(j)
         cum = {}
-        for i, p in enumerate(manh):
-            cum.setdefault(goc(i), []).append(p)
+        for i in range(n):
+            cum.setdefault(goc(i), []).append(i)
+        return list(cum.values())
+
+    def _tuong_cua_mai(self):
+        """Tường (extrude theo cao thật), cửa khoét tường kèm lanh tô, vách ngăn giữa các cửa, mái dốc có mái đua.
+        Số liệu lấy từ bản vẽ: cao độ mái ghi '+6.050 / +6.800' ở mặt cắt, cửa vẽ ở mặt đứng (cùng trục x với mặt bằng)."""
+        tuong = [c for c in self.ck if c["loai"] == "tuong"]
+        cua = [c for c in self.ck if c["loai"] == "cua"]
+        if not tuong:
+            return
+        # 1) bỏ mảnh tường rời nằm ngoài ngôi nhà (cụm nhỏ hơn 6 m2 khi đã có cụm lớn hơn)
+        cum = self._cum_tuong(tuong)
+        hull = [unary_union([tuong[i]["geom"] for i in c]).convex_hull for c in cum]
+        if any(h.area >= 6.0 for h in hull):
+            bo = [tuong[i] for c, h in zip(cum, hull) if h.area < 6.0 for i in c]
+            if bo:
+                ids = {id(c) for c in bo}
+                self.ck = [c for c in self.ck if id(c) not in ids]
+                tuong = [c for c in tuong if id(c) not in ids]
+                self.canh_bao_chung.append(f"Bỏ {len(bo)} mảnh tường rời nằm ngoài ngôi nhà (không chạm tường nào, cụm nhỏ).")
+        H = float(self.ts["chieu_cao_tang"])
+        cao = doc_cao_do(self.goc)
+        if cao:
+            H = cao[0]
+            self.canh_bao_chung.append(f"Chiều cao tường {H:g} m và mái dốc {cao[0]:g} đến {cao[1]:g} m đọc từ cao độ ghi trên bản vẽ (mặt cắt).")
+        nen = unary_union([c["geom"] for c in tuong])
+        x0, y0, x1, y1 = nen.bounds
+        # 2) cửa: ưu tiên hình cửa nằm ngay trong mặt bằng, không có thì lấy cửa vẽ ở mặt đứng cùng dải trục x
+        cua_pt = []          # (hộp khoét, chiều cao cửa)
+        for c in cua:
+            b = c["geom"].bounds
+            if max(b[2] - b[0], b[3] - b[1]) <= 4.0:
+                cua_pt.append((shapely.geometry.box(*b).buffer(0.02), CAO_CUA))
+        dung = []
+        if not cua_pt:
+            dung = cua_tu_mat_dung(self.goc, self.loai_layer, x0, x1, (y0, y1))
+            for a, b, h in dung:
+                cua_pt.append((shapely.geometry.box(a, y0 - 0.05, b, y0 + 0.5), h))
+            if dung:
+                self.canh_bao_chung.append(f"Cửa: {len(dung)} cửa lấy từ mặt đứng (cùng trục x với mặt bằng), khoét ở tường phía y nhỏ (mặt trước).")
+        moi = []
+        for c in tuong:
+            g = c["geom"]
+            c["thong_so"] = {"cao": H}
+            hit = [(b, h) for b, h in cua_pt if g.intersects(b)]
+            if not hit:
+                continue
+            c["geom"] = g.difference(unary_union([b for b, _ in hit]))
+            for j, (b, h) in enumerate(hit):
+                for k, q in enumerate(x for x in _manh(g.intersection(b)) if x.area > 1e-4):
+                    base = {"layer": c["layer"], "handle": c["handle"], "nguon": c["nguon"], "nhan": "", "canh_bao": []}
+                    moi.append(dict(base, id=f"{c['id']}-lt{j + 1}.{k + 1}", loai="tuong", geom=q, ten=f"Lanh tô {c['id']}-{j + 1}",
+                                    thong_so={"z0": h, "cao": max(H - h, 0.05)}))
+                    moi.append(dict(base, id=f"{c['id']}-cua{j + 1}.{k + 1}", loai="cua", geom=q, ten=f"Cửa {c['id']}-{j + 1}", thong_so={"cao": h}))
+        # 3) vách ngăn: mỗi cửa là một gian riêng, vách đặt giữa hai cửa liền kề (từ tường trước tới tường sau)
+        if len(dung) >= 2:
+            day = DAY_VACH_NGAN
+            for i, ((a0, a1, _), (b0, b1, _)) in enumerate(zip(dung, dung[1:]), 1):
+                xm = (a1 + b0) / 2
+                g = shapely.geometry.box(xm - day / 2, y0, xm + day / 2, y1).difference(nen)
+                for q in _manh(g):
+                    if q.area > 1e-3:
+                        moi.append({"id": f"vach-ngan-{i}", "loai": "tuong", "ten": f"Vách ngăn {i}", "nhan": "", "layer": tuong[0]["layer"], "handle": "",
+                                    "nguon": "TU_SINH", "geom": q, "thong_so": {"cao": H}, "canh_bao": []})
+            self.canh_bao_chung.append(f"Vách ngăn: dựng {len(dung) - 1} vách dày {day * 1000:.0f} mm giữa các cửa (suy ra từ số cửa, Sếp đối chiếu mặt bằng).")
+        self.ck = [c for c in self.ck if c["loai"] != "cua"]
+        self.ck = [c for c in self.ck if not (c["loai"] == "tuong" and c["geom"].is_empty)]
+        self.ck += moi
+        # 4) mái: gom cụm tường, phủ tấm phẳng lên bao lồi; dốc về phía cửa, đua 1 m theo bề rộng nhà, 0,3 m theo chiều dài
+        manh = _manh(unary_union([c["geom"] for c in self.ck if c["loai"] == "tuong"]))
         ds = []
-        for ps in cum.values():
-            hull = unary_union(ps).convex_hull
-            if hull.geom_type == "Polygon" and hull.area >= 6.0 and _dai_rong_min(hull) >= 2.0:
-                ds.append(hull.buffer(VUON_MAI, join_style=2))
-        for i, f in enumerate(ds, 1):
-            self.ck.append({"id": f"mai-{i}", "loai": "mai", "ten": f"Mái {i}", "nhan": "", "layer": tuong[0]["layer"], "handle": "", "nguon": "TU_SINH", "geom": f,
-                            "thong_so": {"day": DAY_MAI}, "canh_bao": []})
+        for c in self._cum_tuong([{"geom": p} for p in manh]):
+            h = unary_union([manh[i] for i in c]).convex_hull
+            if h.geom_type == "Polygon" and h.area >= 6.0 and _dai_rong_min(h) >= 2.0:
+                bx0, by0, bx1, by1 = h.bounds
+                if h.area / ((bx1 - bx0) * (by1 - by0)) >= 0.95:           # gần chữ nhật nằm theo trục
+                    dai_x = (bx1 - bx0) > (by1 - by0)
+                    dx, dy = (VUON_MAI_DAI, VUON_MAI_NGAN) if dai_x else (VUON_MAI_NGAN, VUON_MAI_DAI)
+                    ds.append((shapely.geometry.box(bx0 - dx, by0 - dy, bx1 + dx, by1 + dy), dai_x))
+                else:
+                    ds.append((h.buffer(VUON_MAI, join_style=2), None))
+        co_cua = bool(cua_pt)
+        for i, (f, dai_x) in enumerate(ds, 1):
+            ts = {"day": DAY_MAI}
+            if cao:
+                ts["z_thap"], ts["z_cao"] = cao[0], cao[1]
+                if cao[1] > cao[0] + 1e-6 and dai_x is not None:
+                    # dốc theo bề rộng nhà, cao về phía có cửa (mặt trước = y nhỏ); không có cửa thì cao về phía y lớn / x lớn
+                    if dai_x:
+                        ts["huong"] = [0, -1] if co_cua else [0, 1]
+                    else:
+                        ts["huong"] = [-1, 0] if co_cua else [1, 0]
+            self.ck.append({"id": f"mai-{i}", "loai": "mai", "ten": f"Mái {i}", "nhan": "", "layer": tuong[0]["layer"], "handle": "", "nguon": "TU_SINH",
+                            "geom": f, "thong_so": ts, "canh_bao": []})
 
     # ---------- bước 2: gán nhãn ----------
     def gan_nhan(self):
@@ -663,11 +731,11 @@ def thong_so_mac_dinh():
     return dict(config.app_config()["mac_dinh"])
 
 
-def boc_khoi_luong(ban_ve, loai_layer, thong_so=None, dieu_chinh=None):
+def boc_khoi_luong(ban_ve, loai_layer, thong_so=None, dieu_chinh=None, ban_ve_goc=None):
     ts = thong_so_mac_dinh()
     ts.update({k: v for k, v in (thong_so or {}).items() if v not in (None, "")})
     ban_ve, loai_layer = suy_dam(ban_ve, loai_layer)
-    bt = _BoTinh(ban_ve, loai_layer, ts, dieu_chinh)
+    bt = _BoTinh(ban_ve, loai_layer, ts, dieu_chinh, ban_ve_goc)
     bt.gom_hinh()
     bt.kiem_tra_don_vi()
     bt.gan_nhan()

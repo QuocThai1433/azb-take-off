@@ -160,7 +160,10 @@
     if (ck.loai === "san") { const t = ts.t || 0.12; return [Z - t, Z]; }
     if (ck.loai === "tuong") { const z0 = ts.z0 || 0; return [Z - Hc + z0, Z - Hc + z0 + (ts.cao || Hc - z0)]; }
     if (ck.loai === "cua") return [Z - Hc, Z - Hc + (ts.cao || 2.1)];
-    if (ck.loai === "mai") return [Z, Z + (ts.day || 0.15)];
+    if (ck.loai === "mai") {   // z_thap / z_cao: cao độ mép thấp / mép cao của mái dốc (tính từ mặt nền); không có thì mái phẳng trên đỉnh tầng
+      const b = Z - Hc + (ts.z_thap != null ? ts.z_thap : Hc), d = ts.day || 0.15;
+      return [b, b + d + (ts.huong && ts.z_cao > ts.z_thap ? ts.z_cao - ts.z_thap : 0)];
+    }
     if (ck.loai === "mong") { const d0 = ts.day || 0.8, z0 = ck.Z != null ? ck.Z : 0; return [z0 - d0, z0]; }
     return null;
   }
@@ -514,9 +517,19 @@
         o.mat = mat;
         const khoiTho = (poly, y0, y1) => {
           let geo;
-          try { geo = new THREE.ExtrudeGeometry(poly.length > 1 ? hinhShape(THREE, poly) : new THREE.Shape(poly[0].map(p => new THREE.Vector2(p[0], p[1]))), {depth: Math.max(y1 - y0, 0.01), bevelEnabled: false}); }
+          const tsm = ck.thong_so || {}, doc = loai === "mai" && tsm.huong && tsm.z_cao > tsm.z_thap;   // mái dốc: dày = day, nghiêng theo hướng huong
+          try { geo = new THREE.ExtrudeGeometry(poly.length > 1 ? hinhShape(THREE, poly) : new THREE.Shape(poly[0].map(p => new THREE.Vector2(p[0], p[1]))), {depth: Math.max(doc ? (tsm.day || 0.15) : y1 - y0, 0.01), bevelEnabled: false}); }
           catch (e) { return; }
-          geo.rotateX(-Math.PI / 2); geo.translate(0, y0, 0);
+          geo.rotateX(-Math.PI / 2);
+          if (doc) {
+            const pos = geo.attributes.position, u = tsm.huong, pr = i => pos.getX(i) * u[0] + (-pos.getZ(i)) * u[1];
+            let pmin = 1e18, pmax = -1e18;
+            for (let i = 0; i < pos.count; i++) { const v = pr(i); if (v < pmin) pmin = v; if (v > pmax) pmax = v; }
+            const dd = (tsm.z_cao - tsm.z_thap) / Math.max(pmax - pmin, 1e-6);
+            for (let i = 0; i < pos.count; i++) pos.setY(i, pos.getY(i) + (pr(i) - pmin) * dd);
+            pos.needsUpdate = true; geo.computeVertexNormals();
+          }
+          geo.translate(0, y0, 0);
           themMesh(o, geo, mat, loai !== "san" && !bo);
         };
         const catDuoc = CAT_DUOC.includes(loai) && !bo && ong.length > 0;

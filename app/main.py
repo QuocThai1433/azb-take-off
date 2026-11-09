@@ -442,7 +442,7 @@ def _tinh(yc):
     bv = p["ban_ve"]
     if len(yc.vung) == 4:
         bv = cat_vung(bv, [float(v) for v in yc.vung])
-    kq = boc_khoi_luong(bv, yc.loai_layer, yc.thong_so, yc.dieu_chinh)
+    kq = boc_khoi_luong(bv, yc.loai_layer, yc.thong_so, yc.dieu_chinh, p["ban_ve"])
     # Cổng kiểm tra gán layer: báo trước những chỗ có vẻ gán sai, vì đây là nguồn sai số lớn nhất mà không tự báo lỗi
     try:
         canh = [f"Gán layer: {x['noi_dung']}" for x in kiem_tra_layer.kiem_tra_gan_layer(p["ban_ve"], yc.loai_layer, _de_xuat(p))
