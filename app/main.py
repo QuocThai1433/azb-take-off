@@ -441,6 +441,12 @@ def _tinh(yc):
     except Exception:  # phân tích phụ không được làm hỏng việc tính
         canh = []
     kq["canh_bao_chung"] = canh + [f"Kiểm tra số liệu: {x}" for x in kiem_tra_layer.kiem_tra_ket_qua(kq)] + kq["canh_bao_chung"]
+    try:  # thông số cọc đọc từ bảng thống kê / ghi chú trên toàn bản vẽ (bảng thường nằm ngoài vùng đang tính), dùng để dựng cọc 3D đúng chiều dài
+        from .gan_nhan import _bang_coc
+        dk, dai = _bang_coc(p["ban_ve"])
+        kq["coc_bang"] = {"d_mm": dk, "l_m": dai}
+    except Exception:
+        kq["coc_bang"] = {"d_mm": None, "l_m": None}
     p["kq"] = kq
     log.info("Tính %s: %d cấu kiện, %d cảnh báo chung, %.1fs", bv.ten_file, len(kq["cau_kien"]), len(kq["canh_bao_chung"]), time.time() - t0)
     return kq

@@ -151,11 +151,11 @@
 
   // ---------- chiều đứng từng loại ----------
   function khoiDoc(ck, H) {
-    const ts = ck.thong_so || {};
-    if (ck.loai === "cot" || ck.loai === "vach") return [0, ts.cao || H];
-    if (ck.loai === "dam") { const h = ts.h || 0.5, ht = ts.h_tinh != null ? ts.h_tinh : h; return [H - h, H - h + ht]; }
-    if (ck.loai === "san") { const t = ts.t || 0.12; return [H - t, H]; }
-    if (ck.loai === "mong") { const d = ts.day || 0.8; return [-d, 0]; }
+    const ts = ck.thong_so || {}, Z = ck.Z != null ? ck.Z : H, Hc = ck.Hc != null ? ck.Hc : H;   // Z = cao độ mặt sàn của mặt bằng chứa cấu kiện, Hc = chiều cao tầng bên dưới
+    if (ck.loai === "cot" || ck.loai === "vach") return [Z - Hc, Z - Hc + (ts.cao || Hc)];
+    if (ck.loai === "dam") { const h = ts.h || 0.5, ht = ts.h_tinh != null ? ts.h_tinh : h; return [Z - h, Z - h + ht]; }
+    if (ck.loai === "san") { const t = ts.t || 0.12; return [Z - t, Z]; }
+    if (ck.loai === "mong") { const d0 = ts.day || 0.8, z0 = ck.Z != null ? ck.Z : 0; return [z0 - d0, z0]; }
     return null;
   }
   function hinhShape(THREE, poly) {
@@ -206,17 +206,19 @@
       pn: innerWidth > 900, dem: [],
       // liên kết, làm việc từng phần, tim trục, cọc, vẽ thêm
       tab: "dt", lv: null, tang: 1, noi: true, noiMm: 300, dungSai: 50, mauKhoi: false, matBang: false,
-      sua: {}, truc: {x: [], y: []}, them: [], cocCfg: {head: null, cut: null, L: 15},
+      mb: {}, mbRef: null, sua: {}, truc: {x: [], y: []}, them: [], cocCfg: {head: null, cut: null, L: 15},
       ve: {tool: "cot", pts: [], b: 300, h: 300, w: 200, hd: 500, t: 120, d: 300, dir: "x", muc: null},
     };
     st.loc.coc = st.loc.truc = st.loc.ve = st.loc.chu = true;
     const KHOA = "azb-3d-" + (d.ten_file || "");
-    const goiY = () => ({sua: st.sua, truc: st.truc, them: st.them, cocCfg: st.cocCfg, tang: st.tang, noi: st.noi});
+    const goiY = () => ({sua: st.sua, truc: st.truc, them: st.them, cocCfg: st.cocCfg, tang: st.tang, noi: st.noi, mb: st.mb, mbRef: st.mbRef});
+    const dsMB = Array.isArray(d.mat_bang) && d.mat_bang.length ? d.mat_bang : null;   // nhiều mặt bằng (móng, các tầng) ghép thành một công trình
     let daLuuBV = JSON.stringify(goiY());      // bản đã lưu vào bản vẽ (so để biết còn thay đổi chưa lưu)
     function nap() {
       try {
         const j = d.ve3d || JSON.parse(localStorage.getItem(KHOA) || "null"); if (!j) return;
-        ["sua", "truc", "them", "cocCfg"].forEach(k => { if (j[k]) st[k] = j[k]; });
+        ["sua", "truc", "them", "cocCfg", "mb"].forEach(k => { if (j[k]) st[k] = j[k]; });
+        if (j.mbRef) st.mbRef = j.mbRef;
         if (j.tang) st.tang = j.tang;
         if (j.noi != null) st.noi = j.noi;
       } catch (e) {}
@@ -232,10 +234,90 @@
       if (!d.luuVe3d) { alert("Không lưu được: 3D này không mở từ một bản vẽ trong dự án."); return; }
       d.luuVe3d(JSON.parse(JSON.stringify(goiY()))); daLuuBV = JSON.stringify(goiY()); capLuu();
     }
+
+    // ---------- ghép nhiều mặt bằng thành một công trình (móng, tầng 1, tầng 2 ...) ----------
+    const khongDau = t => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/gi, "d").toLowerCase();
+    function doanMB(p) {
+      const t = khongDau((p.ten || "") + " " + (p.tang_goi_y || ""));
+      if (/mong|foundation|\bfnd\b|dai coc|pile/.test(t)) return {loai: "mong", tang: 0};
+      if (/\bmai\b|roof/.test(t)) return {loai: "mai", tang: null};
+      const m = t.match(/(?:tang|floor|level|lvl|\bt)\s*[-_.:]?\s*(\d+)/);
+      return {loai: "tang", tang: m ? +m[1] : null};
+    }
+    const tamCotMB = p => {
+      const lay = lo => p.ck.filter(c => c.loai === lo && c.hinh.length && c.hinh[0][0].length > 2).map(c => tamVong(lamSach(c.hinh[0][0])));
+      let a = lay("cot"); if (a.length < 2) a = a.concat(lay("mong")); if (a.length < 2) a = a.concat(lay("vach"));
+      return a;
+    };
+    // Căn mặt bằng p vào mặt bằng chuẩn theo vị trí cột: bỏ phiếu các độ dịch (a - b) và lấy độ dịch có nhiều cột trùng nhất
+    function canTheoCot(pRef, p) {
+      const A = tamCotMB(pRef).slice(0, 400), B = tamCotMB(p).slice(0, 400); if (A.length < 1 || B.length < 1) return null;
+      const cell = 0.1, bin = new Map();
+      A.forEach(a => B.forEach(b => { const kx = Math.round((a[0] - b[0]) / cell), ky = Math.round((a[1] - b[1]) / cell), k = kx + "," + ky; const e = bin.get(k) || {n: 0, sx: 0, sy: 0, kx, ky}; e.n++; e.sx += a[0] - b[0]; e.sy += a[1] - b[1]; bin.set(k, e); }));
+      let best = null;
+      bin.forEach(e => {
+        let n = 0, sx = 0, sy = 0;
+        for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const q = bin.get((e.kx + i) + "," + (e.ky + j)); if (q) { n += q.n; sx += q.sx; sy += q.sy; } }
+        if (!best || n > best.n) best = {n, dx: sx / n, dy: sy / n};
+      });
+      if (!best) return null;
+      // đếm lại số cột thực sự khớp (trong 0.12 m) sau khi dịch
+      let khop = 0; A.forEach(a => { if (B.some(b => Math.hypot(a[0] - (b[0] + best.dx), a[1] - (b[1] + best.dy)) < 0.12)) khop++; });
+      return {dx: +best.dx.toFixed(3), dy: +best.dy.toFixed(3), n: khop};
+    }
+    function macDinhMB() {
+      if (!dsMB) return;
+      const dd = dsMB.map(doanMB), dung_ = new Set(dd.filter(x => x.loai === "tang" && x.tang != null).map(x => x.tang));
+      let nx = 1; dd.forEach(x => { if (x.loai === "tang" && x.tang == null) { while (dung_.has(nx)) nx++; x.tang = nx; dung_.add(nx); } });
+      const tMax = Math.max(0, ...dd.filter(x => x.loai === "tang").map(x => x.tang));
+      dsMB.forEach((p, i) => {
+        if (st.mb[p.key]) return;
+        const x = dd[i], tg = x.loai === "mai" ? tMax + 1 : x.tang;
+        st.mb[p.key] = {loai: x.loai, tang: tg, Z: x.loai === "mong" ? 0 : +(tg * H).toFixed(3), dx: 0, dy: 0, hien: true, canh: null};
+      });
+      if (!st.mbRef || !dsMB.some(p => p.key === st.mbRef)) {
+        let b = null; dsMB.forEach(p => { const c = st.mb[p.key]; if (c.loai === "mong") return; const n = p.ck.filter(k => k.loai === "cot").length; if (!b || n > b.n) b = {n, key: p.key}; });
+        st.mbRef = b ? b.key : dsMB[0].key;
+      }
+    }
+    function tuCanMB(ep) {
+      if (!dsMB) return;
+      const ref = dsMB.find(p => p.key === st.mbRef); if (!ref) return;
+      const bb = p => { const a = []; p.ck.forEach(c => c.hinh.forEach(h => h[0].forEach(q => a.push(q)))); return a.length ? bbVong(a) : [0, 0, 0, 0]; };
+      const bR = bb(ref);
+      dsMB.forEach(p => {
+        const c = st.mb[p.key]; if (!c) return;
+        if (p.key === st.mbRef) { c.dx = 0; c.dy = 0; c.canh = {n: -1}; return; }
+        if (!ep && c.canh) return;
+        const r = canTheoCot(ref, p);
+        if (r && r.n >= 2) { c.dx = r.dx; c.dy = r.dy; c.canh = {n: r.n}; }
+        else { const b2 = bb(p); c.dx = +(bR[0] - b2[0]).toFixed(3); c.dy = +(bR[1] - b2[1]).toFixed(3); c.canh = {n: 0}; }   // không khớp được cột: tạm căn theo góc dưới trái
+      });
+    }
+    function ghepMB() {
+      const ck = [], coc = [];
+      const ds = dsMB.map((p, i) => ({p, i, c: st.mb[p.key]})).filter(x => x.c && x.c.hien && x.c.loai !== "bo");
+      const Zs = [...new Set(ds.map(x => x.c.Z))].sort((a, b) => a - b);
+      ds.forEach(x => {
+        const k = Zs.indexOf(x.c.Z), Hc = k > 0 ? x.c.Z - Zs[k - 1] : (x.c.Z > 0 ? x.c.Z : H), dx = x.c.dx || 0, dy = x.c.dy || 0;
+        const nhan = x.c.loai === "mong" ? "" : ` · T${x.c.tang}`;
+        const tt = h => h.map(poly => poly.map(r => r.map(q => [q[0] + dx, q[1] + dy])));
+        x.p.ck.forEach(c => {
+          if (x.c.loai === "mong" && c.loai === "cot") return;   // cột trong mặt bằng móng chỉ là cột chờ, cột thật lấy ở mặt bằng tầng
+          ck.push(Object.assign({}, c, {id: `${x.i}:${c.id}`, ten: c.ten + nhan, hinh: tt(c.hinh), Z: x.c.Z, Hc, mbi: x.i}));
+        });
+        (x.p.coc || []).forEach(c => coc.push(Object.assign({}, c, {id: `${x.i}:${c.id}`, x: c.x + dx, y: c.y + dy, mbi: x.i})));
+      });
+      return {ck, coc};
+    }
     const lui = []; let seq = 0;
-    function ghiLui() { lui.push(JSON.stringify({sua: st.sua, truc: st.truc, them: st.them, cocCfg: st.cocCfg})); if (lui.length > 60) lui.shift(); }
+    function ghiLui() { lui.push(JSON.stringify({sua: st.sua, truc: st.truc, them: st.them, cocCfg: st.cocCfg, mb: st.mb, mbRef: st.mbRef})); if (lui.length > 60) lui.shift(); }
     nap();
+    if (d.coc_bang && d.coc_bang.l_m && !(d.ve3d && d.ve3d.cocCfg) && st.cocCfg.L === 15) st.cocCfg.L = d.coc_bang.l_m;   // chiều dài cọc đọc từ bảng thống kê cọc
+    macDinhMB(); tuCanMB(false);
+    if (dsMB && !(d.ve3d && d.ve3d.mb)) daLuuBV = JSON.stringify(Object.assign(JSON.parse(daLuuBV), {mb: st.mb, mbRef: st.mbRef}));
     if (d.ve3d) daLuuBV = JSON.stringify(goiY());
+    if (dsMB) st.tang = 1;
     st.them.forEach(m => { const n = parseInt(String(m.id).replace(/\D/g, ""), 10); if (n > seq) seq = n; });
     let objs = new Map(), holes = [], vaCham = [], vaMep = [], khongKhoet = [], thongThuy = null, nhomMain = null, nhomHo = null, nhomTruc = null, nhomMB = null, tong = {};
     let loiLK = [], soNoi = 0, khungMo = [0, 0, 1, 1], nhanPhu = [];
@@ -397,8 +479,9 @@
       const giaoBB = (p, q) => p[0] <= q[2] && p[2] >= q[0] && p[1] <= q[3] && p[3] >= q[1];
       const bbP = P => { let x0 = 1e18, y0 = 1e18, x1 = -1e18, y1 = -1e18; P.forEach(p => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }); return [x0, y0, x1, y1]; };
       // 2) cấu kiện bê tông (dầm, sàn, vách được khoét lỗ cho ống đi xuyên)
-      const dsCK = dsCauKien();
-      const dsCoc = (d.coc || []).map(c => Object.assign({}, c)).concat(st.them.filter(m => m.k === "coc").map(m => ({id: m.id, ten: m.ten, x: m.x, y: m.y, d: m.d, moi: true})));
+      const gh = dsMB ? ghepMB() : null;
+      const dsCK = dsCauKien(gh);
+      const dsCoc = (gh ? gh.coc : (d.coc || []).map(c => Object.assign({}, c))).concat(st.them.filter(m => m.k === "coc").map(m => ({id: m.id, ten: m.ten, x: m.x, y: m.y, d: m.d, moi: true})));
       {
         let x0 = 1e18, y0 = 1e18, x1 = -1e18, y1 = -1e18;
         dsCK.forEach(ck => ck.hinh.forEach(p => p[0].forEach(q => { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); })));
@@ -411,7 +494,7 @@
         const coLoi = (ck.canh_bao || []).some(c => c.muc === "loi" || c.muc === "canh_bao");
         let vol = 0; ck.hinh.forEach(p => vol += dienTich(p));
         vol *= Math.max(dz[1] - dz[0], 0);
-        const o = {id: ck.id, loai, ck, dz, bo, coLoi, vol, meshes: [], edges: [], mat: null, ten: ck.ten, vongs: ck.hinh.map(p => lamSach(p[0])), lk: new Set()};
+        const o = {id: ck.id, loai, ck, dz, bo, coLoi, vol, meshes: [], edges: [], mat: null, ten: ck.ten, vongs: ck.hinh.map(p => lamSach(p[0])), lk: new Set(), mbi: ck.mbi};
         objs.set(ck.id, o);
         tong[loai] = tong[loai] || {n: 0, v: 0}; tong[loai].n++; if (!bo) tong[loai].v += vol;
         const mat = new THREE.MeshStandardMaterial({color: bo ? 0x555b66 : LOAI[loai].mau, roughness: 0.62, metalness: 0.05});
@@ -520,13 +603,14 @@
     // ---------- dữ liệu cấu kiện: gộp cấu kiện từ bản vẽ + phần vẽ thêm, nối dầm vào cột, chỉnh cao độ ----------
     function itemCK(m) {
       const b0 = {id: m.id, ten: m.ten || m.id, nhan: "", layer: "Vẽ thêm trong 3D", nguon: "3D", canh_bao: [], loai_bo: false, moi: true, item: m};
+      if (m.Z != null) { b0.Z = m.Z; b0.Hc = H; }
       if (m.k === "cot") return Object.assign(b0, {loai: "cot", thong_so: {}, hinh: [[vongHCN(m.x, m.y, m.b, m.h)]]});
       if (m.k === "dam") return Object.assign(b0, {loai: "dam", thong_so: {h: m.h, b: m.w}, hinh: [[vongDam(m.a, m.b, m.w)]]});
       if (m.k === "san") return Object.assign(b0, {loai: "san", thong_so: {t: m.t}, hinh: [[[[m.x0, m.y0], [m.x1, m.y0], [m.x1, m.y1], [m.x0, m.y1]]]]});
       return null;
     }
-    function dsCauKien() {
-      const ds = (d.cau_kien || []).slice();
+    function dsCauKien(gh) {
+      const ds = (gh ? gh.ck : d.cau_kien || []).slice();
       st.them.forEach(m => { const c = itemCK(m); if (c) ds.push(c); });
       soNoi = 0;
       return st.noi ? noiDam(ds) : ds;
@@ -534,7 +618,7 @@
     // Dầm vẽ rời khỏi cột / vách một khe nhỏ thì kéo dài đầu dầm cho chạm mặt cột, như thi công thực tế.
     function noiDam(ds) {
       const tol = st.noiMm / 1000;
-      const gan = ds.filter(c => !c.loai_bo && (c.loai === "cot" || c.loai === "vach") && c.hinh.length).map(c => c.hinh.map(p => lamSach(p[0]))).flat();
+      const gan = ds.filter(c => !c.loai_bo && (c.loai === "cot" || c.loai === "vach") && c.hinh.length).map(c => c.hinh.map(p => ({R: lamSach(p[0]), mbi: c.mbi}))).flat();
       if (!gan.length) return ds;
       return ds.map(ck => {
         if (ck.loai !== "dam" || ck.loai_bo || ck.hinh.length !== 1) return ck;
@@ -545,7 +629,8 @@
         const v = [-u[1], u[0]], us = P.map(p => p[0] * u[0] + p[1] * u[1]), vs = P.map(p => p[0] * v[0] + p[1] * v[1]);
         const u0 = Math.min(...us), u1 = Math.max(...us), v0 = Math.min(...vs), v1 = Math.max(...vs);
         let n0 = u0, n1 = u1, best0 = tol + 1e-9, best1 = tol + 1e-9;
-        gan.forEach(R => {
+        gan.forEach(({R, mbi: cm}) => {
+          if (cm !== ck.mbi) return;
           const cu = R.map(p => p[0] * u[0] + p[1] * u[1]), cv = R.map(p => p[0] * v[0] + p[1] * v[1]);
           if (Math.min(Math.max(...cv), v1) - Math.max(Math.min(...cv), v0) < 0.02) return;
           const cmin = Math.min(...cu), cmax = Math.max(...cu), g0 = u0 - cmax, g1 = cmin - u1;
@@ -579,7 +664,7 @@
         const t = thongSoCoc(c, dayMax), r = t.D / 2, tren = Math.min(t.cut, t.head), hThan = Math.max(tren - t.tip, 0.05), dCat = Math.max(t.head - t.cut, 0);
         const mat = new THREE.MeshStandardMaterial({color: LOAI.coc.mau, roughness: 0.7, metalness: 0.05});
         const o = {id: c.id, loai: "coc", ten: c.ten, dz: [t.tip, Math.max(t.head, t.cut)], meshes: [], edges: [], bo: false, coLoi: t.cut > t.head + 1e-6, vol: Math.PI * r * r * hThan, ck: null, mat, matCat: null,
-          coc: Object.assign({x: c.x, y: c.y, moi: !!c.moi, layer: c.layer, dCat}, t), vongs: [vongTron(c.x, c.y, r)], lk: new Set(), moi: !!c.moi};
+          coc: Object.assign({x: c.x, y: c.y, moi: !!c.moi, layer: c.layer, dCat}, t), vongs: [vongTron(c.x, c.y, r)], lk: new Set(), moi: !!c.moi, mbi: c.mbi};
         objs.set(c.id, o);
         const them = (geo, m, cat) => {
           const mesh = new THREE.Mesh(geo, m); mesh.userData.id = c.id; mesh.userData.cat = !!cat; mesh.castShadow = !cat; mesh.receiveShadow = true; o.meshes.push(mesh); nhomMain.add(mesh);
@@ -596,7 +681,7 @@
       });
     }
     function nhanTang() {
-      if (st.tang <= 1) return;
+      if (st.tang <= 1 || dsMB) return;
       const goc = [...objs.values()].filter(o => THEM_LOAI.includes(o.loai) && o.ck);
       for (let k = 1; k < st.tang; k++) goc.forEach(b => {
         const o = Object.assign({}, b, {id: `${b.id}@${k}`, ten: `${b.ten} · T${k + 1}`, dz: [b.dz[0] + k * H, b.dz[1] + k * H], meshes: [], edges: [], base: b.id, tang: k, mat: b.mat.clone(), va: false, lk: new Set()});
@@ -612,7 +697,7 @@
       const tol = st.dungSai / 1000;
       const ds = [...objs.values()].filter(o => o.vongs && !o.base && !o.bo && o.vongs.length);
       ds.forEach(o => { o.lk = new Set(); const bs = o.vongs.map(bbVong); o.bbx = [Math.min(...bs.map(b => b[0])), Math.min(...bs.map(b => b[1])), Math.max(...bs.map(b => b[2])), Math.max(...bs.map(b => b[3]))]; });
-      const khongNoi = (a, b) => a.loai === b.loai && (a.loai === "cot" || a.loai === "san" || a.loai === "coc");
+      const khongNoi = (a, b) => a.loai === b.loai && a.mbi === b.mbi && (a.loai === "cot" || a.loai === "san" || a.loai === "coc");
       for (let i = 0; i < ds.length; i++) for (let j = i + 1; j < ds.length; j++) {
         const a = ds[i], b = ds[j];
         if (khongNoi(a, b) || a.bbx[0] > b.bbx[2] + tol || b.bbx[0] > a.bbx[2] + tol || a.bbx[1] > b.bbx[3] + tol || b.bbx[1] > a.bbx[3] + tol) continue;
@@ -633,7 +718,7 @@
       const bao = (o, nd) => loiLK.push({id: o.id, nd});
       ds.forEach(o => {
         if (!o.lk.size) bao(o, "Rời rạc: chưa chạm cấu kiện nào");
-        else if (o.loai === "cot" && coMong && !dem(o, ["mong", "coc"])) bao(o, "Cột chưa đặt trên móng");
+        else if (o.loai === "cot" && coMong && !dem(o, ["mong", "coc"]) && !(o.dz[0] > 0.05 && dem(o, ["cot", "vach"]))) bao(o, "Cột chưa đặt trên móng / chưa nối với cột tầng dưới");
         else if (o.loai === "dam" && dem(o, ["cot", "vach", "dam"]) < 2) bao(o, "Dầm chưa tựa đủ 2 đầu (cột / vách / dầm)");
         else if (o.loai === "mong" && coCoc && !dem(o, ["coc"])) bao(o, "Móng chưa có cọc");
         else if (o.loai === "coc" && coMong && !dem(o, ["mong"])) bao(o, "Cọc không nằm dưới móng");
@@ -912,6 +997,7 @@
     const TIEN_TO = {cot: "CM", dam: "DM", san: "SM", coc: "PM", duong: "Nét ", chu: "GC"};
     function themMoi(m) {
       ghiLui(); m.id = "moi" + (++seq);
+      if (m.k === "cot" || m.k === "dam" || m.k === "san") m.Z = mucY();
       m.ten = TIEN_TO[m.k] + (st.them.filter(x => x.k === m.k).length + 1);
       st.them.push(m); luu(); dung(); ap(); st.chon = m.id; ap(); capNhatPn();
     }
@@ -944,7 +1030,7 @@
     function hoanTac() {
       if (!lui.length) return;
       const j = JSON.parse(lui.pop());
-      st.sua = j.sua; st.truc = j.truc; st.them = j.them; st.cocCfg = j.cocCfg;
+      st.sua = j.sua; st.truc = j.truc; st.them = j.them; st.cocCfg = j.cocCfg; if (j.mb) st.mb = j.mb; st.mbRef = j.mbRef || st.mbRef;
       luu(); huyVe(); dung(); ap(); capNhatPn();
     }
     const HUONG_DAN_VE = {
@@ -1206,13 +1292,31 @@
       nl /= 2;
       return `<div class="x3-sec"><h5>Liên kết toàn công trình</h5>
         <div class="x3-mut">Hai cấu kiện liên kết khi chạm / chồng nhau trên mặt bằng và trùng khoảng cao độ. <b style="color:#e6ebf5">${n}</b> cấu kiện · <b style="color:#e6ebf5">${f2(nl, 0)}</b> liên kết · <b style="color:${loiLK.length ? "#ff7a45" : "#3ecf8e"}">${loiLK.length}</b> chỗ cần kiểm tra.</div>
-        <div class="x3-kv" style="margin-top:6px">${kvr("Số tầng dựng", `<input type="number" data-g="tang" min="1" max="30" step="1" value="${st.tang}">`)}${kvr("Dung sai chạm", `<input type="number" data-g="dungSai" min="0" max="500" step="10" value="${st.dungSai}"> mm`)}</div>
+        <div class="x3-kv" style="margin-top:6px">${dsMB ? kvr("Tầng", `<a data-tab="mb" style="cursor:pointer">${dsMB.length} mặt bằng ghép → tab Tầng</a>`) : kvr("Số tầng dựng", `<input type="number" data-g="tang" min="1" max="30" step="1" value="${st.tang}">`)}${kvr("Dung sai chạm", `<input type="number" data-g="dungSai" min="0" max="500" step="10" value="${st.dungSai}"> mm`)}</div>
         <div class="x3-row"><label><input type="checkbox" data-o="noi" ${st.noi ? "checked" : ""}>Nối dầm vào cột / vách khi hở ≤</label><span class="n"><input type="number" data-g="noiMm" min="0" max="1000" step="50" value="${st.noiMm}"> mm</span></div>
         ${soNoi ? `<div class="x3-mut">Đã kéo dài đầu của ${soNoi} dầm cho chạm cột / vách (chỉ để dựng 3D, không đổi khối lượng chính thức).</div>` : ""}
         <div class="x3-row"><label><input type="checkbox" data-o="mauKhoi" ${st.mauKhoi ? "checked" : ""}>Bê tông liền khối (một màu, như công trình thật)</label></div>
         ${loiLK.length ? `<div style="max-height:200px;overflow:auto;margin-top:6px">${loiLK.slice(0, 80).map(x => { const o = objs.get(x.id); return `<div class="x3-ho" data-go="${esc(x.id)}"><span><b>${esc(o.ten)}</b> · ${LOAI[o.loai].ten}</span><span></span><span class="x3-mut" style="grid-column:1/3">${esc(x.nd)}</span></div>`; }).join("")}${loiLK.length > 80 ? `<div class="x3-mut">… và ${loiLK.length - 80} chỗ khác</div>` : ""}</div>` : ""}</div>`;
     }
 
+
+    // Tab Tầng: mỗi mặt bằng được khai báo loại (móng / tầng), cao độ sàn và độ dịch để căn thẳng trục với mặt bằng chuẩn
+    function mbHTML() {
+      const hang = dsMB.map((p, i) => {
+        const c = st.mb[p.key], chuan = p.key === st.mbRef, nOb = p.ck.length, nc = (p.coc || []).length;
+        const kq = chuan ? '<span class="x3-chip" style="background:#3ecf8e">Mặt bằng chuẩn</span>' : c.canh ? (c.canh.n >= 2 ? `<span class="x3-chip" style="background:#3ecf8e">Khớp ${c.canh.n} cột</span>` : '<span class="x3-chip" style="background:#ffb020">Chưa khớp cột: căn tạm theo góc</span>') : "";
+        return `<div class="x3-sec" style="${c.hien ? "" : "opacity:.55"}"><div class="x3-row"><label><input type="checkbox" data-mbh="${i}" ${c.hien ? "checked" : ""}><b>${esc(p.ten)}</b></label></div>
+          <div class="x3-mut" style="margin-bottom:4px">${nOb} cấu kiện${nc ? ` · ${nc} cọc` : ""} ${kq}</div>
+          <div class="x3-kv">${kvr("Loại", `<select data-mb="loai" data-i="${i}"><option value="mong" ${c.loai === "mong" ? "selected" : ""}>Móng / cọc</option><option value="tang" ${c.loai === "tang" || c.loai === "mai" ? "selected" : ""}>Tầng</option><option value="bo" ${c.loai === "bo" ? "selected" : ""}>Bỏ qua</option></select>`)}
+            ${c.loai !== "mong" ? kvr("Tầng số", `<input type="number" data-mb="tang" data-i="${i}" min="1" max="60" step="1" value="${c.tang}">`) : ""}
+            ${kvr("Cao độ sàn", `<input type="number" data-mb="Z" data-i="${i}" step="0.1" value="${f2(c.Z, 2)}"> m`)}
+            ${kvr("Dịch X / Y", `<input type="number" data-mb="dx" data-i="${i}" step="0.05" value="${f2(c.dx, 3)}"><input type="number" data-mb="dy" data-i="${i}" step="0.05" value="${f2(c.dy, 3)}">`)}</div>
+          <div class="x3-row" style="flex-wrap:wrap;margin-top:6px"><button data-a="mb-can" data-i="${i}" ${chuan ? "disabled" : ""}>⚙ Căn theo cột</button><button data-a="mb-chuan" data-i="${i}" ${chuan ? "disabled" : ""}>Đặt làm chuẩn</button><button data-a="mb-chi" data-i="${i}">Chỉ hiện tầng này</button></div></div>`;
+      }).join("");
+      return `<div class="x3-sec"><h5>Ghép các mặt bằng thành công trình</h5>
+        <div class="x3-mut">Mỗi mặt bằng (móng, tầng 1, tầng 2...) đã được dựng riêng rồi <b>dịch cho thẳng trục</b> với mặt bằng chuẩn và <b>xếp lên đúng cao độ sàn</b>. Cột tầng trên nối cột tầng dưới; cột tầng 1 đứng trên móng. Tầng n mặc định có cao độ sàn = n × cao tầng (${f2(H, 2)} m): sửa nếu khác. Ở mỗi mặt bằng, cột trong bản vẽ móng chỉ là cột chờ nên không dựng.</div>
+        <div class="x3-row" style="flex-wrap:wrap;margin-top:6px"><button class="cam" data-a="mb-can-het">⚙ Căn lại tất cả theo cột</button><button data-a="mb-hien-het">Hiện mọi mặt bằng</button></div></div>${hang}`;
+    }
     function trucHTML() {
       const hang = (hx, tieuDe, ghiChu) => `<div class="x3-sec"><h5>${tieuDe}</h5><div class="x3-mut" style="margin-bottom:4px">${ghiChu}</div>
         ${st.truc[hx].map((a, i) => `<div class="x3-row"><input type="text" class="tt" data-tr="ten" data-hx="${hx}" data-i="${i}" value="${esc(a.ten)}" style="width:62px;height:28px;background:#0a0f19;color:#e6ebf5;border:1px solid #2a3957;border-radius:6px;padding:0 6px"><input type="number" data-tr="v" data-hx="${hx}" data-i="${i}" step="0.05" value="${f2(a.v, 3)}"><span class="x3-mut">m</span><button data-a="chon-truc" data-hx="${hx}" data-i="${i}" style="height:24px" title="Bay tới trục">⌖</button><button data-a="truc-tam" data-hx="${hx}" data-i="${i}" style="height:24px" title="Đặt trục vào tâm cấu kiện đang chọn">◎</button><button data-a="xoa-truc" data-hx="${hx}" data-i="${i}" style="height:24px">✕</button></div>`).join("") || '<div class="x3-mut">Chưa có.</div>'}
@@ -1300,9 +1404,10 @@
     function capNhatPn() {
       pn.hidden = !st.pn;
       const cuon = pn.scrollTop;
-      const TABS = [["dt", "Đối tượng"], ["tc", "Trục &amp; cọc"], ["ve", "Vẽ thêm"], ["mh", "Mô hình"]];
+      const TABS = [["dt", "Đối tượng"]].concat(dsMB ? [["mb", "Tầng"]] : [], [["tc", "Trục &amp; cọc"], ["ve", "Vẽ thêm"], ["mh", "Mô hình"]]);
       let s = `<div class="x3-tabs">${TABS.map(([k, t]) => `<button data-tab="${k}" class="${st.tab === k ? "on" : ""}">${t}</button>`).join("")}</div>`;
       if (st.tab === "dt") s += lopHTML() + chonHTML() + lienKetHTML();
+      else if (st.tab === "mb" && dsMB) s += mbHTML();
       else if (st.tab === "tc") s += trucHTML();
       else if (st.tab === "ve") s += veHTML();
       else s += moHinhHTML();
@@ -1330,6 +1435,13 @@
         const k = dd.o; st[k] = t.checked;
         if (k === "noi") { luu(); dung(); ap(); } else if (k === "khoet") { dung(); ap(); } else ap();
         capNhatPn(); return;
+      }
+      if (dd.mbh != null) { const c = st.mb[dsMB[+dd.mbh].key]; ghiLui(); c.hien = t.checked; luu(); dung(); ap(); capNhatPn(); return; }
+      if (dd.mb) {
+        const i = +dd.i, c = st.mb[dsMB[i].key]; ghiLui();
+        if (dd.mb === "loai") { c.loai = t.value; if (c.loai === "mong") { c.Z = 0; c.tang = 0; } else if (c.loai === "tang") { if (!c.tang) c.tang = 1; c.Z = +(c.tang * H).toFixed(3); } }
+        else { const v = parseFloat(t.value); if (!isFinite(v)) return; c[dd.mb] = dd.mb === "tang" ? Math.max(1, Math.round(v)) : v; if (dd.mb === "tang") c.Z = +(c.tang * H).toFixed(3); if (dd.mb === "dx" || dd.mb === "dy") c.canh = {n: 0, tay: true}; }
+        luu(); dung(); ap(); capNhatPn(); return;
       }
       if (dd.g) {
         let v = parseFloat(t.value); if (!isFinite(v)) return;
@@ -1424,6 +1536,11 @@
         arr.push({ten: dd.hx === "x" ? String(arr.length + 1) : chuCai(arr.length), v: +v0.toFixed(3)});
         luu(); dungTruc(); ap(); capNhatPn();
       }
+      else if (k === "mb-can" && dsMB) { const c = st.mb[dsMB[+dd.i].key]; ghiLui(); c.canh = null; tuCanMB(false); luu(); dung(); ap(); capNhatPn(); }
+      else if (k === "mb-can-het" && dsMB) { ghiLui(); tuCanMB(true); luu(); dung(); ap(); capNhatPn(); }
+      else if (k === "mb-chuan" && dsMB) { ghiLui(); st.mbRef = dsMB[+dd.i].key; tuCanMB(true); luu(); dung(); ap(); capNhatPn(); }
+      else if (k === "mb-chi" && dsMB) { ghiLui(); dsMB.forEach((p, j) => { st.mb[p.key].hien = j === +dd.i; }); luu(); dung(); ap(); capNhatPn(); }
+      else if (k === "mb-hien-het" && dsMB) { ghiLui(); dsMB.forEach(p => { st.mb[p.key].hien = true; }); luu(); dung(); ap(); capNhatPn(); }
       else if (k === "do-truc") doTruc();
       else if (k === "truc-tam") {
         const c = st.chon && objs.get(st.chon);
@@ -1642,7 +1759,7 @@
     datLai(); addEventListener("resize", datLai);
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(datLai) : null; ro && ro.observe(kg);
     capNhatPn(); capLuu();
-    $("#x3-tt").textContent = `Cao tầng ${H} m · ${(d.cau_kien || []).filter(c => c.loai_bo).length} cấu kiện bị loại (xám mờ)` + (coOng ? ` · ${holes.length} lỗ khoét · ${vaCham.length + vaMep.length} va chạm` : "") + (tong.coc ? ` · ${tong.coc.n} cọc` : "") + ` · ${loiLK.length} chỗ liên kết cần kiểm tra`;
+    $("#x3-tt").textContent = `Cao tầng ${H} m · ${dsMB ? dsMB.length + " mặt bằng ghép" : (d.cau_kien || []).filter(c => c.loai_bo).length + " cấu kiện bị loại (xám mờ)"}` + (coOng ? ` · ${holes.length} lỗ khoét · ${vaCham.length + vaMep.length} va chạm` : "") + (tong.coc ? ` · ${tong.coc.n} cọc` : "") + ` · ${loiLK.length} chỗ liên kết cần kiểm tra`;
     $("#x3-ft").textContent = (khungNote ? khungNote + " · " : "") + "Chuột trái: xoay · Phải: dịch · Lăn: zoom · Bấm: chọn · Nhấp đúp: bay tới · Bấm ❔ Hướng dẫn hoặc phím ? để xem chi tiết. Khối dựng từ hình 2D và chiều cao đã tính, chưa phải mô hình BIM.";
     let chay = true;
     const bnd = new THREE.Vector3();
