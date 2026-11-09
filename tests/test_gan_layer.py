@@ -17,8 +17,8 @@ LAYER_THAT = [
     ("S-Text250", "nhan"), ("TEXTTHEP", "nhan"), ("S-GHI CHU", "nhan"),
     ("A-Wall", "bo_qua"), ("A-COT", "bo_qua"), ("A-Detl-XFine", "bo_qua"),
     ("X - NHA BAO VE 2-1$0$A-Wall", "bo_qua"),
-    ("X - NHA BAO VE 2-1$0$WALL", "bo_qua"),            # xref + 'wall' mơ hồ: không tự gán vách
-    ("WALL", "bo_qua"), ("0-WALL", "bo_qua"),            # 'wall' trần: mơ hồ, chỉ gợi ý
+    ("X - NHA BAO VE 2-1$0$WALL", "tuong"),            # 'wall' là tường kiến trúc (chỉ dựng 3D, không tính khối lượng)
+    ("WALL", "tuong"), ("0-WALL", "tuong"),            # 'wall' trần: tường kiến trúc, không bao giờ tự gán thành vách bê tông
     ("0", "bo_qua"), ("1", "bo_qua"), ("05", "bo_qua"), ("100", "bo_qua"), ("COBAN", "bo_qua"), ("BETONG", "bo_qua"),
     ("S-COT", "cot"), ("S-Column", "cot"), ("S-DAM", "dam"), ("S-Beam", "dam"),
     ("S-Foundation", "mong"), ("Mong-netmanh", "mong"), ("PILE", "coc"), ("S-Pile", "coc"), ("coc", "coc"),

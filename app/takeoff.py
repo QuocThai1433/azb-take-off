@@ -243,10 +243,19 @@ class _BoTinh:
                 for i, p in enumerate(_manh(unary_union([khep, don] if don is not None else [khep]))):
                     if p.area >= dt_min:
                         theo_loai["tuong"].append((HinhKin(p, f"net{i}", "NET_TUONG"), ten))
-        to = [x for x in theo_loai["tuong"] if x[1] == ten and x[0].nguon != "NET_TUONG" and x[0].geom.area > 3 and _dai_rong_min(x[0].geom) > 0.8]
-        if to:
-            theo_loai["tuong"] = [x for x in theo_loai["tuong"] if x not in to]
-            self.canh_bao_chung.append(f"Layer {ten}: bỏ {len(to)} hình kín rộng hơn 0,8 m (khung mặt đứng / mặt cắt, không phải tường).")
+        # Hình kín lớn (đường bao ngoài của nhà) không phải một bức tường đặc: dựng thành vành tường dày mặc định
+        so_vanh = 0
+        for k, (h, t) in enumerate(theo_loai["tuong"]):
+            if t != ten or h.nguon == "NET_TUONG" or h.geom.area <= 3 or _dai_rong_min(h.geom) <= 0.8:
+                continue
+            vanh = h.geom.difference(h.geom.buffer(-DAY_TUONG_MAC_DINH, join_style=2))
+            if not vanh.is_empty:
+                theo_loai["tuong"][k] = (HinhKin(vanh, h.handle, h.nguon), t)
+                so_vanh += 1
+        if so_vanh:
+            self.canh_bao_chung.append(
+                f"Layer {ten}: {so_vanh} hình kín lớn (đường bao nhà) được dựng thành vành tường dày {DAY_TUONG_MAC_DINH * 1000:.0f} mm. "
+                "Nếu layer này lẫn mặt đứng / mặt cắt thì Sếp chọn vùng quanh đúng mặt bằng.")
 
     def _tuong_cua_mai(self):
         """Tường (extrude theo cao tầng), khoét ô cửa (cửa = hộp bao của hình cửa, chỉ chỗ giao với tường), lanh tô phía trên, mái phẳng."""

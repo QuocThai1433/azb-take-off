@@ -23,6 +23,10 @@ rules:
     type: bo_qua
     conf: 0.99
     ly_do: "Layer hệ thống Defpoints của CAD"
+  - pattern: '(door|window|cua).*(iden|tag|text|note|legend|schedule|shcedule|dim)|(iden|tag|schedule|shcedule).*(door|window|cua)'
+    type: bo_qua
+    conf: 0.85
+    ly_do: "Nhãn / bảng thống kê cửa, không phải hình cửa"
   - pattern: '(?<![a-z])(door|doors|window|windows|cua di|cua so|cua)(?![a-z])'
     type: cua
     conf: 0.8
@@ -98,9 +102,9 @@ rules:
     conf: 0.85
     ly_do: "Tên layer là vách / lõi"
   - pattern: '(?<![a-z])(wall|walls)(?![a-z])'
-    type: vach
-    conf: 0.5
-    ly_do: "Tên 'wall' có thể là tường kiến trúc hoặc vách kết cấu, cần xác nhận"
+    type: tuong
+    conf: 0.75
+    ly_do: "Tên 'wall' thường là tường kiến trúc (chỉ dựng 3D). Nếu là vách bê tông kết cấu thì chọn lại Vách / lõi"
   - pattern: '(?<![a-z])(san|slab)(?![a-z])'
     type: san
     conf: 0.8

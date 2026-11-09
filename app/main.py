@@ -131,7 +131,8 @@ def _thong_tin_ban_ve(pid, ten, bv):
         l["goi_y_ly_do"] = config.phan_tich_ten(l["ten"])[2]
     # Tên layer không cho biết gì: dò theo hình học (cặp nét song song = hai mặt tường)
     chua_ro = {l["ten"] for l in layers if config.phan_tich_ten(l["ten"])[0] is None}
-    for ten, dai in do_layer_tuong(bv, bo_qua={l["ten"] for l in layers} - chua_ro).items():
+    da_co_tuong = any(l["goi_y"] == "tuong" for l in layers)   # đã có layer tường theo tên thì không đoán thêm theo hình học
+    for ten, dai in ({} if da_co_tuong else do_layer_tuong(bv, bo_qua={l["ten"] for l in layers} - chua_ro)).items():
         for l in layers:
             if l["ten"] == ten:
                 l["goi_y"] = "tuong"
