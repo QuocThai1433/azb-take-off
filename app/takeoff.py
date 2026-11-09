@@ -309,20 +309,20 @@ class _BoTinh:
         cua_pt = []          # (hộp khoét, chiều cao cửa)
         for c in cua:
             b = c["geom"].bounds
-            if max(b[2] - b[0], b[3] - b[1]) <= 4.0:
+            if max(b[2] - b[0], b[3] - b[1]) <= 4.0 and b[2] >= x0 - 0.5 and b[0] <= x1 + 0.5 and b[3] >= y0 - 0.5 and b[1] <= y1 + 0.5:
                 cua_pt.append((shapely.geometry.box(*b).buffer(0.02), CAO_CUA))
         dung = []
         if not cua_pt:
             dung = cua_tu_mat_dung(self.goc, self.loai_layer, x0, x1, (y0, y1))
             for a, b, h in dung:
-                cua_pt.append((shapely.geometry.box(a, y0 - 0.05, b, y0 + 0.5), h))
+                cua_pt.append((shapely.geometry.box(a, y0 - 0.05, b, y0 + 0.25), h))
             if dung:
                 self.canh_bao_chung.append(f"Cửa: {len(dung)} cửa lấy từ mặt đứng (cùng trục x với mặt bằng), khoét ở tường phía y nhỏ (mặt trước).")
         moi = []
         for c in tuong:
             g = c["geom"]
             c["thong_so"] = {"cao": H}
-            hit = [(b, h) for b, h in cua_pt if g.intersects(b)]
+            hit = [(b, h) for b, h in cua_pt if g.intersects(b) and g.intersection(b).area >= 0.05]   # bỏ vệt giao nhỏ ở góc tường
             if not hit:
                 continue
             c["geom"] = g.difference(unary_union([b for b, _ in hit]))
