@@ -327,7 +327,7 @@
     if (dsMB) st.tang = 1;
     st.them.forEach(m => { const n = parseInt(String(m.id).replace(/\D/g, ""), 10); if (n > seq) seq = n; });
     let objs = new Map(), holes = [], vaCham = [], vaMep = [], khongKhoet = [], thongThuy = null, nhomMain = null, nhomHo = null, nhomTruc = null, nhomMB = null, tong = {};
-    let loiLK = [], soNoi = 0, khungMo = [0, 0, 1, 1], nhanPhu = [];
+    let loiLK = [], soNoi = 0, soKhungLon = 0, khungMo = [0, 0, 1, 1], nhanPhu = [];
     MEPK.forEach(k => {   // mặc định cao độ + kích thước theo từng hệ thống
       const x = nguonOng.find(o => o.loai === k); if (!x) return;
       const md = macDinh[k] || {};
@@ -620,6 +620,9 @@
       const ds = (gh ? gh.ck : d.cau_kien || []).slice();
       st.them.forEach(m => { const c = itemCK(m); if (c) ds.push(c); });
       soNoi = 0;
+      // Hình "dầm" rộng hơn 1,2 m không phải một dầm mà là đường bao khung dầm / ô dầm: dựng thành khối đặc sẽ thành một tấm lớn, nên bỏ khỏi 3D
+      const ra = ds.filter(c => { if (c.loai !== "dam" || c.hinh.length < 1 || !c.hinh[0][0] || c.hinh[0][0].length < 3) return true; const r = dai_rong(lamSach(c.hinh[0][0])); return Math.min(r[0], r[1]) <= 1.2; });
+      soKhungLon = ds.length - ra.length; ds.length = 0; ra.forEach(c => ds.push(c));
       return st.noi ? noiDam(ds) : ds;
     }
     // Dầm vẽ rời khỏi cột / vách một khe nhỏ thì kéo dài đầu dầm cho chạm mặt cột, như thi công thực tế.
@@ -1301,6 +1304,7 @@
         <div class="x3-mut">Hai cấu kiện liên kết khi chạm / chồng nhau trên mặt bằng và trùng khoảng cao độ. <b style="color:#e6ebf5">${n}</b> cấu kiện · <b style="color:#e6ebf5">${f2(nl, 0)}</b> liên kết · <b style="color:${loiLK.length ? "#ff7a45" : "#3ecf8e"}">${loiLK.length}</b> chỗ cần kiểm tra.</div>
         <div class="x3-kv" style="margin-top:6px">${dsMB ? kvr("Tầng", `<a data-tab="mb" style="cursor:pointer">${dsMB.length} mặt bằng ghép → tab Tầng</a>`) : kvr("Số tầng dựng", `<input type="number" data-g="tang" min="1" max="30" step="1" value="${st.tang}">`)}${kvr("Dung sai chạm", `<input type="number" data-g="dungSai" min="0" max="500" step="10" value="${st.dungSai}"> mm`)}</div>
         <div class="x3-row"><label><input type="checkbox" data-o="noi" ${st.noi ? "checked" : ""}>Nối dầm vào cột / vách khi hở ≤</label><span class="n"><input type="number" data-g="noiMm" min="0" max="1000" step="50" value="${st.noiMm}"> mm</span></div>
+        ${soKhungLon ? `<div class="x3-cb">${soKhungLon} hình "dầm" rộng hơn 1,2 m (đường bao khung dầm hoặc ô dầm, không phải dầm) đã bỏ khỏi 3D. Nếu là dầm thật thì kiểm tra lại cách gán layer.</div>` : ""}
         ${soNoi ? `<div class="x3-mut">Đã kéo dài đầu của ${soNoi} dầm cho chạm cột / vách (chỉ để dựng 3D, không đổi khối lượng chính thức).</div>` : ""}
         <div class="x3-row"><label><input type="checkbox" data-o="mauKhoi" ${st.mauKhoi ? "checked" : ""}>Bê tông liền khối (một màu, như công trình thật)</label></div>
         ${loiLK.length ? `<div style="max-height:200px;overflow:auto;margin-top:6px">${loiLK.slice(0, 80).map(x => { const o = objs.get(x.id); return `<div class="x3-ho" data-go="${esc(x.id)}"><span><b>${esc(o.ten)}</b> · ${LOAI[o.loai].ten}</span><span></span><span class="x3-mut" style="grid-column:1/3">${esc(x.nd)}</span></div>`; }).join("")}${loiLK.length > 80 ? `<div class="x3-mut">… và ${loiLK.length - 80} chỗ khác</div>` : ""}</div>` : ""}</div>`;
