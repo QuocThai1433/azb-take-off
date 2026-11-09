@@ -28,3 +28,13 @@ def test_tuong_khoet_cua_lanh_to_va_mai():
 def test_tuong_net_don_duoc_bu_thanh_dai():
     kq = boc_khoi_luong(_ban_ve(), {"TUONG": "tuong", "CUA": "bo_qua"}, {})
     assert any(c["nguon"] == "NET_TUONG" for c in kq["cau_kien"])
+
+
+def test_hai_net_song_song_thanh_mot_buc_tuong_day():
+    t = LayerData("T", net_ho=[LineString([(0, 0), (4, 0)]), LineString([(0, 0.35), (4, 0.35)])])
+    kq = boc_khoi_luong(BanVe("t.dxf", 1.0, "m", {"T": t}, []), {"T": "tuong"}, {})
+    from shapely.geometry import Polygon
+    ds = [c for c in kq["cau_kien"] if c["loai"] == "tuong"]
+    assert len(ds) == 1
+    p = Polygon(ds[0]["hinh"][0][0])
+    assert abs(p.area - 4 * 0.35) < 0.05

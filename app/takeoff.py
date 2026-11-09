@@ -83,6 +83,12 @@ def _manh(g):
     return [x for x in getattr(g, "geoms", []) if x.geom_type == "Polygon" and x.area > 0]
 
 
+def _dai_rong_min(g):
+    """Cạnh ngắn của hình chữ nhật bao xoay nhỏ nhất (m)."""
+    xy = list(g.minimum_rotated_rectangle.exterior.coords)
+    return min(math.dist(xy[0], xy[1]), math.dist(xy[1], xy[2]))
+
+
 def _tiep_xuc(a, b):
     """Chiều dài đoạn biên chung giữa hai hình không chồng nhau."""
     if a.is_empty or b.is_empty:
@@ -179,13 +185,7 @@ class _BoTinh:
                     continue
                 theo_loai[loai].append((h, ten))
             if loai == "tuong":
-                # Tường vẽ bằng nét rời / polyline hở: bù hai bên thành dải rộng bằng bề dày tường mặc định
-                for i, ln in enumerate(ld.net_ho):
-                    if ln.length < 0.3:
-                        continue
-                    g = ln.buffer(DAY_TUONG_MAC_DINH / 2, cap_style=2, join_style=2)
-                    if g.area >= dt_min and not g.is_empty:
-                        theo_loai[loai].append((HinhKin(g, f"net{i}", "NET_TUONG"), ten))
+                self._tuong_tu_net(ld, ten, theo_loai, dt_min)
 
         if coc_layer:
             self.canh_bao_chung.append(
@@ -228,6 +228,25 @@ class _BoTinh:
             self.canh_bao_chung.append(
                 f"Layer {ten}: {n} hình vẽ trùng nhau (thường là hatch + polyline cùng một hình), mỗi hình chỉ tính một lần.")
         self._tuong_cua_mai()
+
+    def _tuong_tu_net(self, ld, ten, theo_loai, dt_min):
+        """Tường vẽ bằng nét: hai nét song song cách nhau <= 0,45 m là hai mặt của một bức tường (lấp khe giữa);
+        nét đơn bù thành dải dày 0,2 m. Hình kín quá to (khung mặt đứng / mặt cắt, không phải tường) bị bỏ."""
+        if ld.net_ho:
+            lines = [ln for ln in ld.net_ho if ln.length >= 0.3]
+            if lines:
+                r = 0.225
+                dai = unary_union(lines)
+                khep = dai.buffer(r, cap_style=3, join_style=2).buffer(-r, join_style=2)
+                le = dai.difference(khep.buffer(0.02))      # phần nét không nằm trong cặp song song
+                don = le.buffer(DAY_TUONG_MAC_DINH / 2, cap_style=2, join_style=2) if not le.is_empty else None
+                for i, p in enumerate(_manh(unary_union([khep, don] if don is not None else [khep]))):
+                    if p.area >= dt_min:
+                        theo_loai["tuong"].append((HinhKin(p, f"net{i}", "NET_TUONG"), ten))
+        to = [x for x in theo_loai["tuong"] if x[1] == ten and x[0].nguon != "NET_TUONG" and x[0].geom.area > 3 and _dai_rong_min(x[0].geom) > 0.8]
+        if to:
+            theo_loai["tuong"] = [x for x in theo_loai["tuong"] if x not in to]
+            self.canh_bao_chung.append(f"Layer {ten}: bỏ {len(to)} hình kín rộng hơn 0,8 m (khung mặt đứng / mặt cắt, không phải tường).")
 
     def _tuong_cua_mai(self):
         """Tường (extrude theo cao tầng), khoét ô cửa (cửa = hộp bao của hình cửa, chỉ chỗ giao với tường), lanh tô phía trên, mái phẳng."""
