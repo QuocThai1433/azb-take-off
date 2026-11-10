@@ -928,7 +928,7 @@ async function moLai(id) {
     S.mac_dinh = t.mac_dinh; S.loaiHopLe = t.loai_hop_le;
     S.daDong = S.daDong.filter(f => f.id !== id);
     S.files.push({id, ten:t.ten_file, vai_tro:cu?.vai_tro || doanVaiTro(t.ten_file), layers:cu?.layers?.length ? cu.layers : layerMacDinh(t),
-                  hinh:h, vung:cu?.vung ?? null, ve3d:cu?.ve3d ?? null, tang_tm:cu?.tang_tm || "", kl:null});
+                  hinh:h, vung:cu?.vung ?? null, ve3d:cu?.ve3d ?? null, tang_tm:cu?.tang_tm || "", hq:cu?.hq || null, kl:null});
     if (S.files.length === 1) veTabKL();
     moFile(S.files.length - 1); taiThuVien();
     lenh(`Đã mở lại ${t.ten_file}.`, "ok");
@@ -1039,7 +1039,7 @@ function dongFile(i) {
   // Đóng chỉ gỡ khỏi màn hình làm việc. File vẫn nằm trong data/uploads; thiết lập (layer, vùng, vai trò) được nhớ để mở lại.
   const conDung = S.files.some((f, j) => j !== i && f.id === g.id);   // còn mục nhân bản dùng chung file thì chưa tính là đã đóng
   S.files.splice(i, 1);
-  if (!conDung) S.daDong = S.daDong.filter(f => f.id !== g.id).concat({id:g.id, ten:g.ten, vai_tro:g.vai_tro, layers:g.layers, vung:g.vung, ve3d:g.ve3d, tang_tm:g.tang_tm});
+  if (!conDung) S.daDong = S.daDong.filter(f => f.id !== g.id).concat({id:g.id, ten:g.ten, vai_tro:g.vai_tro, layers:g.layers, vung:g.vung, ve3d:g.ve3d, tang_tm:g.tang_tm, hq:g.hq || null});
   S.act = S.files.length ? Math.min(i, S.files.length - 1) : -1;
   ve_ds(); ve_layer(); ve_tab(); dongBoVung(); if (S.act >= 0) zoomToanBo(); veLai();
   if (!conDung) { lenh(`Đã đóng ${g.ten}. File vẫn được giữ, mở lại ở mục "Bản vẽ đã tải".`, "ok"); taiThuVien(); }
@@ -1261,7 +1261,7 @@ function ve() {
       nhomSang().forEach(g => { const v = g.vung; ctx.rect(sx(Math.min(v[0], v[2])), sy(Math.max(v[1], v[3])), Math.abs(v[2] - v[0]) * s, Math.abs(v[3] - v[1]) * s); });
       ctx.fill("evenodd");
     }
-    veLuoiHQ(f);
+    veLuoiHQ(f); veDiemVungHQ(f);
     veHover(f);
     if (S.keo && S.keo.kieu === "hop" && S.keo.moved) {  // khung chọn: Window (xanh dương, nét liền) hoặc Crossing (xanh lá, nét đứt)
       const cat = S.keo.b[0] < S.keo.a[0], x = sx(Math.min(S.keo.a[0], S.keo.b[0])), y = sy(Math.max(S.keo.a[1], S.keo.b[1]));
@@ -1387,6 +1387,7 @@ window.addEventListener("mouseup", e => {
     if (Math.hypot(m.x - S.keo.px, m.y - S.keo.py) > 4) { S.keo.moved = true; S.keo.b = [wx(m.x), wy(m.y)]; }
     if (LAY.hoi && !S.keo.moved) hoiLayerTaiDiem({x:S.keo.px, y:S.keo.py});
     else if (S.hqChon && !S.keo.moved) hqBat(wx(S.keo.px), wy(S.keo.py));
+    else if (S.hqChonVung && !S.keo.moved) hqBatVung(wx(S.keo.px), wy(S.keo.py));
     else if (S.ctCho) { if (S.keo.moved) docThepCad(S.keo.a, S.keo.b); else lenh("Kéo khung (giữ chuột trái và kéo) quanh bảng thống kê thép, trùm cả dòng tiêu đề. Esc để hủy.", "loi"); }
     else if (S.gnMode && !S.keo.moved) { const x = wx(S.keo.px), y = wy(S.keo.py); if (S.gnMode === "them") themNhanTai(x, y); else suaNhanTaiDiem(x, y); }
     else if (S.gnCho) { if (S.keo.moved) chayGanNhan(S.keo.a, S.keo.b); else lenh("Gán nhãn: kéo khung (giữ chuột trái và kéo) quanh một mặt bằng. Esc để hủy.", "loi"); }
@@ -2716,8 +2717,9 @@ function veHQ() {
     <datalist id="hq-cd">${S.hqGoiY.map(g => `<option value="${(g.gia_tri > 0 ? "+" : "") + g.gia_tri.toFixed(3)}">`).join("")}</datalist>
     <div style="overflow:auto"><table><tr><th>Mã</th><th>Tên tầng</th><th>Loại</th><th>Cao độ KC</th><th>Cao độ HT</th><th>Cao tầng (m)</th><th>Dày sàn (mm)</th><th>Cao dầm (mm)</th><th>Ghi chú</th><th></th></tr>
       ${hangTang || '<tr><td colspan="10" class="nho">Chưa có tầng: bấm Thêm tầng hoặc Tạo bảng mẫu.</td></tr>'}</table></div>
+    <div id="hq-vung" style="margin-top:14px"></div>
     <div id="hq-kq" style="margin-top:10px"></div></div>`;
-  hqVeKetQua(); if (h.luoi.doc.length || h.luoi.ngang.length || h.tang.length || h.goc) hqKiemTra();
+  veHQVung(); hqVeKetQua(); if (h.luoi.doc.length || h.luoi.ngang.length || h.tang.length || h.goc) hqKiemTra();
 }
 function hqThemTang(ma, ten, loai, cd) { S.hqc.tang.push({ma, ten, loai, cao_do_kc:cd, cao_do_ht:"", day_san:"", cao_dam:"", ghi_chu:""}); }
 async function hqDo() {
@@ -2781,6 +2783,169 @@ function veLuoiHQ(f) {
   ctx.restore();
 }
 
+// ---------- Gán vùng mặt bằng: tầng, cấu kiện, điểm căn về lưới trục chuẩn ----------
+// Mỗi mục bản vẽ (mặt bằng) có f.hq = {tang, cau_kien, diem, goc_local, diem_b, goc_local_b, luoi_local, can, xac_nhan}.
+const HQ_CK = {mong:"Móng", cot_vach:"Cột - vách", dam_san:"Dầm - sàn", kien_truc:"Kiến trúc", mep:"MEP", khac:"Khác"};
+S.hqSel = -1; S.hqChonVung = null; S.hqGV = null;
+const hqKhongDau = t => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/gi, "d").toLowerCase();
+function hqVungMacDinh(f) {   // đoán tầng và cấu kiện từ tên mục / tầng đọc được khi tách mặt bằng; Sếp sửa và xác nhận
+  const t = hqKhongDau(f.ten + " " + (f.tang_tm || "")), ma = new Set(S.hqc.tang.map(x => x.ma));
+  let tang = "", ck = "";
+  const m = t.match(/(?:tang|floor|level|lvl|\bt)\s*[-_.:]?\s*(\d+)/);
+  if (/mong|foundation|\bfnd\b|dai coc|pile|da kieng/.test(t) && ma.has("MONG")) tang = "MONG";
+  else if (m && ma.has("T" + m[1])) tang = "T" + m[1];
+  else if (/\bmai\b|roof/.test(t) && ma.has("MAI")) tang = "MAI";
+  if (/mong|foundation|dai coc|pile|da kieng/.test(t)) ck = "mong";
+  else if (/\bcot\b|vach|column|wall/.test(t)) ck = "cot_vach";
+  else if (/dam|san\b|beam|slab/.test(t)) ck = "dam_san";
+  else if (/kien truc|tuong|cua\b|arch/.test(t)) ck = "kien_truc";
+  else if (/mep|ong gio|dien|nuoc|pccc|hvac/.test(t)) ck = "mep";
+  return {tang, cau_kien:ck, diem:null, goc_local:null, diem_b:null, goc_local_b:null, luoi_local:null, can:null, xac_nhan:false};
+}
+const hqCoVung = f => f.vai_tro === "mat_bang";
+function hqHQ(f) { if (!f.hq) f.hq = hqVungMacDinh(f); return f.hq; }
+function hqDong(i) {
+  const f = S.files[i], z = hqHQ(f), c = z.can, gv = S.hqGV && S.hqGV.dong[i];
+  const trangThai = !c || !c.ok ? "chưa căn" : z.xac_nhan ? "✓ đã xác nhận" : "chờ xác nhận";
+  const mau = trangThai[0] === "✓" ? "#4cc38a" : "#e0b040";
+  return `<tr data-hq-vi="${i}" ${i === S.hqSel ? 'style="background:rgba(255,214,10,.12)"' : ""}>
+    <td><a href="#" data-hq-mo="${i}" title="Mở bản vẽ này">${esc(f.ten)}</a></td>
+    <td><select data-hq-vt="${i}:tang"><option value="">–</option>${S.hqc.tang.map(t => `<option value="${esc(t.ma)}" ${t.ma === z.tang ? "selected" : ""}>${esc(t.ma)}</option>`).join("")}</select></td>
+    <td><select data-hq-vt="${i}:cau_kien"><option value="">–</option>${Object.entries(HQ_CK).map(([k, v]) => `<option value="${k}" ${k === z.cau_kien ? "selected" : ""}>${v}</option>`).join("")}</select></td>
+    <td class="nho">${z.diem ? esc(hqNhan(z.diem)) : "–"}</td>
+    <td class="nho">${c && c.ok ? `dời (${so(c.dich[0], 3)}; ${so(c.dich[1], 3)})${c.quay ? `, quay ${so(c.quay, 2)}°` : ""}` : "–"}</td>
+    <td style="color:${mau}">${trangThai}${gv && gv.van_de.length && trangThai[0] !== "✓" ? ` <span class="nho" title="${esc(gv.van_de.join(", "))}">⚠</span>` : ""}</td></tr>`;
+}
+function hqVeChiTiet(i) {
+  const f = S.files[i]; if (!f) return "";
+  const z = hqHQ(f), c = z.can, L = S.hqc.luoi;
+  const sel = (hx, d, w) => `<select data-hq-vd="${w}:${hx}"><option value="">${hx === "doc" ? "trục dọc" : "trục ngang"}</option>${L[hx].map(t => `<option ${d && d[hx] === t.ten ? "selected" : ""}>${esc(t.ten)}</option>`).join("")}</select>`;
+  const xy = (g, w) => `X <input type="number" step="0.001" data-hq-vx="${w}:0" value="${g ? g[0] : ""}" style="width:90px"> Y <input type="number" step="0.001" data-hq-vx="${w}:1" value="${g ? g[1] : ""}" style="width:90px">`;
+  const luoiLoc = z.luoi_local ? `${z.luoi_local.doc.length} trục dọc, ${z.luoi_local.ngang.length} trục ngang` : "chưa dò";
+  return `<div style="margin-top:8px;padding:8px;border:1px solid var(--vien);border-radius:6px">
+    <div><b>${esc(f.ten)}</b> <span class="nho">(lưới trục trong vùng: ${luoiLoc})</span></div>
+    <div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><b>Điểm căn A</b> nằm trên giao trục ${sel("doc", z.diem, "a")} ${sel("ngang", z.diem, "a")} tại ${xy(z.goc_local, "a")}
+      <button data-hq-vb="a">${S.hqChonVung && S.hqChonVung.which === "a" ? "Bấm vào bản vẽ... (Esc)" : "Chọn trên bản vẽ"}</button></div>
+    <div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><b>Điểm căn B</b> <span class="nho">(tuỳ chọn, để tính xoay)</span> ${sel("doc", z.diem_b, "b")} ${sel("ngang", z.diem_b, "b")} tại ${xy(z.goc_local_b, "b")}
+      <button data-hq-vb="b">${S.hqChonVung && S.hqChonVung.which === "b" ? "Bấm vào bản vẽ... (Esc)" : "Chọn trên bản vẽ"}</button><button data-hq-vb="xb">Bỏ B</button></div>
+    <div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button data-hq-vdo="${i}">Dò trục + căn tự động</button>
+      <label><input type="checkbox" data-hq-vxn="${i}" ${z.xac_nhan ? "checked" : ""} ${c && c.ok ? "" : "disabled"}> Đã xác nhận vùng này căn đúng</label></div>
+    ${c ? c.canh_bao.map(x => `<div class="cb">⚠ ${esc(x)}</div>`).join("") : ""}
+    ${c && c.kiem_tra_truc && c.kiem_tra_truc.length ? `<div class="nho">Kiểm tra chéo theo trục: ${c.kiem_tra_truc.map(k => `${esc(k.truc)} ${k.lech_mm >= 0 ? "+" : ""}${k.lech_mm} mm`).join(", ")}</div>` : ""}</div>`;
+}
+function veHQVung() {
+  const o = $("hq-vung"); if (!o) return;
+  const ds = S.files.map((f, i) => i).filter(i => hqCoVung(S.files[i]));
+  o.innerHTML = `<div><b>4. Gán vùng mặt bằng</b> <span class="nho">mỗi mặt bằng: thuộc tầng nào, cấu kiện gì, căn về lưới trục chuẩn bằng một giao trục</span></div>
+    ${ds.length ? `<table style="margin-top:6px"><tr><th>Mặt bằng</th><th>Tầng</th><th>Cấu kiện</th><th>Giao trục căn</th><th>Phép dời</th><th>Trạng thái</th></tr>${ds.map(hqDong).join("")}</table>
+      <div style="margin-top:6px"><button id="hq-vdo-het">Dò + căn tự động tất cả</button></div>` : '<div class="nho" style="margin-top:6px">Chưa có mặt bằng nào (vai trò "Mặt bằng") trong dự án.</div>'}
+    ${S.hqSel >= 0 && S.files[S.hqSel] ? hqVeChiTiet(S.hqSel) : '<div class="nho" style="margin-top:6px">Bấm tên một mặt bằng trong bảng để chỉnh điểm căn.</div>'}
+    <div id="hq-gv" style="margin-top:8px"></div>`;
+  hqKiemTraVung();
+}
+let hqHenGV = 0;
+function hqKiemTraVung() {
+  clearTimeout(hqHenGV);
+  hqHenGV = setTimeout(async () => {
+    const ds = S.files.map((f, i) => ({f, i})).filter(x => hqCoVung(x.f));
+    if (!ds.length) { S.hqGV = null; return; }
+    try {
+      const r = await json("/api/he-quy-chieu/kiem-tra-gan-vung", {hqc:S.hqc, ds:ds.map(x => ({ten:x.f.ten, tang:hqHQ(x.f).tang, cau_kien:hqHQ(x.f).cau_kien, xac_nhan:hqHQ(x.f).xac_nhan, can:hqHQ(x.f).can}))});
+      S.hqGV = {dong:{}, xong:r.xong}; ds.forEach((x, k) => S.hqGV.dong[x.i] = r.dong[k]);
+      const o = $("hq-gv"); if (o) o.innerHTML = (r.xong ? '<div style="color:#4cc38a">✓ Mọi mặt bằng đã gán tầng, cấu kiện và căn vào lưới trục.</div>' : "") + r.canh_bao.map(c => `<div class="cb">⚠ ${esc(c)}</div>`).join("");
+      document.querySelectorAll("tr[data-hq-vi]").forEach(tr => {   // cập nhật dấu cảnh báo từng dòng mà không dựng lại bảng
+        const g = S.hqGV.dong[+tr.dataset.hqVi], td = tr.lastElementChild; if (!g || !td) return;
+        const z = hqHQ(S.files[+tr.dataset.hqVi]); if (z.xac_nhan && g.xong) return;
+        td.querySelector("span.nho")?.remove(); if (g.van_de.length) td.insertAdjacentHTML("beforeend", ` <span class="nho" title="${esc(g.van_de.join(", "))}">⚠</span>`);
+      });
+    } catch (e) { /* lần sau thử lại */ }
+  }, 300);
+}
+async function hqTinhCan(i) {
+  const f = S.files[i], z = hqHQ(f); if (!f) return;
+  if (!z.diem || !z.diem.doc || !z.diem.ngang || !z.goc_local || z.goc_local.some(v => v == null || v === "" || !Number.isFinite(+v))) { z.can = null; z.xac_nhan = false; veHQVung(); return; }
+  const ket = z.diem_b && z.diem_b.doc && z.diem_b.ngang && z.goc_local_b && z.goc_local_b.length === 2 && z.goc_local_b.every(v => v !== "" && v != null && Number.isFinite(+v));
+  try {
+    z.can = await json("/api/he-quy-chieu/can-vung", {id:f.id, hqc:S.hqc, diem:z.diem, goc_local:z.goc_local.map(Number), diem_b:ket ? z.diem_b : null, goc_local_b:ket ? z.goc_local_b.map(Number) : null, luoi_local:z.luoi_local});
+  } catch (e) { z.can = {ok:false, canh_bao:[e.message], kiem_tra_truc:[]}; }
+  z.xac_nhan = false; veHQVung(); veLai();
+}
+async function hqDoVung(i, im) {
+  const f = S.files[i], z = hqHQ(f);
+  try {
+    const r = await json("/api/he-quy-chieu/goi-y-vung", {id:f.id, vung:f.vung || [], hqc:S.hqc});
+    z.luoi_local = r.luoi;
+    if (r.diem) { z.diem = r.diem; z.goc_local = r.goc_local; }
+    if (!im) lenh(`${f.ten}: ${r.diem ? r.ly_do : (r.canh_bao[0] || "không đề xuất được điểm căn")}`, r.diem ? "ok" : "loi");
+    await hqTinhCan(i);
+  } catch (e) { lenh(`${f.ten}: ${e.message}`, "loi"); }
+}
+$("p-hq").addEventListener("click", async e => {
+  const a = e.target.closest("a[data-hq-mo]");
+  if (a) { e.preventDefault(); const i = +a.dataset.hqMo; S.hqSel = i; if (S.act !== i) moFile(i); veHQ(); const f = S.files[i]; if (f && f.vung) zoomTheoKhung(f.vung); return; }
+  const tr = e.target.closest("tr[data-hq-vi]");
+  if (tr && !e.target.closest("select,input,button")) { S.hqSel = +tr.dataset.hqVi; veHQVung(); return; }
+  const d = e.target.closest("button"); if (!d) return;
+  if (d.id === "hq-vdo-het") {
+    const ds = S.files.map((f, i) => i).filter(i => hqCoVung(S.files[i])); lenh(`Đang dò và căn ${ds.length} mặt bằng...`);
+    for (const i of ds) await hqDoVung(i, true);
+    const ok = ds.filter(i => (S.files[i].hq.can || {}).ok).length; lenh(`Căn tự động được ${ok}/${ds.length} mặt bằng. Kiểm tra từng dòng rồi xác nhận.`, ok === ds.length ? "ok" : "loi"); return;
+  }
+  if (d.dataset.hqVdo != null) return hqDoVung(+d.dataset.hqVdo);
+  if (d.dataset.hqVb) {
+    const i = S.hqSel, z = S.files[i] && hqHQ(S.files[i]); if (!z) return;
+    if (d.dataset.hqVb === "xb") { z.diem_b = null; z.goc_local_b = null; return hqTinhCan(i); }
+    if (S.act !== i) moFile(i);
+    S.hqChonVung = S.hqChonVung && S.hqChonVung.which === d.dataset.hqVb ? null : {i, which:d.dataset.hqVb}; S.hqChon = null; veHQ();
+    if (S.hqChonVung) lenh("Bấm vào giao trục trên bản vẽ (bắt dính vào giao trục đã dò, Esc để hủy).", "ok");
+  }
+});
+$("p-hq").addEventListener("change", e => {
+  const d = e.target, i = S.hqSel;
+  if (d.dataset.hqVt) { const [k, f] = d.dataset.hqVt.split(":"), z = hqHQ(S.files[+k]); z[f] = d.value; z.xac_nhan = false; return veHQVung(); }
+  if (d.dataset.hqVxn) { hqHQ(S.files[+d.dataset.hqVxn]).xac_nhan = d.checked; return veHQVung(); }
+  const z = S.files[i] && hqHQ(S.files[i]); if (!z) return;
+  if (d.dataset.hqVd) {
+    const [w, hx] = d.dataset.hqVd.split(":"), k = w === "a" ? "diem" : "diem_b", g = z[k] || {doc:"", ngang:""}; g[hx] = d.value; z[k] = g.doc || g.ngang ? g : null; return hqTinhCan(i);
+  }
+  if (d.dataset.hqVx) {
+    const [w, j] = d.dataset.hqVx.split(":"), k = w === "a" ? "goc_local" : "goc_local_b", g = z[k] || ["", ""]; g[+j] = d.value === "" ? "" : parseFloat(d.value); z[k] = g; return hqTinhCan(i);
+  }
+});
+// Chọn điểm căn bằng cách bấm trên bản vẽ: bắt dính vào giao trục đã dò trong vùng (25 px), không có thì lấy đúng điểm bấm
+function hqBatVung(x, y) {
+  const ch = S.hqChonVung, f = S.files[ch.i]; if (!f) return; const z = hqHQ(f);
+  let tot = null, dt = 25 / S.v.s;
+  if (z.luoi_local) z.luoi_local.doc.forEach(a => z.luoi_local.ngang.forEach(b => { const k = Math.hypot(a.v - x, b.v - y); if (k < dt) { dt = k; tot = {pt:[a.v, b.v], doc:a.ten, ngang:b.ten}; } }));
+  const pt = tot ? tot.pt : [+x.toFixed(3), +y.toFixed(3)], mac = S.hqc.goc || null;
+  const dk = ch.which === "a" ? "diem" : "diem_b", gk = ch.which === "a" ? "goc_local" : "goc_local_b";
+  const trongChuan = d => d && S.hqc.luoi.doc.some(t => t.ten === d.doc) && S.hqc.luoi.ngang.some(t => t.ten === d.ngang) ? {doc:d.doc, ngang:d.ngang} : null;
+  z[gk] = pt; z[dk] = (tot && trongChuan(tot)) || z[dk] || (ch.which === "a" && mac ? {...mac} : null);
+  lenh(`Điểm căn ${ch.which.toUpperCase()} của ${f.ten}: (${pt[0]}; ${pt[1]})${tot ? ` · giao trục ${tot.doc}-${tot.ngang} của vùng` : ""}. Kiểm tra giao trục chuẩn tương ứng.`, "ok");
+  S.hqChonVung = null; veHQ(); hqTinhCan(ch.i);
+}
+addEventListener("keydown", e => { if (e.key === "Escape" && S.hqChonVung) { S.hqChonVung = null; if (!$("p-hq").hidden) veHQ(); lenh("Đã hủy chọn điểm căn.", "ok"); } });
+// Vẽ lưới trục của vùng đang chọn (xanh lơ) và các điểm căn A / B
+function veDiemVungHQ(f) {
+  const i = S.hqSel; if (i < 0 || S.files[i] !== undefined && S.files[i].id !== f.id) return;
+  const g = S.files[i]; if (!g || !g.hq || $("p-hq").hidden) return; const z = g.hq, s = S.v.s;
+  ctx.save(); ctx.textBaseline = "middle";
+  if (z.luoi_local) {
+    ctx.setLineDash([6, 4]); ctx.lineWidth = 1; ctx.strokeStyle = "rgba(80,200,230,.8)"; ctx.fillStyle = "#6fd6ec"; ctx.font = "11px sans-serif"; ctx.textAlign = "center";
+    z.luoi_local.doc.forEach(t => { ctx.beginPath(); ctx.moveTo(sx(t.v), sy(t.tu)); ctx.lineTo(sx(t.v), sy(t.den)); ctx.stroke(); ctx.fillText(t.ten, sx(t.v), sy(t.tu) + 10); });
+    z.luoi_local.ngang.forEach(t => { ctx.beginPath(); ctx.moveTo(sx(t.tu), sy(t.v)); ctx.lineTo(sx(t.den), sy(t.v)); ctx.stroke(); ctx.fillText(t.ten, sx(t.den) + 12, sy(t.v)); });
+    ctx.setLineDash([]);
+  }
+  ctx.textAlign = "left"; ctx.font = "bold 12px sans-serif";
+  [["goc_local", "diem", "A", "#ffd60a"], ["goc_local_b", "diem_b", "B", "#ff7ad9"]].forEach(([gk, dk, nhan, mau]) => {
+    const p = z[gk]; if (!p || p.length !== 2 || p.some(v => v === "" || v == null)) return;
+    ctx.strokeStyle = mau; ctx.fillStyle = mau; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(sx(+p[0]), sy(+p[1]), 8, 0, 7); ctx.stroke();
+    ctx.fillText(`Căn ${nhan}${z[dk] ? " " + hqNhan(z[dk]) : ""}`, sx(+p[0]) + 12, sy(+p[1]) + 14);
+  });
+  if (S.hqChonVung && S.mouse) { ctx.strokeStyle = "#ffd60a"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(S.mouse.x, S.mouse.y, 25, 0, 7); ctx.stroke(); }
+  ctx.restore();
+}
+
 // ---------- Tách nhiều mặt bằng trong một file (chỉ đề xuất vùng; người dùng tick rồi bấm Tạo mới có hiệu lực) ----------
 const TM_VAI = {mat_bang:"Mặt bằng", chi_tiet:"Chi tiết", ghi_chu:"Ghi chú / bảng"};
 async function veTM(doLai, kc) {
@@ -2825,7 +2990,7 @@ function taoMucTM(f, ds, tuDong) {
   if (!dsTao.length) return 0;
   const goc = g.ten.replace(/ \(\d+\)$/, "").replace(/\.[^.]+$/, "");
   let vt = S.files.reduce((m, x, i) => x.id === f.id ? i : m, nguon);
-  dsTao.forEach(r => { S.files.splice(++vt, 0, {...g, ten:`${goc} - ${r.ten || "Vùng " + r.id}`, vai_tro:r.vai_tro, layers:g.layers.map(l => ({...l})), vung:r.khung.slice(), tang_tm:r.tang || "", kl:null}); });
+  dsTao.forEach(r => { S.files.splice(++vt, 0, {...g, ten:`${goc} - ${r.ten || "Vùng " + r.id}`, vai_tro:r.vai_tro, layers:g.layers.map(l => ({...l})), vung:r.khung.slice(), tang_tm:r.tang || "", hq:null, kl:null}); });
   lenh(`${tuDong ? "Tách xong: đã tự tạo" : "Đã tạo"} ${dsTao.length} mục từ ${g.ten}, mỗi mục có vùng cắt và vai trò riêng. Gán layer cho từng mặt bằng rồi tính. Bỏ vùng nào (chuột phải) thì mục đó đóng theo.`, "ok");
   return dsTao.length;
 }
@@ -3151,7 +3316,7 @@ window.themBanVe = themBanVe;  // dùng khi kiểm thử
   const chup = () => ({
     phien_ban: 1, du_an: $("du-an").value, don_vi: $("don-vi").value, act: S.act,
     ts: Object.fromEntries(TS.map(([k]) => [k, ($("ts-" + k) || {}).value ?? ""])),
-    files: S.files.map(f => ({id:f.id, ten:f.ten, vai_tro:f.vai_tro, layers:f.layers.filter(l => l.ten !== TEN_NHAN), vung:f.vung, ve3d:f.ve3d, tang_tm:f.tang_tm})).concat(giu),
+    files: S.files.map(f => ({id:f.id, ten:f.ten, vai_tro:f.vai_tro, layers:f.layers.filter(l => l.ten !== TEN_NHAN), vung:f.vung, ve3d:f.ve3d, tang_tm:f.tang_tm, hq:f.hq || null})).concat(giu),
     he_quy_chieu: S.hqc,   // lưới trục chuẩn, điểm gốc, bảng tầng
     da_dong: S.daDong,   // bản vẽ đã đóng: file còn trong data/uploads, nhớ thiết lập để mở lại
   });
@@ -3213,7 +3378,7 @@ window.themBanVe = themBanVe;  // dùng khi kiểm thử
         }
         const x = tin[f.id]; if (!x) continue;
         S.mac_dinh = x.t.mac_dinh; S.loaiHopLe = x.t.loai_hop_le;
-        S.files.push({id:f.id, ten:f.ten, vai_tro:f.vai_tro, layers:f.layers || [], hinh:x.h, vung:f.vung ?? null, ve3d:f.ve3d ?? null, tang_tm:f.tang_tm || "", kl:null});
+        S.files.push({id:f.id, ten:f.ten, vai_tro:f.vai_tro, layers:f.layers || [], hinh:x.h, vung:f.vung ?? null, ve3d:f.ve3d ?? null, tang_tm:f.tang_tm || "", hq:f.hq || null, kl:null});
       }
       $("du-an").value = tt.du_an || ""; if (tt.don_vi) $("don-vi").value = tt.don_vi;
       veTabKL();

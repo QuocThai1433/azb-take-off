@@ -334,6 +334,125 @@ def cao_do_goi_y(ban_ve):
     return [{"gia_tri": v, "so_lan": n} for v, n in sorted(dem.items())]
 
 
+# ---------- Gán vùng mặt bằng vào hệ quy chiếu ----------
+CAU_KIEN = {"mong": "Móng", "cot_vach": "Cột - vách", "dam_san": "Dầm - sàn", "kien_truc": "Kiến trúc", "mep": "MEP", "khac": "Khác"}
+DUNG_SAI_TRUC = 0.05          # m - trục của vùng lệch khỏi lưới chuẩn quá mức này sau khi căn thì cảnh báo
+DUNG_SAI_KHOANG_CACH = 0.05   # m - khoảng cách hai điểm căn ở vùng khác ở lưới chuẩn quá mức này thì cảnh báo
+
+
+def goi_y_diem_vung(ban_ve, vung, hqc_da_kiem):
+    """Đề xuất điểm căn của một vùng: dò lưới trục trong vùng, nếu có trục trùng tên với lưới chuẩn thì lấy giao
+    của trục trùng tên (ưu tiên trục của điểm gốc chuẩn). Trả {luoi, diem, goc_local, ly_do, canh_bao}."""
+    luoi_c = hqc_da_kiem.get("luoi") or {}
+    kq = do_luoi_truc(ban_ve, vung)
+    ten_c = {hx: {str(t["ten"]) for t in luoi_c.get(hx) or []} for hx in ("doc", "ngang")}
+    chung = {hx: [t for t in kq[hx] if str(t["ten"]) in ten_c[hx]] for hx in ("doc", "ngang")}
+    cb = [c for c in kq["canh_bao"] if "tên" not in c]
+    out = {"luoi": {"doc": kq["doc"], "ngang": kq["ngang"]}, "diem": None, "goc_local": None, "ly_do": "", "canh_bao": cb}
+    if not (kq["doc"] and kq["ngang"]):
+        out["canh_bao"].append("Vùng này chưa dò được đủ trục dọc và trục ngang: chọn điểm căn bằng tay trên bản vẽ.")
+        return out
+    if not (chung["doc"] and chung["ngang"]):
+        out["canh_bao"].append("Tên trục trong vùng không trùng tên trục chuẩn: kiểm tra tên trục, hoặc chọn điểm căn bằng tay.")
+        return out
+    uu_tien = (hqc_da_kiem.get("goc") or {}).get("diem") or {}   # ưu tiên trục của điểm gốc chuẩn
+    a = next((t for t in chung["doc"] if str(t["ten"]) == str(uu_tien.get("doc"))), chung["doc"][0])
+    b = next((t for t in chung["ngang"] if str(t["ten"]) == str(uu_tien.get("ngang"))), chung["ngang"][0])
+    out["diem"] = {"doc": a["ten"], "ngang": b["ten"]}
+    out["goc_local"] = [a["v"], b["v"]]
+    out["ly_do"] = f"Trục {a['ten']} và {b['ten']} trong vùng trùng tên với lưới chuẩn."
+    return out
+
+
+def tinh_can_vung(hqc_da_kiem, diem, goc_local, diem_b=None, goc_local_b=None, luoi_local=None):
+    """Phép đưa một vùng về toạ độ của mặt bằng chuẩn, rồi về toạ độ công trình.
+    diem = {"doc","ngang"}: giao trục chuẩn mà điểm A của vùng đang nằm trên; goc_local = toạ độ điểm A trên bản vẽ của vùng.
+    Có điểm B (giao trục khác + toạ độ) thì tính cả góc xoay. luoi_local (lưới trục dò trong vùng) để kiểm tra chéo.
+    Trả {"dich": [dx, dy], "quay": độ, "tam": [x, y], "canh_bao": [...], "kiem_tra_truc": [...], "ok": bool}:
+      toạ độ chuẩn  p' = R(quay) (p - tam) + tam + dich    (tam = điểm A của vùng)."""
+    luoi = hqc_da_kiem.get("luoi") or {}
+    cb, kt = [], []
+    ra = diem_giao(luoi, diem)
+    if not ra or not goc_local or len(goc_local) != 2:
+        return {"dich": None, "quay": 0.0, "tam": None, "canh_bao": ["Chưa có điểm căn của vùng (giao trục + vị trí trên bản vẽ)."], "kiem_tra_truc": [], "ok": False}
+    quay = 0.0
+    if diem_b and goc_local_b and len(goc_local_b) == 2:
+        rb = diem_giao(luoi, diem_b)
+        if not rb:
+            cb.append("Điểm B không nằm trên lưới trục chuẩn: bỏ qua, chỉ dời không xoay.")
+        else:
+            va, vr = (goc_local_b[0] - goc_local[0], goc_local_b[1] - goc_local[1]), (rb[0] - ra[0], rb[1] - ra[1])
+            lv, lr = math.hypot(*va), math.hypot(*vr)
+            if lv < 1e-6 or lr < 1e-6:
+                cb.append("Hai điểm căn trùng nhau: bỏ qua điểm B.")
+            else:
+                quay = round(math.degrees(math.atan2(vr[1], vr[0]) - math.atan2(va[1], va[0])), 4)
+                quay = (quay + 180) % 360 - 180
+                if abs(lv - lr) > DUNG_SAI_KHOANG_CACH:
+                    cb.append(f"Khoảng cách hai điểm căn trong vùng {lv:.3f} m khác lưới chuẩn {lr:.3f} m (lệch {abs(lv - lr) * 1000:.0f} mm): "
+                              "bản vẽ vùng có thể khác tỷ lệ hoặc chọn sai trục.")
+    dich = [round(ra[0] - goc_local[0], 4), round(ra[1] - goc_local[1], 4)]
+    if abs(quay) < 1e-6:
+        quay = 0.0
+    kq = {"dich": dich, "quay": quay, "tam": [round(goc_local[0], 4), round(goc_local[1], 4)], "canh_bao": cb, "kiem_tra_truc": kt, "ok": True}
+    # kiểm tra chéo: các trục của vùng, sau khi căn, phải nằm đúng chỗ trục cùng tên ở lưới chuẩn
+    if luoi_local and abs(quay) > 0.01:
+        cb.append("Vùng có xoay: chưa kiểm tra chéo vị trí trục, Sếp đối chiếu bằng mắt trên bản vẽ.")
+    elif luoi_local:
+        for hx, i in (("doc", 0), ("ngang", 1)):
+            chuan = {str(t["ten"]): t["v"] for t in luoi.get(hx) or []}
+            for t in luoi_local.get(hx) or []:
+                ten = str(t.get("ten"))
+                if ten not in chuan:
+                    continue
+                lech = round(t["v"] + dich[i] - chuan[ten], 4)
+                kt.append({"truc": ten, "huong": hx, "lech_mm": round(lech * 1000)})
+                if abs(lech) > DUNG_SAI_TRUC:
+                    cb.append(f"Trục {ten} trong vùng lệch {abs(lech) * 1000:.0f} mm so với lưới chuẩn sau khi căn.")
+    return kq
+
+
+def ap_phep_vung(can, hqc_da_kiem, x, y):
+    """Toạ độ công trình của điểm (x, y) trên bản vẽ của vùng đã căn `can` (kết quả tinh_can_vung)."""
+    a = math.radians(can.get("quay") or 0.0)
+    tx, ty = can["tam"]
+    px, py = x - tx, y - ty
+    rx, ry = px * math.cos(a) - py * math.sin(a), px * math.sin(a) + py * math.cos(a)
+    return sang_toa_do_cong_trinh(hqc_da_kiem, rx + tx + can["dich"][0], ry + ty + can["dich"][1])
+
+
+def kiem_tra_gan_vung(ds, hqc_da_kiem):
+    """Kiểm tra bảng gán vùng: mỗi dòng {ten, tang, cau_kien, xac_nhan, can}. Trả cảnh báo cấp dự án + trạng thái từng dòng."""
+    ma_tang = {d["ma"] for d in hqc_da_kiem.get("tang") or []}
+    cb, dong, thay = [], [], {}
+    for i, r in enumerate(ds or []):
+        ten = str(r.get("ten") or f"vùng {i + 1}")
+        c = []
+        if not r.get("tang"):
+            c.append("chưa chọn tầng")
+        elif r["tang"] not in ma_tang:
+            c.append(f"tầng '{r['tang']}' không có trong bảng tầng")
+        if not r.get("cau_kien"):
+            c.append("chưa chọn cấu kiện")
+        elif r["cau_kien"] not in CAU_KIEN:
+            c.append("cấu kiện không hợp lệ")
+        if not (r.get("can") or {}).get("ok"):
+            c.append("chưa căn vào lưới trục")
+        elif not r.get("xac_nhan"):
+            c.append("chưa xác nhận")
+        dong.append({"ten": ten, "van_de": c, "xong": not c})
+        if r.get("tang") and r.get("cau_kien"):
+            k = (r["tang"], r["cau_kien"])
+            thay.setdefault(k, []).append(ten)
+    for (t, ck), ten_ds in thay.items():
+        if len(ten_ds) > 1:
+            cb.append(f"{len(ten_ds)} vùng cùng tầng {t} và cùng loại {CAU_KIEN.get(ck, ck).lower()}: {', '.join(ten_ds)}. Kiểm tra có bị gán trùng không.")
+    for d in dong:
+        if d["van_de"]:
+            cb.append(f"{d['ten']}: {', '.join(d['van_de'])}.")
+    return {"dong": dong, "canh_bao": cb, "xong": bool(dong) and all(d["xong"] for d in dong)}
+
+
 # ---------- Tổng hợp hệ quy chiếu ----------
 def kiem_tra(hqc):
     """Kiểm tra cả hệ quy chiếu người dùng đã nhập: lưới trục, điểm gốc, điểm hướng, bảng tầng.
@@ -349,7 +468,7 @@ def kiem_tra(hqc):
     elif not hqc.get("goc"):
         cb.append("Chưa chọn điểm gốc (giao của một trục dọc và một trục ngang).")
     if goc_xy:
-        goc = {"ten": ten_diem(hqc["goc"]), "x": _so(goc_xy[0]), "y": _so(goc_xy[1]), "goc_quay": 0.0, "dao_x": False, "dao_y": False}
+        goc = {"ten": ten_diem(hqc["goc"]), "diem": dict(hqc["goc"]), "x": _so(goc_xy[0]), "y": _so(goc_xy[1]), "goc_quay": 0.0, "dao_x": False, "dao_y": False}
         h2 = diem_giao(luoi, hqc.get("diem2"))
         if hqc.get("diem2") and not h2:
             cb.append("Điểm hướng không còn nằm trên lưới trục: chọn lại hoặc bỏ điểm hướng.")
@@ -383,4 +502,5 @@ def sang_toa_do_cong_trinh(hqc_da_kiem, x, y):
 
 
 __all__ = ["do_luoi_truc", "kiem_tra_luoi", "diem_giao", "ten_diem", "doc_so", "chuan_hoa_bang_tang", "cao_do_goi_y",
-           "kiem_tra", "sang_toa_do_cong_trinh", "LOAI_TANG"]
+           "kiem_tra", "sang_toa_do_cong_trinh", "LOAI_TANG", "CAU_KIEN", "goi_y_diem_vung", "tinh_can_vung",
+           "ap_phep_vung", "kiem_tra_gan_vung"]

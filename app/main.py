@@ -493,6 +493,48 @@ async def kiem_tra_hqc_api(request: Request):
         raise HTTPException(400, f"Hệ quy chiếu không hợp lệ: {ex}")
 
 
+
+class YeuCauVung(BaseModel):
+    id: str
+    vung: list = []            # khung vùng trên bản vẽ (mét); rỗng = cả bản vẽ
+    hqc: dict = {}             # hệ quy chiếu đang nhập (lưới, gốc, bảng tầng)
+    diem: dict | None = None   # giao trục chuẩn mà điểm A của vùng nằm trên
+    goc_local: list | None = None
+    diem_b: dict | None = None
+    goc_local_b: list | None = None
+    luoi_local: dict | None = None
+
+
+def _hqc_hop_le(hqc):
+    try:
+        return he_quy_chieu.kiem_tra(hqc)
+    except (KeyError, TypeError, ValueError) as ex:
+        raise HTTPException(400, f"Hệ quy chiếu không hợp lệ: {ex}")
+
+
+@app.post("/api/he-quy-chieu/goi-y-vung")
+def goi_y_vung_api(yc: YeuCauVung):
+    """ĐỀ XUẤT điểm căn của một vùng mặt bằng: dò trục trong vùng, tìm trục trùng tên với lưới chuẩn."""
+    bv = _phien(yc.id)["ban_ve"]
+    vung = [float(v) for v in yc.vung] if len(yc.vung) == 4 else None
+    return he_quy_chieu.goi_y_diem_vung(bv, vung, _hqc_hop_le(yc.hqc))
+
+
+@app.post("/api/he-quy-chieu/can-vung")
+def can_vung_api(yc: YeuCauVung):
+    """Tính phép dời (và xoay nếu có điểm B) đưa vùng về lưới chuẩn, kiểm tra chéo bằng vị trí trục."""
+    return he_quy_chieu.tinh_can_vung(_hqc_hop_le(yc.hqc), yc.diem, yc.goc_local, yc.diem_b, yc.goc_local_b, yc.luoi_local)
+
+
+class YeuCauGanVung(BaseModel):
+    hqc: dict = {}
+    ds: list = []   # mỗi vùng: {ten, tang, cau_kien, xac_nhan, can}
+
+
+@app.post("/api/he-quy-chieu/kiem-tra-gan-vung")
+def kiem_tra_gan_vung_api(yc: YeuCauGanVung):
+    return he_quy_chieu.kiem_tra_gan_vung(yc.ds, _hqc_hop_le(yc.hqc))
+
 def _tinh(yc):
     t0 = time.time()
     p = _phien(yc.id)

@@ -142,3 +142,78 @@ def test_trang_thai_du_an_giu_he_quy_chieu():
     tt = {"files": [], "he_quy_chieu": _hqc()}
     assert c.post("/api/du-an/trang-thai", json=tt).status_code == 200
     assert c.get("/api/du-an/trang-thai").json()["trang_thai"]["he_quy_chieu"]["goc"] == {"doc": "1", "ngang": "A"}
+
+
+# ---------- Giai đoạn 2: gán vùng mặt bằng, căn về lưới chuẩn ----------
+def _kq():
+    return hq.kiem_tra(_hqc())
+
+
+def test_can_vung_dich_theo_giao_truc():
+    # vùng khác vẽ lệch: giao trục 1-A của nó nằm ở (100, 50) thay vì (20, 0)
+    can = hq.tinh_can_vung(_kq(), {"doc": "1", "ngang": "A"}, [100, 50])
+    assert can["ok"] and can["dich"] == [-80, -50] and can["quay"] == 0
+    x, y = hq.ap_phep_vung(can, _kq(), 106, 50)     # điểm cách giao trục 6 m theo X
+    assert (x, y) == pytest.approx((6, 0))
+
+
+def test_can_vung_co_xoay_theo_diem_b():
+    # vùng vẽ xoay 90 độ: trục 2 của nó nằm ở trên giao trục 1 (cách 6 m theo Y) thay vì bên phải
+    can = hq.tinh_can_vung(_kq(), {"doc": "1", "ngang": "A"}, [0, 0], {"doc": "2", "ngang": "A"}, [0, 6])
+    assert can["quay"] == pytest.approx(-90)
+    x, y = hq.ap_phep_vung(can, _kq(), 0, 6)
+    assert (x, y) == pytest.approx((6, 0), abs=1e-6)
+
+
+def test_can_vung_canh_bao_khac_khoang_cach_va_thieu_diem():
+    can = hq.tinh_can_vung(_kq(), {"doc": "1", "ngang": "A"}, [0, 0], {"doc": "2", "ngang": "A"}, [5.5, 0])
+    assert any("khác lưới chuẩn" in c for c in can["canh_bao"])
+    assert not hq.tinh_can_vung(_kq(), None, None)["ok"]
+    assert not hq.tinh_can_vung(_kq(), {"doc": "9", "ngang": "A"}, [0, 0])["ok"]
+
+
+def test_kiem_tra_cheo_bang_truc_cua_vung():
+    loc = {"doc": [{"ten": "1", "v": 100}, {"ten": "2", "v": 106.2}], "ngang": [{"ten": "A", "v": 50}]}
+    can = hq.tinh_can_vung(_kq(), {"doc": "1", "ngang": "A"}, [100, 50], luoi_local=loc)
+    lech = {t["truc"]: t["lech_mm"] for t in can["kiem_tra_truc"]}
+    assert lech["1"] == 0 and lech["2"] == 200
+    assert any("Trục 2" in c and "200 mm" in c for c in can["canh_bao"])
+
+
+def test_goi_y_diem_vung_tim_truc_trung_ten(tmp_path):
+    bv = _tao(tmp_path)    # lưới tên 1,2,3 / A,B giống lưới chuẩn nhưng đặt ở toạ độ khác
+    kq = hq.goi_y_diem_vung(bv, None, _kq())
+    assert kq["diem"] == {"doc": "1", "ngang": "A"}      # ưu tiên trục của điểm gốc chuẩn
+    assert kq["goc_local"] == pytest.approx([20, 0])
+
+
+def test_goi_y_diem_vung_khong_trung_ten(tmp_path):
+    h = _hqc()
+    h["luoi"] = {"doc": [{"ten": "X1", "v": 0}], "ngang": [{"ten": "Y1", "v": 0}]}
+    h["goc"] = {"doc": "X1", "ngang": "Y1"}
+    kq = hq.goi_y_diem_vung(_tao(tmp_path), None, hq.kiem_tra(h))
+    assert kq["diem"] is None and any("không trùng tên" in c for c in kq["canh_bao"])
+
+
+def test_kiem_tra_gan_vung():
+    can_ok = {"ok": True}
+    kq = hq.kiem_tra_gan_vung([
+        {"ten": "Móng", "tang": "MONG", "cau_kien": "mong", "xac_nhan": True, "can": can_ok},
+        {"ten": "T2 dầm sàn", "tang": "T2", "cau_kien": "dam_san", "xac_nhan": False, "can": can_ok},
+        {"ten": "T2 dầm sàn 2", "tang": "T2", "cau_kien": "dam_san", "xac_nhan": True, "can": can_ok},
+        {"ten": "T9", "tang": "T9", "cau_kien": "cot_vach", "xac_nhan": True, "can": {}},
+        {"ten": "chưa gán"}], _kq())
+    t = " | ".join(kq["canh_bao"])
+    assert not kq["xong"]
+    assert "chưa xác nhận" in t and "cùng tầng T2" in t and "không có trong bảng tầng" in t and "chưa chọn tầng" in t
+    assert kq["dong"][0]["xong"]
+    ok = hq.kiem_tra_gan_vung([{"ten": "a", "tang": "T1", "cau_kien": "cot_vach", "xac_nhan": True, "can": can_ok}], _kq())
+    assert ok["xong"] and ok["canh_bao"] == []
+
+
+def test_api_gan_vung():
+    c = TestClient(app)
+    d = {"hqc": _hqc(), "ds": [{"ten": "a", "tang": "T1", "cau_kien": "mong", "xac_nhan": True, "can": {"ok": True}}]}
+    assert c.post("/api/he-quy-chieu/kiem-tra-gan-vung", json=d).json()["xong"]
+    r = c.post("/api/he-quy-chieu/can-vung", json={"id": "x", "hqc": _hqc(), "diem": {"doc": "1", "ngang": "A"}, "goc_local": [100, 50]})
+    assert r.status_code == 200 and r.json()["dich"] == [-80, -50]
