@@ -535,6 +535,20 @@ class YeuCauGanVung(BaseModel):
 def kiem_tra_gan_vung_api(yc: YeuCauGanVung):
     return he_quy_chieu.kiem_tra_gan_vung(yc.ds, _hqc_hop_le(yc.hqc))
 
+
+class YeuCauTongHop(BaseModel):
+    hqc: dict = {}
+    ds: list = []   # mỗi vùng: {fi, ten, tang, cau_kien, xac_nhan, can, ck, coc}
+
+
+@app.post("/api/he-quy-chieu/tong-hop")
+def tong_hop_api(yc: YeuCauTongHop):
+    """Gom đối tượng theo Tầng -> Cấu kiện -> Đối tượng, đưa về toạ độ công trình (tim trục) kèm cao độ."""
+    try:
+        return he_quy_chieu.tong_hop_cong_trinh(_hqc_hop_le(yc.hqc), yc.ds)
+    except (KeyError, TypeError, ValueError) as ex:
+        raise HTTPException(400, f"Dữ liệu tổng hợp không hợp lệ: {ex}")
+
 def _tinh(yc):
     t0 = time.time()
     p = _phien(yc.id)

@@ -1261,7 +1261,7 @@ function ve() {
       nhomSang().forEach(g => { const v = g.vung; ctx.rect(sx(Math.min(v[0], v[2])), sy(Math.max(v[1], v[3])), Math.abs(v[2] - v[0]) * s, Math.abs(v[3] - v[1]) * s); });
       ctx.fill("evenodd");
     }
-    veLuoiHQ(f); veDiemVungHQ(f);
+    veLuoiHQ(f); veDiemVungHQ(f); veTHHQ(f);
     veHover(f);
     if (S.keo && S.keo.kieu === "hop" && S.keo.moved) {  // khung chọn: Window (xanh dương, nét liền) hoặc Crossing (xanh lá, nét đứt)
       const cat = S.keo.b[0] < S.keo.a[0], x = sx(Math.min(S.keo.a[0], S.keo.b[0])), y = sy(Math.max(S.keo.a[1], S.keo.b[1]));
@@ -2718,8 +2718,9 @@ function veHQ() {
     <div style="overflow:auto"><table><tr><th>Mã</th><th>Tên tầng</th><th>Loại</th><th>Cao độ KC</th><th>Cao độ HT</th><th>Cao tầng (m)</th><th>Dày sàn (mm)</th><th>Cao dầm (mm)</th><th>Ghi chú</th><th></th></tr>
       ${hangTang || '<tr><td colspan="10" class="nho">Chưa có tầng: bấm Thêm tầng hoặc Tạo bảng mẫu.</td></tr>'}</table></div>
     <div id="hq-vung" style="margin-top:14px"></div>
+    <div id="hq-th" style="margin-top:14px"></div>
     <div id="hq-kq" style="margin-top:10px"></div></div>`;
-  veHQVung(); hqVeKetQua(); if (h.luoi.doc.length || h.luoi.ngang.length || h.tang.length || h.goc) hqKiemTra();
+  veHQVung(); veHQTH(); hqVeKetQua(); if (h.luoi.doc.length || h.luoi.ngang.length || h.tang.length || h.goc) hqKiemTra();
 }
 function hqThemTang(ma, ten, loai, cd) { S.hqc.tang.push({ma, ten, loai, cao_do_kc:cd, cao_do_ht:"", day_san:"", cao_dam:"", ghi_chu:""}); }
 async function hqDo() {
@@ -2943,6 +2944,130 @@ function veDiemVungHQ(f) {
     ctx.fillText(`Căn ${nhan}${z[dk] ? " " + hqNhan(z[dk]) : ""}`, sx(+p[0]) + 12, sy(+p[1]) + 14);
   });
   if (S.hqChonVung && S.mouse) { ctx.strokeStyle = "#ffd60a"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(S.mouse.x, S.mouse.y, 25, 0, 7); ctx.stroke(); }
+  ctx.restore();
+}
+
+// ---------- Tổng hợp theo Tầng -> Cấu kiện -> Đối tượng và đưa về tim trục ----------
+S.hqTH = null;   // {data, ck:{fi:{id:cấu kiện}}, chon:Set("MA|nhom"), mo:Set, sel:id, xem:bool}
+const HQ_MAU_NHOM = {mong:"#d9b38c", cot_vach:"#ff6b5e", dam_san:"#ffc447", kien_truc:"#6fb4ff", mep:"#4cc38a", khac:"#c0c0c0"};
+const hqMm = v => v == null ? "–" : Math.round(v * 1000);
+const hqM = v => v == null ? "–" : (v > 0 ? "+" : v < 0 ? "" : "±") + v.toFixed(3);
+async function hqTinhTongHop() {
+  const ds = S.files.map((f, i) => i).filter(i => hqCoVung(S.files[i]) && (S.files[i].hq || {}).can && S.files[i].hq.can.ok && S.files[i].hq.tang);
+  if (!ds.length) return lenh("Chưa có mặt bằng nào đã gán tầng và căn vào lưới trục (mục 4).", "loi");
+  lenh(`Đang tính và tổng hợp ${ds.length} mặt bằng...`); const gui = [], ck = {};
+  for (const i of ds) {
+    const e = S.files[i], z = e.hq;
+    try {
+      e.loaiDung3D = coKetCau3D(e) ? e : S.files.find(x => x.id === e.id && coKetCau3D(x));
+      if (!e.loaiDung3D) { await tuGanKetCau(e); e.loaiDung3D = coKetCau3D(e) ? e : null; }
+      if (!e.loaiDung3D) { lenh(`${e.ten}: chưa gán layer kết cấu (cột / dầm / sàn / móng...), bỏ qua.`, "loi"); continue; }
+      const d = await json("/api/tinh", yeuCauKLCho(e));
+      ck[i] = Object.fromEntries(d.cau_kien.map(c => [c.id, c]));
+      gui.push({fi:i, ten:e.ten, tang:z.tang, cau_kien:z.cau_kien || "khac", xac_nhan:z.xac_nhan, can:z.can, ck:d.cau_kien, coc:d.coc || []});
+    } catch (err) { lenh(`${e.ten}: ${err.message}`, "loi"); }
+  }
+  if (!gui.length) return;
+  try {
+    const dt = await json("/api/he-quy-chieu/tong-hop", {hqc:S.hqc, ds:gui}), cu = S.hqTH;
+    S.hqTH = {data:dt, ck, chon:new Set(), mo:new Set(), sel:null, xem:cu ? cu.xem : true};
+    dt.tang.forEach(t => { S.hqTH.mo.add(t.ma); t.nhom.forEach(n => { S.hqTH.chon.add(t.ma + "|" + n.cau_kien); if (dt.tong.so_doi_tuong <= 60) S.hqTH.mo.add(t.ma + "|" + n.cau_kien); }); });   // ít đối tượng thì mở sẵn danh sách
+    lenh(`Tổng hợp xong: ${dt.tong.so_doi_tuong} đối tượng, ${dt.tong.so_tang} tầng, ${dt.tong.so_vung} mặt bằng.`, dt.tong.so_doi_tuong ? "ok" : "loi");
+  } catch (err) { lenh(err.message, "loi"); }
+  veHQTH(); veLai();
+}
+const hqDsChon = () => { const t = S.hqTH; if (!t) return []; const kq = []; t.data.tang.forEach(g => g.nhom.forEach(n => { if (t.chon.has(g.ma + "|" + n.cau_kien)) n.doi_tuong.forEach(o => kq.push(o)); })); return kq; };
+function hqDongDT(o) {
+  const t = S.hqTH;
+  return `<tr data-hq-dt="${esc(o.id)}" ${t.sel === o.id ? 'style="background:rgba(255,214,10,.15)"' : ""}>
+    <td></td><td>${esc(o.ten)}${o.canh_bao.length ? ` <span title="${esc(o.canh_bao.join(" | "))}" style="color:#e0b040">⚠</span>` : ""}</td><td class="nho">${esc(o.loai)}</td>
+    <td class="so">${o.kich_thuoc.length ? o.kich_thuoc.map(hqMm).join("×") : "–"}</td>
+    <td class="so">${so(o.tam_ct[0], 3)}; ${so(o.tam_ct[1], 3)}</td><td class="so" title="${esc(o.ghi_chu_cao_do || "")}">${hqM(o.z_day)} → ${hqM(o.z_dinh)}</td>
+    <td class="so">${so(o.dien_tich, 3)}</td><td class="so">${o.the_tich == null ? "–" : so(o.the_tich, 3)}</td><td class="nho">${esc(o.vung)}</td></tr>`;
+}
+function veHQTH() {
+  const p = $("hq-th"); if (!p) return; const t = S.hqTH, dd = S.hqc.da_dua_ve;
+  const dsChon = hqDsChon();
+  let h = `<div><b>5. Tổng hợp theo tầng và đưa về tim trục</b> <span class="nho">tầng → cấu kiện → đối tượng, toạ độ theo gốc ${esc(hqNhan(S.hqc.goc)) || "(chưa chọn gốc)"}</span></div>
+    <div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button id="hq-th-tinh">Tính và tổng hợp</button>
+      ${t ? `<button id="hq-th-dua" ${dsChon.length ? "" : "disabled"}>Đưa về tim trục (${dsChon.length} đối tượng đã tick)</button>
+      <label class="nho"><input type="checkbox" id="hq-th-xem" ${t.xem ? "checked" : ""}> Xem trước trên bản vẽ chuẩn</label>
+      <button id="hq-th-csv" ${dsChon.length ? "" : "disabled"}>Xuất CSV</button>` : ""}</div>
+    ${dd ? `<div style="color:#4cc38a">✓ Đã đưa về tim trục lúc ${esc(dd.luc)}: ${dd.so_doi_tuong} đối tượng (${dd.nhom.map(n => `${esc(n.tang)} ${esc(n.ten)} ${n.so}`).join("; ")}).</div>` : ""}`;
+  if (!t) h += '<div class="nho">Bấm "Tính và tổng hợp" sau khi đã gán tầng, cấu kiện và căn xong các mặt bằng ở mục 4.</div>';
+  else {
+    h += t.data.canh_bao.map(c => `<div class="cb">⚠ ${esc(c)}</div>`).join("") + t.data.bo_qua.map(b => `<div class="nho">${esc(b.vung)}: bỏ ${b.so} đối tượng ${esc(b.ly_do)}.</div>`).join("");
+    h += `<div style="overflow:auto;max-height:420px;margin-top:6px"><table><tr><th></th><th>Đối tượng</th><th>Loại</th><th>Kích thước (mm)</th><th>Tâm công trình X; Y (m)</th><th>Cao độ đáy → đỉnh</th><th>DT (m²)</th><th>TT (m³)</th><th>Vùng</th></tr>`;
+    t.data.tang.forEach(g => {
+      h += `<tr style="background:var(--xanh-nhat)"><td><input type="checkbox" data-hq-tt="${esc(g.ma)}" ${g.nhom.every(n => t.chon.has(g.ma + "|" + n.cau_kien)) ? "checked" : ""}></td>
+        <td colspan="8"><a href="#" data-hq-mo-tang="${esc(g.ma)}"><b>${t.mo.has(g.ma) ? "▾" : "▸"} ${esc(g.ma)} ${esc(g.ten)}</b></a> <span class="nho">cao độ ${hqM(g.cao_do_kc)}${g.chieu_cao ? `, cao ${so(g.chieu_cao, 3)} m` : ""} · ${g.so} đối tượng</span></td></tr>`;
+      if (!t.mo.has(g.ma)) return;
+      g.nhom.forEach(n => {
+        const k = g.ma + "|" + n.cau_kien, mo = t.mo.has(k);
+        h += `<tr><td><input type="checkbox" data-hq-tn="${esc(k)}" ${t.chon.has(k) ? "checked" : ""}></td><td colspan="5"><a href="#" data-hq-mo-nhom="${esc(k)}" style="color:${HQ_MAU_NHOM[n.cau_kien]}">${mo ? "▾" : "▸"} <b>${esc(n.ten)}</b></a> <span class="nho">${n.so} đối tượng</span></td>
+          <td class="so">${so(n.dien_tich, 3)}</td><td class="so">${so(n.the_tich, 3)}${n.thieu_the_tich ? ` <span class="nho" title="${n.thieu_the_tich} đối tượng chưa biết chiều cao nên chưa có thể tích">*</span>` : ""}</td><td></td></tr>`;
+        if (mo) h += n.doi_tuong.map(hqDongDT).join("");
+      });
+    });
+    h += "</table></div>";
+  }
+  p.innerHTML = h;
+}
+$("p-hq").addEventListener("click", async e => {
+  const a = e.target.closest("a[data-hq-mo-tang],a[data-hq-mo-nhom]"), t = S.hqTH;
+  if (a && t) { e.preventDefault(); const k = a.dataset.hqMoTang || a.dataset.hqMoNhom; t.mo.has(k) ? t.mo.delete(k) : t.mo.add(k); return veHQTH(); }
+  const tr = e.target.closest("tr[data-hq-dt]");
+  if (tr && t && !e.target.closest("input,button")) {
+    t.sel = tr.dataset.hqDt; const o = t.data.tang.flatMap(g => g.nhom.flatMap(n => n.doi_tuong)).find(x => x.id === t.sel);
+    if (o) {
+      if (S.act !== o.fi) moFile(o.fi);
+      const c = (t.ck[o.fi] || {})[o.ma_goc], pts = c ? c.hinh.flatMap(p => p[0]) : [[o.tam_local[0], o.tam_local[1]]];
+      const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]), m = Math.max(2, Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+      zoomTheoKhung([Math.min(...xs) - m, Math.min(...ys) - m, Math.max(...xs) + m, Math.max(...ys) + m]);
+      lenh(`${o.ten} (${o.vung}): tâm công trình (${so(o.tam_ct[0], 3)}; ${so(o.tam_ct[1], 3)}) m, cao độ ${hqM(o.z_day)} → ${hqM(o.z_dinh)}.`, "ok");
+    }
+    veHQTH(); return veLai();
+  }
+  const d = e.target.closest("button"); if (!d) return;
+  if (d.id === "hq-th-tinh") return hqTinhTongHop();
+  if (!t) return;
+  if (d.id === "hq-th-dua") {
+    const ds = hqDsChon(), dem = {};
+    t.data.tang.forEach(g => g.nhom.forEach(n => { if (t.chon.has(g.ma + "|" + n.cau_kien)) dem[g.ma + "|" + n.cau_kien] = {tang:g.ma, ten:n.ten, so:n.so}; }));
+    S.hqc.da_dua_ve = {luc:new Date().toLocaleString("vi-VN"), so_doi_tuong:ds.length, nhom:Object.values(dem)};
+    lenh(`Đã đưa ${ds.length} đối tượng về tim trục (gốc ${hqNhan(S.hqc.goc)}).`, "ok"); veHQTH(); return;
+  }
+  if (d.id === "hq-th-csv") {
+    const dong = [["Tầng", "Cấu kiện", "Đối tượng", "Loại", "Vùng", "Dài (mm)", "Rộng (mm)", "Tâm X (m)", "Tâm Y (m)", "Cao độ đáy (m)", "Cao độ đỉnh (m)", "Diện tích (m2)", "Thể tích (m3)"]];
+    t.data.tang.forEach(g => g.nhom.forEach(n => { if (t.chon.has(g.ma + "|" + n.cau_kien)) n.doi_tuong.forEach(o => dong.push([g.ma, n.ten, o.ten, o.loai, o.vung, hqMm(o.kich_thuoc[0]), hqMm(o.kich_thuoc[1]), o.tam_ct[0], o.tam_ct[1], o.z_day ?? "", o.z_dinh ?? "", o.dien_tich, o.the_tich ?? ""])); }));
+    const csv = "﻿" + dong.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    const a2 = document.createElement("a"); a2.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"})); a2.download = "doi_tuong_theo_tim_truc.csv"; a2.click(); URL.revokeObjectURL(a2.href);
+    lenh(`Đã xuất ${dong.length - 1} đối tượng ra CSV (toạ độ theo tim trục).`, "ok");
+  }
+});
+$("p-hq").addEventListener("change", e => {
+  const d = e.target, t = S.hqTH; if (!t) return;
+  if (d.id === "hq-th-xem") { t.xem = d.checked; return veLai(); }
+  const dat = (k, b) => b ? t.chon.add(k) : t.chon.delete(k);
+  if (d.dataset.hqTn) { dat(d.dataset.hqTn, d.checked); veHQTH(); return veLai(); }
+  if (d.dataset.hqTt) { const g = t.data.tang.find(x => x.ma === d.dataset.hqTt); g.nhom.forEach(n => dat(g.ma + "|" + n.cau_kien, d.checked)); veHQTH(); veLai(); }
+});
+// Xem trước: đối tượng đã tick (toạ độ đã đưa về mặt bằng chuẩn) vẽ trên bản vẽ chuẩn; đối tượng đang chọn tô vàng ở vùng của nó
+function veTHHQ(f) {
+  const t = S.hqTH, h = S.hqc; if (!t || $("p-hq").hidden) return;
+  ctx.save(); ctx.setLineDash([]); ctx.lineJoin = "round";
+  const vong = (P, mau, fill, lw) => { ctx.beginPath(); P.forEach((q, i) => i ? ctx.lineTo(sx(q[0]), sy(q[1])) : ctx.moveTo(sx(q[0]), sy(q[1]))); ctx.closePath(); if (fill) { ctx.fillStyle = fill; ctx.fill(); } ctx.strokeStyle = mau; ctx.lineWidth = lw; ctx.stroke(); };
+  const treChuan = t.xem && h.fileId && h.fileId === f.id;
+  if (treChuan) hqDsChon().forEach(o => o.hinh_chuan.forEach(poly => vong(poly[0], HQ_MAU_NHOM[o.nhom] || "#fff", (HQ_MAU_NHOM[o.nhom] || "#fff") + "55", 1.5)));
+  const sel = t.sel && t.data.tang.flatMap(g => g.nhom.flatMap(n => n.doi_tuong)).find(x => x.id === t.sel);
+  if (sel) {
+    if (treChuan) sel.hinh_chuan.forEach(poly => vong(poly[0], "#ffd60a", null, 3));
+    if (S.files[sel.fi] === F()) {
+      const c = (t.ck[sel.fi] || {})[sel.ma_goc];
+      if (c) c.hinh.forEach(poly => vong(poly[0], "#ffd60a", "rgba(255,214,10,.3)", 3));
+      else { ctx.strokeStyle = "#ffd60a"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(sx(sel.tam_local[0]), sy(sel.tam_local[1]), Math.max(8, (sel.thong_so.d || 0.4) / 2 * S.v.s), 0, 7); ctx.stroke(); }
+    }
+  }
   ctx.restore();
 }
 

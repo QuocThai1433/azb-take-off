@@ -217,3 +217,92 @@ def test_api_gan_vung():
     assert c.post("/api/he-quy-chieu/kiem-tra-gan-vung", json=d).json()["xong"]
     r = c.post("/api/he-quy-chieu/can-vung", json={"id": "x", "hqc": _hqc(), "diem": {"doc": "1", "ngang": "A"}, "goc_local": [100, 50]})
     assert r.status_code == 200 and r.json()["dich"] == [-80, -50]
+
+
+# ---------- Giai đoạn 3: tổng hợp theo tầng / cấu kiện, đưa về tim trục ----------
+def _hcn(x0, y0, x1, y1):
+    return [[[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]]]
+
+
+def _ck(id_, loai, ten, hinh, **ts):
+    return {"id": id_, "loai": loai, "ten": ten, "layer": "L", "thong_so": ts, "canh_bao": [], "loai_bo": False, "hinh": hinh}
+
+
+def _vung(fi, ten, tang, ck, ds, can=None, xn=True, coc=None):
+    return {"fi": fi, "ten": ten, "tang": tang, "cau_kien": ck, "xac_nhan": xn, "ck": ds, "coc": coc or [],
+            "can": can or hq.tinh_can_vung(_kq(), {"doc": "1", "ngang": "A"}, [100, 50])}
+
+
+def test_tong_hop_theo_tang_cau_kien_va_dua_ve_tim_truc():
+    # vùng vẽ lệch (+80, +50): cột 400x400 tâm tại (106, 50) trên bản vẽ = 6 m cách trục 1 theo X, nằm trên trục A
+    cot = _ck("c1", "cot", "C1", _hcn(105.8, 49.8, 106.2, 50.2))
+    dam = _ck("d1", "dam", "D1", _hcn(100, 49.9, 106, 50.1), h=0.5)
+    kq = hq.tong_hop_cong_trinh(_kq(), [_vung(1, "T2 cột", "T2", "cot_vach", [cot, dam])])
+    assert kq["tong"]["so_doi_tuong"] == 1            # dầm khác loại khai báo (cột-vách) nên không lấy
+    assert kq["bo_qua"] == [{"vung": "T2 cột", "so": 1, "ly_do": "khác loại khai báo (Cột - vách)"}]
+    t = kq["tang"][0]
+    assert t["ma"] == "T2" and t["cao_do_kc"] == 3.6 and t["nhom"][0]["cau_kien"] == "cot_vach"
+    o = t["nhom"][0]["doi_tuong"][0]
+    assert o["tam_ct"] == pytest.approx([6, 0]) and o["tam_chuan"] == pytest.approx([26, 0])   # công trình: gốc A-1; chuẩn: bản vẽ chuẩn
+    assert (o["z_day"], o["z_dinh"]) == (3.6, 7.2)                                               # từ tầng T2 lên MAI
+    assert o["dien_tich"] == pytest.approx(0.16) and o["the_tich"] == pytest.approx(0.16 * 3.6)
+    assert sorted(o["kich_thuoc"]) == pytest.approx([0.4, 0.4])
+    assert o["hinh_ct"][0][0][0] == pytest.approx([5.8, -0.2])
+
+
+def test_tong_hop_khac_lay_het_va_cao_do_dam_san_mong():
+    ds = [_ck("d1", "dam", "D1", _hcn(0, 0, 4, 0.2), h=0.5), _ck("s1", "san", "S1", _hcn(0, 0, 4, 4), t=0.12),
+          _ck("m1", "mong", "M1", _hcn(0, 0, 1, 1), day=0.8), _ck("x", "dam", "D2", _hcn(0, 0, 4, 0.2))]
+    can = hq.tinh_can_vung(_kq(), {"doc": "1", "ngang": "A"}, [0, 0])
+    kq = hq.tong_hop_cong_trinh(_kq(), [_vung(0, "Tầng 1", "T1", "khac", ds, can)])
+    o = {x["ma_goc"]: x for n in kq["tang"][0]["nhom"] for x in n["doi_tuong"]}
+    assert (o["d1"]["z_day"], o["d1"]["z_dinh"]) == (-0.5, 0.0)
+    assert (o["s1"]["z_day"], o["s1"]["z_dinh"]) == (-0.12, 0.0)
+    assert (o["m1"]["z_day"], o["m1"]["z_dinh"]) == (-0.8, 0.0)
+    assert o["x"]["z_day"] == -0.4          # dầm không có h: lấy cao dầm mặc định 400 mm của tầng T1
+    kq2 = hq.tong_hop_cong_trinh(_kq(), [_vung(0, "Tầng 2", "T2", "khac", [ds[3]], can)])   # T2 không khai báo cao dầm
+    o2 = kq2["tang"][0]["nhom"][0]["doi_tuong"][0]
+    assert o2["z_day"] is None and o2["the_tich"] is None and "dầm" in o2["ghi_chu_cao_do"]
+    assert [n["cau_kien"] for n in kq["tang"][0]["nhom"]] == ["mong", "dam_san"]
+
+
+def test_tong_hop_tang_tren_cung_va_coc():
+    coc = [{"id": "coc-0", "ten": "P1", "x": 0, "y": 0, "d": 0.4}]
+    kq = hq.tong_hop_cong_trinh(_kq(), [_vung(0, "Móng", "MONG", "mong", [], hq.tinh_can_vung(_kq(), {"doc": "1", "ngang": "A"}, [20, 0]), coc=coc),
+                                         _vung(1, "Mái", "MAI", "cot_vach", [_ck("c", "cot", "C", _hcn(0, 0, 1, 1))])])
+    assert kq["tang"][0]["ma"] == "MONG" and kq["tang"][0]["nhom"][0]["doi_tuong"][0]["loai"] == "coc"
+    assert kq["tang"][0]["nhom"][0]["doi_tuong"][0]["dien_tich"] == pytest.approx(3.14159 * 0.04, rel=0.03)
+    mai = kq["tang"][1]["nhom"][0]["doi_tuong"][0]
+    assert mai["z_dinh"] is None and "tầng trên cùng" in mai["ghi_chu_cao_do"]
+
+
+def test_tong_hop_bo_qua_vung_chua_can_va_canh_bao_trung():
+    c = _ck("c1", "cot", "C1", _hcn(0, 0, 1, 1))
+    kq = hq.tong_hop_cong_trinh(_kq(), [
+        {"fi": 0, "ten": "chưa căn", "tang": "T1", "cau_kien": "khac", "ck": [c], "can": None},
+        {"fi": 1, "ten": "tầng lạ", "tang": "T9", "cau_kien": "khac", "ck": [c], "can": {"ok": True, "dich": [0, 0], "quay": 0, "tam": [0, 0]}},
+        _vung(2, "A", "T1", "cot_vach", [c], hq.tinh_can_vung(_kq(), {"doc": "1", "ngang": "A"}, [0, 0]), xn=False),
+        _vung(3, "B", "T1", "cot_vach", [c], hq.tinh_can_vung(_kq(), {"doc": "1", "ngang": "A"}, [0, 0]))])
+    t = " | ".join(kq["canh_bao"])
+    assert "chưa căn" in t and "chưa có tầng hợp lệ" in t and "chưa xác nhận" in t and "trùng vị trí" in t
+    assert kq["tong"]["so_vung"] == 2 and kq["tong"]["so_doi_tuong"] == 2
+
+
+def test_tong_hop_khong_co_goc():
+    h = _hqc(goc=None)
+    kq = hq.tong_hop_cong_trinh(hq.kiem_tra(h), [])
+    assert kq["tang"] == [] and "điểm gốc" in kq["canh_bao"][0]
+
+
+def test_tong_hop_co_xoay():
+    can = hq.tinh_can_vung(_kq(), {"doc": "1", "ngang": "A"}, [0, 0], {"doc": "2", "ngang": "A"}, [0, 6])   # vùng quay -90 độ
+    c = _ck("c", "cot", "C", _hcn(-0.2, 5.8, 0.2, 6.2))        # trên bản vẽ vùng nằm ở (0, 6) = trục 2 sau khi xoay
+    o = hq.tong_hop_cong_trinh(_kq(), [_vung(0, "xoay", "T1", "khac", [c], can)])["tang"][0]["nhom"][0]["doi_tuong"][0]
+    assert o["tam_ct"] == pytest.approx([6, 0], abs=1e-3)
+
+
+def test_api_tong_hop():
+    c = TestClient(app)
+    d = {"hqc": _hqc(), "ds": [_vung(0, "T1", "T1", "cot_vach", [_ck("c", "cot", "C", _hcn(0, 0, 1, 1))])]}
+    r = c.post("/api/he-quy-chieu/tong-hop", json=d)
+    assert r.status_code == 200 and r.json()["tong"]["so_doi_tuong"] == 1

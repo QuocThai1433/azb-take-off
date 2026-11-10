@@ -453,6 +453,152 @@ def kiem_tra_gan_vung(ds, hqc_da_kiem):
     return {"dong": dong, "canh_bao": cb, "xong": bool(dong) and all(d["xong"] for d in dong)}
 
 
+# ---------- Tổng hợp theo tầng / cấu kiện và đưa về tim trục ----------
+NHOM_CAU_KIEN = {"cot": "cot_vach", "vach": "cot_vach", "dam": "dam_san", "san": "dam_san", "lo_san": "dam_san",
+                 "mong": "mong", "coc": "mong", "tuong": "kien_truc", "cua": "kien_truc",
+                 "ong_gio": "mep", "ong_nuoc": "mep", "ong_pccc": "mep", "khay_cap": "mep"}
+
+
+def ve_toa_do_chuan(can, x, y):
+    """Toạ độ trên mặt bằng chuẩn của điểm (x, y) thuộc vùng đã căn `can` (chưa đổi sang gốc công trình)."""
+    a = math.radians(can.get("quay") or 0.0)
+    tx, ty = can["tam"]
+    px, py = x - tx, y - ty
+    return (px * math.cos(a) - py * math.sin(a) + tx + can["dich"][0], px * math.sin(a) + py * math.cos(a) + ty + can["dich"][1])
+
+
+def _hinh_sang(hinh, ham):
+    return [[[list(map(_so, ham(p[0], p[1]))) for p in vong] for vong in poly] for poly in hinh]
+
+
+def _poly_shapely(poly):
+    from shapely.geometry import Polygon
+    try:
+        p = Polygon(poly[0], poly[1:])
+        return p if p.is_valid else p.buffer(0)
+    except (ValueError, IndexError):
+        return None
+
+
+def _cao_do(loai, ts, tang):
+    """(đáy, đỉnh, ghi chú) của một cấu kiện theo cao độ tầng. Thiếu số liệu thì trả None ở chỗ đó, kèm lý do."""
+    z, h_tang = tang["cao_do_kc"], tang.get("chieu_cao")
+    ts = ts or {}
+    if loai in ("cot", "vach"):
+        h = h_tang or ts.get("h_tinh") or ts.get("h")
+        return (z, round(z + h, 4), "cao từ cao độ tầng lên tầng trên") if h else (z, None, "tầng trên cùng: chưa biết chiều cao")
+    if loai == "dam":
+        h = ts.get("h") or ((tang.get("cao_dam") or 0) / 1000 or None)
+        return (round(z - h, 4), z, "mặt trên dầm = cao độ kết cấu tầng") if h else (None, z, "chưa biết chiều cao dầm")
+    if loai in ("san", "lo_san"):
+        t = ts.get("t") or ((tang.get("day_san") or 0) / 1000 or None)
+        return (round(z - t, 4), z, "mặt trên sàn = cao độ kết cấu tầng") if t else (None, z, "chưa biết chiều dày sàn")
+    if loai == "mong":
+        d = ts.get("day")
+        return (round(z - d, 4), z, "mặt trên móng = cao độ tầng móng") if d else (None, z, "chưa biết chiều cao móng")
+    return (None, z, "")
+
+
+def _kich_thuoc(g):
+    """Hai cạnh của hình chữ nhật nhỏ nhất bao đối tượng (dài, rộng); không phải hình có diện tích thì rỗng."""
+    if g.geom_type not in ("Polygon", "MultiPolygon") or g.area <= 0:
+        return []
+    r = g.minimum_rotated_rectangle
+    if r.geom_type != "Polygon":
+        return []
+    c = list(r.exterior.coords)
+    return sorted([math.dist(c[0], c[1]), math.dist(c[1], c[2])], reverse=True)
+
+
+def _nhom_theo_ten(ds):
+    """Sắp tên kiểu tự nhiên: C2 trước C10."""
+    return sorted(ds, key=lambda d: [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", str(d["ten"]))])
+
+
+def tong_hop_cong_trinh(hqc_da_kiem, ds_vung):
+    """Gom đối tượng của các mặt bằng theo Tầng -> Cấu kiện -> Đối tượng và đưa về tim trục.
+    ds_vung: [{fi, ten, tang, cau_kien, xac_nhan, can, ck: [cấu kiện đã tính], coc: [cọc]}].
+    Chỉ lấy đối tượng thuộc loại cấu kiện mà vùng khai báo ('khac' = lấy hết). Mỗi đối tượng có toạ độ công trình
+    (gốc tại điểm gốc, chiều theo điểm hướng), toạ độ trên mặt bằng chuẩn, cao độ đáy / đỉnh, diện tích, thể tích."""
+    from shapely.ops import unary_union
+    tang_theo_ma = {d["ma"]: d for d in hqc_da_kiem.get("tang") or []}
+    canh_bao, bo_qua, theo_tang = [], [], {}
+    if not hqc_da_kiem.get("goc"):
+        return {"tang": [], "canh_bao": ["Chưa có điểm gốc: chọn điểm gốc ở mục 2 trước khi tổng hợp."], "bo_qua": [], "tong": {"so_doi_tuong": 0, "so_vung": 0}}
+    n_vung = 0
+    for v in ds_vung or []:
+        ten_v = str(v.get("ten") or "vùng")
+        can, tang = v.get("can") or {}, tang_theo_ma.get(v.get("tang"))
+        if not can.get("ok"):
+            canh_bao.append(f"{ten_v}: chưa căn vào lưới trục, bỏ qua.")
+            continue
+        if not tang or tang["cao_do_kc"] is None:
+            canh_bao.append(f"{ten_v}: chưa có tầng hợp lệ (hoặc tầng chưa có cao độ), bỏ qua.")
+            continue
+        if not v.get("xac_nhan"):
+            canh_bao.append(f"{ten_v}: chưa xác nhận căn đúng, vẫn tổng hợp nhưng Sếp cần kiểm tra.")
+        khai_bao = v.get("cau_kien") or "khac"
+        n_vung += 1
+        doi_tuong = list(v.get("ck") or [])
+        coc = [{"id": c["id"], "loai": "coc", "ten": c["ten"], "layer": c.get("layer", ""), "thong_so": {"d": c.get("d")},
+                "hinh": [[[[c["x"] + math.cos(k * math.pi / 8) * c["d"] / 2, c["y"] + math.sin(k * math.pi / 8) * c["d"] / 2] for k in range(16)]]],
+                "canh_bao": []} for c in v.get("coc") or []]
+        so_bo = 0
+        for c in doi_tuong + coc:
+            if c.get("loai_bo"):
+                continue
+            nhom = NHOM_CAU_KIEN.get(c["loai"], "khac")
+            if khai_bao != "khac" and nhom != khai_bao:
+                so_bo += 1
+                continue
+            polys = [p for p in map(_poly_shapely, c.get("hinh") or []) if p is not None and not p.is_empty]
+            if not polys:
+                continue
+            g = unary_union(polys)
+            ct = lambda x, y, can=can: ap_phep_vung(can, hqc_da_kiem, x, y)
+            cx, cy = g.centroid.x, g.centroid.y
+            kt = _kich_thuoc(g)
+            z_day, z_dinh, ghi = _cao_do(c["loai"], c.get("thong_so"), tang)
+            dien_tich = round(g.area, 4)
+            the_tich = round(dien_tich * (z_dinh - z_day), 4) if z_day is not None and z_dinh is not None else None
+            o = {"id": f"{v.get('fi')}:{c['id']}", "fi": v.get("fi"), "ma_goc": c["id"], "ten": c.get("ten") or c["id"], "loai": c["loai"],
+                 "nhom": nhom, "layer": c.get("layer", ""), "vung": ten_v, "kich_thuoc": [round(x, 4) for x in kt[:2]],
+                 "tam_local": [_so(cx), _so(cy)], "tam_chuan": [_so(t) for t in ve_toa_do_chuan(can, cx, cy)], "tam_ct": list(ct(cx, cy)),
+                 "z_day": z_day, "z_dinh": z_dinh, "ghi_chu_cao_do": ghi, "dien_tich": dien_tich, "the_tich": the_tich,
+                 "thong_so": c.get("thong_so") or {}, "canh_bao": list(c.get("canh_bao") or []),
+                 "hinh_chuan": _hinh_sang([[[list(p) for p in r] for r in poly] for poly in c["hinh"]], lambda x, y, can=can: ve_toa_do_chuan(can, x, y)),
+                 "hinh_ct": _hinh_sang(c["hinh"], ct)}
+            theo_tang.setdefault(tang["ma"], {}).setdefault(nhom, []).append(o)
+        if so_bo:
+            bo_qua.append({"vung": ten_v, "so": so_bo, "ly_do": f"khác loại khai báo ({CAU_KIEN.get(khai_bao, khai_bao)})"})
+    tang_ds = []
+    for ma, d in sorted(tang_theo_ma.items(), key=lambda kv: kv[1]["cao_do_kc"] if kv[1]["cao_do_kc"] is not None else 1e9):
+        if ma not in theo_tang:
+            continue
+        nhoms = []
+        for ck in CAU_KIEN:
+            ds = _nhom_theo_ten(theo_tang[ma].get(ck, []))
+            if ds:
+                nhoms.append({"cau_kien": ck, "ten": CAU_KIEN[ck], "so": len(ds), "dien_tich": round(sum(o["dien_tich"] for o in ds), 3),
+                              "the_tich": round(sum(o["the_tich"] or 0 for o in ds), 3), "thieu_the_tich": sum(1 for o in ds if o["the_tich"] is None),
+                              "doi_tuong": ds})
+        tang_ds.append({"ma": ma, "ten": d["ten"], "loai": d["loai"], "cao_do_kc": d["cao_do_kc"], "chieu_cao": d.get("chieu_cao"),
+                        "so": sum(n["so"] for n in nhoms), "nhom": nhoms})
+    # đối tượng trùng nhau giữa hai vùng cùng tầng, cùng loại: cùng loại, tâm cách nhau dưới 5 cm
+    for t in tang_ds:
+        for n in t["nhom"]:
+            vi_tri = {}
+            for o in n["doi_tuong"]:
+                vi_tri.setdefault((o["loai"], round(o["tam_ct"][0], 1), round(o["tam_ct"][1], 1)), []).append(o)
+            trung = [o for k, ds in vi_tri.items() if len({x["vung"] for x in ds}) > 1 for o in ds]
+            if trung:
+                canh_bao.append(f"Tầng {t['ma']} - {n['ten']}: {len(trung)} đối tượng nằm trùng vị trí ở nhiều vùng ({', '.join(sorted({o['vung'] for o in trung}))}). Kiểm tra có vẽ lặp không.")
+                for o in trung:
+                    o["canh_bao"].append("Trùng vị trí với đối tượng cùng loại ở vùng khác.")
+    return {"tang": tang_ds, "canh_bao": canh_bao, "bo_qua": bo_qua,
+            "tong": {"so_doi_tuong": sum(t["so"] for t in tang_ds), "so_vung": n_vung, "so_tang": len(tang_ds)}}
+
+
 # ---------- Tổng hợp hệ quy chiếu ----------
 def kiem_tra(hqc):
     """Kiểm tra cả hệ quy chiếu người dùng đã nhập: lưới trục, điểm gốc, điểm hướng, bảng tầng.
@@ -503,4 +649,4 @@ def sang_toa_do_cong_trinh(hqc_da_kiem, x, y):
 
 __all__ = ["do_luoi_truc", "kiem_tra_luoi", "diem_giao", "ten_diem", "doc_so", "chuan_hoa_bang_tang", "cao_do_goi_y",
            "kiem_tra", "sang_toa_do_cong_trinh", "LOAI_TANG", "CAU_KIEN", "goi_y_diem_vung", "tinh_can_vung",
-           "ap_phep_vung", "kiem_tra_gan_vung"]
+           "ap_phep_vung", "kiem_tra_gan_vung", "tong_hop_cong_trinh", "ve_toa_do_chuan", "NHOM_CAU_KIEN"]
