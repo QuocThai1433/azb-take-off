@@ -4,6 +4,9 @@
 # Tải tại trang Open Design Alliance, cài xong sửa đường dẫn cho đúng phiên bản.
 oda_path: "C:/Program Files/ODA/ODAFileConverter 27.10.0/ODAFileConverter.exe"
 
+# Dung lượng tối đa của một file tải lên (MB). Quá mức này bị từ chối để tránh treo máy.
+tai_len_toi_da_mb: 300
+
 # Thông số mặc định hiện trên giao diện (đơn vị m). Người dùng sửa lại cho từng bản vẽ.
 mac_dinh:
   chieu_cao_tang: 3.6        # từ mặt sàn tầng này đến mặt sàn tầng trên

@@ -5,7 +5,7 @@ mái ghi ở mặt cắt (+6.050, +6.800) và cửa vẽ đủ ở mặt đứng
 """
 import re
 
-RE_CAO_DO = re.compile(r"^\+\s*(\d+(?:[.,]\d+)?)$")
+RE_CAO_DO = re.compile(r"^(?:EL\.?\s*|CAO\s*DO\s*)?\+\s*(\d+(?:[.,]\d+)?)\s*(?:m|M)?$")   # +6.800, +6,8, EL +6.800, +6.800m
 CAO_TOI_THIEU = 3.0        # m - cao độ nhỏ hơn mức này (vd +2.000 là đỉnh cửa / tường thấp) không phải mái
 CHENH_MAI_TOI_DA = 1.5     # m - hai cao độ mái cách nhau quá mức này thì không phải hai mép một mái dốc
 

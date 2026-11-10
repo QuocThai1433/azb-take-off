@@ -41,6 +41,31 @@ def kiem_tra_gan_layer(ban_ve, loai_layer, ds_de_xuat):
     return kq[:TOI_DA_BAO]
 
 
+def kiem_tra_chuan_3d(ban_ve, loai_layer):
+    """Bản vẽ nhà (có layer Tường) đã đủ chuẩn để dựng 3D đẹp chưa. Chỉ ĐỌC. Trả danh sách {muc, layer, noi_dung}.
+    Không có layer Tường thì trả rỗng (không phải bản vẽ nhà)."""
+    from .nha_tu_ban_ve import doc_cao_do
+    ten_tuong = [t for t, l in loai_layer.items() if l == "tuong"]
+    if not ten_tuong:
+        return []
+    kq = []
+    n_kin = sum(len(ban_ve.layers[t].hinh_kin) for t in ten_tuong if t in ban_ve.layers)
+    n_ho = sum(len(ban_ve.layers[t].net_ho) for t in ten_tuong if t in ban_ve.layers)
+    if n_kin == 0:
+        kq.append({"muc": "canh_bao", "layer": ten_tuong[0],
+                   "noi_dung": f"Layer Tường chỉ có nét rời ({n_ho} nét), không có hình kín nên 3D khó dựng đúng. Vẽ tường bằng polyline đóng kín."})
+    elif n_ho > 3 * n_kin and n_ho >= 20:
+        kq.append({"muc": "thong_tin", "layer": ten_tuong[0],
+                   "noi_dung": f"Layer Tường có {n_ho} nét rời so với {n_kin} hình kín, phần nét rời có thể không được dựng."})
+    if not any(l == "cua" for l in loai_layer.values()):
+        kq.append({"muc": "thong_tin", "layer": "",
+                   "noi_dung": "Chưa có layer Cửa: tường sẽ không được khoét cửa. Gán layer cửa (mặt bằng hoặc mặt đứng cùng trục x)."})
+    if doc_cao_do(ban_ve) is None:
+        kq.append({"muc": "thong_tin", "layer": "",
+                   "noi_dung": "Không đọc được cao độ mái (chữ dạng +6.800 trên mặt đứng/mặt cắt). Tường và mái sẽ dùng chiều cao tầng mặc định."})
+    return kq
+
+
 def kiem_tra_ket_qua(kq):
     """Kiểm tra độ hợp lý của kết quả sau khi tính. Trả danh sách câu cảnh báo."""
     bt = {t["ma"]: t["khoi_luong"] for t in kq.get("tong_hop", [])}

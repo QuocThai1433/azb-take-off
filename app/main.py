@@ -168,6 +168,24 @@ def trang_cu():
     return FileResponse(STATIC / "index.html")
 
 
+TAI_LEN_TOI_DA = 300 * 1024 ** 2   # byte: file bản vẽ lớn hơn mức này bị từ chối (tránh treo máy); đổi bằng 'tai_len_toi_da_mb' trong config/app.yaml
+
+
+def _luu_co_gioi_han(nguon, duong_dan):
+    """Ghi từng khối xuống đĩa, quá giới hạn thì dừng và báo lỗi (không đọc cả file vào bộ nhớ)."""
+    toi_da = int(config.app_config().get("tai_len_toi_da_mb") or 0) * 1024 ** 2 or TAI_LEN_TOI_DA
+    tong = 0
+    with open(duong_dan, "wb") as out:
+        while True:
+            khoi = nguon.read(1024 * 1024)
+            if not khoi:
+                break
+            tong += len(khoi)
+            if tong > toi_da:
+                raise HTTPException(413, f"File quá lớn (giới hạn {toi_da // 1024 ** 2} MB). Tách bản vẽ nhỏ hơn, hoặc tăng 'tai_len_toi_da_mb' trong config/app.yaml.")
+            out.write(khoi)
+
+
 @app.post("/api/tai-len")
 def tai_len(file: UploadFile = File(...), don_vi: str = Form("auto"), trang: int = Form(1), ty_le: int = Form(0)):
     """Nhận .dxf/.dwg, hoặc .pdf (còn nét vector): PDF được đổi 1 trang thành DXF (mm thực tế) rồi đọc như DXF.
@@ -180,7 +198,11 @@ def tai_len(file: UploadFile = File(...), don_vi: str = Form("auto"), trang: int
     thu_muc = THU_MUC_TAI_LEN / pid
     thu_muc.mkdir(parents=True, exist_ok=True)
     duong_dan = thu_muc / ten
-    duong_dan.write_bytes(file.file.read())
+    try:
+        _luu_co_gioi_han(file.file, duong_dan)
+    except HTTPException:
+        shutil.rmtree(thu_muc, ignore_errors=True)
+        raise
     them = {}
     canh_bao_pdf = []
     try:
@@ -316,7 +338,8 @@ class KiemTraLayer(BaseModel):
 def kiem_tra_gan(yc: KiemTraLayer):
     """Cổng kiểm tra gán layer, gọi được bất cứ lúc nào (không cần bấm Tính)."""
     p = _phien(yc.id)
-    return {"ds": kiem_tra_layer.kiem_tra_gan_layer(p["ban_ve"], yc.loai_layer, _de_xuat(p))}
+    return {"ds": kiem_tra_layer.kiem_tra_gan_layer(p["ban_ve"], yc.loai_layer, _de_xuat(p)),
+            "chuan_3d": kiem_tra_layer.kiem_tra_chuan_3d(p["ban_ve"], yc.loai_layer)}
 
 
 class NhoLayer(BaseModel):

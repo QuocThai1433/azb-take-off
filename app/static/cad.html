@@ -1129,7 +1129,7 @@ function lamMoiKT() {
   ktChoTimer = setTimeout(async () => {
     const f = F(); const tab = document.querySelector('#tab-phai [data-t="ai"]') || document.querySelector('[data-t="ai"]');
     if (!f || f.vai_tro !== "mat_bang") { aiKT = []; if (tab) tab.textContent = "Gán layer"; return; }
-    try { aiKT = (await json("/api/kiem-tra-layer", {id:f.id, loai_layer:loaiLayer(f)})).ds || []; } catch { return; }
+    try { const r = await json("/api/kiem-tra-layer", {id:f.id, loai_layer:loaiLayer(f)}); aiKT = [...(r.ds || []), ...(r.chuan_3d || [])]; } catch { return; }
     if (tab) tab.textContent = "Gán layer" + (aiKT.length ? ` ⚠${aiKT.length}` : "");
     if (aiDS.length && $("p-ai").offsetParent) ve_AI_bang();
   }, 500);
@@ -2762,7 +2762,7 @@ async function veAI() {
   try {
     aiDS = (await (await goi("/api/de-xuat-layer/" + f.id)).json()).ds;
     aiHS = (await (await goi("/api/ho-so-layer")).json()).ds;
-    aiKT = f.vai_tro === "mat_bang" ? (await json("/api/kiem-tra-layer", {id:f.id, loai_layer:loaiLayer(f)})).ds || [] : [];
+    if (f.vai_tro === "mat_bang") { const r = await json("/api/kiem-tra-layer", {id:f.id, loai_layer:loaiLayer(f)}); aiKT = [...(r.ds || []), ...(r.chuan_3d || [])]; } else aiKT = [];
   } catch (e) { p.innerHTML = `<div class="nho" style="padding:10px">${esc(e.message)}</div>`; return; }
   ve_AI_bang();
 }
