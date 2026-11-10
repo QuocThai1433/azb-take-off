@@ -284,6 +284,11 @@
       let nx = 1; dd.forEach(x => { if (x.loai === "tang" && x.tang == null) { while (dung_.has(nx)) nx++; x.tang = nx; dung_.add(nx); } });
       const tMax = Math.max(0, ...dd.filter(x => x.loai === "tang").map(x => x.tang));
       dsMB.forEach((p, i) => {
+        if (p.hq) {   // mặt bằng đã gán tầng + căn theo hệ quy chiếu dự án: dùng đúng số liệu đó, không đoán
+          const cu = st.mb[p.key];
+          st.mb[p.key] = {loai: p.hq.loai, tang: p.hq.tang, Z: p.hq.Z, dx: 0, dy: 0, hien: cu ? cu.hien !== false : true, canh: {n: -2}, hq: p.hq.ma};
+          return;
+        }
         if (st.mb[p.key]) return;
         const x = dd[i], tg = x.loai === "mai" ? tMax + 1 : x.tang;
         st.mb[p.key] = {loai: x.loai, tang: tg, Z: x.loai === "mong" ? 0 : +(tg * H).toFixed(3), dx: 0, dy: 0, hien: true, canh: null};
@@ -299,13 +304,19 @@
       const bb = p => { const a = []; p.ck.forEach(c => c.hinh.forEach(h => h[0].forEach(q => a.push(q)))); return a.length ? bbVong(a) : [0, 0, 0, 0]; };
       const bR = bb(ref);
       dsMB.forEach(p => {
-        const c = st.mb[p.key]; if (!c) return;
+        const c = st.mb[p.key]; if (!c || c.hq) return;
         if (p.key === st.mbRef) { c.dx = 0; c.dy = 0; c.canh = {n: -1}; return; }
         if (!ep && c.canh) return;
         const r = canTheoCot(ref, p);
         if (r && r.n >= 2) { c.dx = r.dx; c.dy = r.dy; c.canh = {n: r.n}; }
         else { const b2 = bb(p); c.dx = +(bR[0] - b2[0]).toFixed(3); c.dy = +(bR[1] - b2[1]).toFixed(3); c.canh = {n: 0}; }   // không khớp được cột: tạm căn theo góc dưới trái
       });
+    }
+    // Theo hệ quy chiếu: cột, vách, tường, cửa của tầng T dựng từ cao độ tầng T lên tầng trên (Z = đỉnh, Hc = cao tầng); dầm, sàn, móng nằm ở cao độ tầng
+    function zHq(hq, c, ck, k, mac) {
+      if (!hq) return k === "Z" ? c.Z : mac;
+      const dung_ = ck.loai === "cot" || ck.loai === "vach" || ck.loai === "tuong" || ck.loai === "cua", hh = hq.cao || H;
+      return k === "Z" ? (dung_ ? c.Z + hh : c.Z) : (dung_ ? hh : (hq.cao_duoi || H));
     }
     function ghepMB() {
       const ck = [], coc = [];
@@ -317,10 +328,10 @@
         const tt = h => h.map(poly => poly.map(r => r.map(q => [q[0] + dx, q[1] + dy])));
         const coTang = ds.some(y => y.c.loai !== "mong" && y.p.ck.some(k => k.loai === "cot"));
         x.p.ck.forEach(c => {
-          const cotMong = x.c.loai === "mong" && c.loai === "cot";
+          const hq = x.c.hq ? x.p.hq : null, cotMong = !hq && x.c.loai === "mong" && c.loai === "cot";
           if (cotMong && coTang) return;   // đã có mặt bằng tầng chứa cột thật: cột trong mặt bằng móng chỉ là cột chờ
           // chưa có mặt bằng tầng: giữ cột của mặt bằng móng, dựng từ cao độ 0 lên một tầng
-          ck.push(Object.assign({}, c, {id: `${x.i}:${c.id}`, ten: c.ten + nhan, hinh: tt(c.hinh), Z: cotMong ? H : x.c.Z, Hc: cotMong ? H : Hc, mbi: x.i}));
+          ck.push(Object.assign({}, c, {id: `${x.i}:${c.id}`, ten: c.ten + nhan, hinh: tt(c.hinh), Z: cotMong ? H : zHq(hq, x.c, c, "Z", Hc), Hc: cotMong ? H : zHq(hq, x.c, c, "Hc", Hc), mbi: x.i}));
         });
         (x.p.coc || []).forEach(c => coc.push(Object.assign({}, c, {id: `${x.i}:${c.id}`, x: c.x + dx, y: c.y + dy, mbi: x.i})));
       });
@@ -330,6 +341,7 @@
     function ghiLui() { lui.push(JSON.stringify({sua: st.sua, truc: st.truc, them: st.them, cocCfg: st.cocCfg, mb: st.mb, mbRef: st.mbRef})); if (lui.length > 60) lui.shift(); }
     nap();
     if (d.coc_bang && d.coc_bang.l_m && !(d.ve3d && d.ve3d.cocCfg) && st.cocCfg.L === 15) st.cocCfg.L = d.coc_bang.l_m;   // chiều dài cọc đọc từ bảng thống kê cọc
+    if (d.hq_truc) st.truc = JSON.parse(JSON.stringify(d.hq_truc));   // lưới trục chuẩn của dự án (đã đổi về gốc công trình)
     macDinhMB(); tuCanMB(false);
     if (dsMB && !(d.ve3d && d.ve3d.mb)) daLuuBV = JSON.stringify(Object.assign(JSON.parse(daLuuBV), {mb: st.mb, mbRef: st.mbRef}));
     if (d.ve3d) daLuuBV = JSON.stringify(goiY());
@@ -1353,7 +1365,7 @@
     function mbHTML() {
       const hang = dsMB.map((p, i) => {
         const c = st.mb[p.key], chuan = p.key === st.mbRef, nOb = p.ck.length, nc = (p.coc || []).length;
-        const kq = chuan ? '<span class="x3-chip" style="background:#3ecf8e">Mặt bằng chuẩn</span>' : c.canh ? (c.canh.n >= 4 ? `<span class="x3-chip" style="background:#3ecf8e">Khớp ${c.canh.n} điểm (cột / cọc / móng)</span>` : c.canh.n >= 2 ? `<span class="x3-chip" style="background:#ffb020">Chỉ khớp ${c.canh.n} điểm: kiểm tra lại độ dịch</span>` : '<span class="x3-chip" style="background:#ffb020">Chưa khớp cột: căn tạm theo góc</span>') : "";
+        const kq = c.hq ? `<span class="x3-chip" style="background:#3ecf8e">Theo hệ quy chiếu: ${esc(c.hq)} · ${c.Z >= 0 ? "+" : ""}${f2(c.Z, 3)} m</span>` : chuan ? '<span class="x3-chip" style="background:#3ecf8e">Mặt bằng chuẩn</span>' : c.canh ? (c.canh.n >= 4 ? `<span class="x3-chip" style="background:#3ecf8e">Khớp ${c.canh.n} điểm (cột / cọc / móng)</span>` : c.canh.n >= 2 ? `<span class="x3-chip" style="background:#ffb020">Chỉ khớp ${c.canh.n} điểm: kiểm tra lại độ dịch</span>` : '<span class="x3-chip" style="background:#ffb020">Chưa khớp cột: căn tạm theo góc</span>') : "";
         return `<div class="x3-sec" style="${c.hien ? "" : "opacity:.55"}"><div class="x3-row"><label><input type="checkbox" data-mbh="${i}" ${c.hien ? "checked" : ""}><b>${esc(p.ten)}</b></label></div>
           <div class="x3-mut" style="margin-bottom:4px">${nOb} cấu kiện${nc ? ` · ${nc} cọc` : ""} ${kq}</div>
           <div class="x3-kv">${kvr("Loại", `<select data-mb="loai" data-i="${i}"><option value="mong" ${c.loai === "mong" ? "selected" : ""}>Móng / cọc</option><option value="tang" ${c.loai === "tang" || c.loai === "mai" ? "selected" : ""}>Tầng</option><option value="bo" ${c.loai === "bo" ? "selected" : ""}>Bỏ qua</option></select>`)}

@@ -716,7 +716,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-<script src="/static/xem3d.js?v=11"></script>
+<script src="/static/xem3d.js?v=12"></script>
 <script>
 const LOAI = {cot:"Cột", dam:"Dầm", san:"Sàn", lo_san:"Lỗ mở sàn", mong:"Móng", coc:"Cọc", vach:"Vách/lõi", tuong:"Tường (chỉ dựng 3D)", cua:"Cửa (chỉ dựng 3D, khoét tường)", khung_dam:"Khung dầm (bao ngoài)",
   o_dam:"Ô trống giữa dầm", nhan:"Nhãn chữ", ong_gio:"Ống gió (MLINE+block)", ong_nuoc:"Ống nước (chỉ dựng 3D)", ong_pccc:"Ống PCCC (chỉ dựng 3D)", khay_cap:"Khay cáp (chỉ dựng 3D)", bo_qua:"Bỏ qua"};
@@ -2989,7 +2989,7 @@ function veHQTH() {
   const p = $("hq-th"); if (!p) return; const t = S.hqTH, dd = S.hqc.da_dua_ve;
   const dsChon = hqDsChon();
   let h = `<div><b>5. Tổng hợp theo tầng và đưa về tim trục</b> <span class="nho">tầng → cấu kiện → đối tượng, toạ độ theo gốc ${esc(hqNhan(S.hqc.goc)) || "(chưa chọn gốc)"}</span></div>
-    <div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button id="hq-th-tinh">Tính và tổng hợp</button>
+    <div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button id="hq-th-tinh">Tính và tổng hợp</button> <button id="hq-th-3d" class="cam" title="Dựng 3D từ lưới trục, bảng tầng và các mặt bằng đã căn">Dựng 3D theo hệ quy chiếu</button>
       ${t ? `<button id="hq-th-dua" ${dsChon.length ? "" : "disabled"}>Đưa về tim trục (${dsChon.length} đối tượng đã tick)</button>
       <label class="nho"><input type="checkbox" id="hq-th-xem" ${t.xem ? "checked" : ""}> Xem trước trên bản vẽ chuẩn</label>
       <button id="hq-th-csv" ${dsChon.length ? "" : "disabled"}>Xuất CSV</button>` : ""}</div>
@@ -3070,6 +3070,55 @@ function veTHHQ(f) {
   }
   ctx.restore();
 }
+
+// ---------- Dựng 3D theo hệ quy chiếu: tầng, cao độ, căn trục lấy từ dữ liệu đã nhập, không đoán ----------
+const HQ_NHOM_LOAI = {cot:"cot_vach", vach:"cot_vach", dam:"dam_san", san:"dam_san", lo_san:"dam_san", mong:"mong", coc:"mong", tuong:"kien_truc", cua:"kien_truc"};
+function hqBienDoi(goc) {   // toạ độ bản vẽ của vùng -> toạ độ công trình (gốc tại giao trục gốc, trục X theo điểm hướng)
+  const a = (goc.goc_quay || 0) * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+  return can => {
+    const b = (can.quay || 0) * Math.PI / 180, cb = Math.cos(b), sb = Math.sin(b);
+    return (x, y) => {
+      const px = x - can.tam[0], py = y - can.tam[1];
+      const dx = px * cb - py * sb + can.tam[0] + can.dich[0] - goc.x, dy = px * sb + py * cb + can.tam[1] + can.dich[1] - goc.y;
+      return [+(dx * ca + dy * sa).toFixed(4), +(-dx * sa + dy * ca).toFixed(4)];
+    };
+  };
+}
+async function hqDung3D() {
+  try {
+    const kq = await json("/api/he-quy-chieu/kiem-tra", S.hqc);
+    if (!kq.du) { lenh("Hệ quy chiếu chưa đủ (lưới trục, điểm gốc, bảng tầng có cao độ): " + (kq.canh_bao[0] || ""), "loi"); return; }
+    const ds = S.files.map((f, i) => i).filter(i => hqCoVung(S.files[i]) && (S.files[i].hq || {}).can && S.files[i].hq.can.ok && S.files[i].hq.tang);
+    if (!ds.length) return lenh("Chưa có mặt bằng nào đã gán tầng và căn vào lưới trục (mục 4).", "loi");
+    const tangs = kq.tang.filter(t => t.cao_do_kc != null), bien = hqBienDoi(kq.goc), canh = [], mb = []; let d0 = null, bang = null;
+    lenh(`Đang dựng 3D theo hệ quy chiếu từ ${ds.length} mặt bằng ...`);
+    for (const i of ds) {
+      const e = S.files[i], z = e.hq, ti = tangs.findIndex(t => t.ma === z.tang), t = tangs[ti]; if (!t) { canh.push(`${e.ten}: tầng ${z.tang} không có trong bảng tầng, bỏ qua.`); continue; }
+      try {
+        e.loaiDung3D = coKetCau3D(e) ? e : S.files.find(x => x.id === e.id && coKetCau3D(x));
+        if (!e.loaiDung3D) { await tuGanKetCau(e); e.loaiDung3D = coKetCau3D(e) ? e : null; }
+        if (!e.loaiDung3D) { canh.push(`${e.ten}: chưa gán layer kết cấu, bỏ qua.`); continue; }
+        const d = await json("/api/tinh", yeuCauKLCho(e)); if (!d0) d0 = d; if (!bang && d.coc_bang && d.coc_bang.l_m) bang = d.coc_bang;
+        const bd = bien(z.can), nhom = z.cau_kien || "khac", loc = c => nhom === "khac" || HQ_NHOM_LOAI[c.loai] === nhom;
+        const ck = d.cau_kien.filter(loc).map(c => ({...c, hinh:c.hinh.map(p => p.map(r => r.map(q => bd(q[0], q[1]))))}));
+        const coc = nhom === "khac" || nhom === "mong" ? (d.coc || []).map(c => { const q = bd(c.x, c.y); return {...c, x:q[0], y:q[1]}; }) : [];
+        if (!ck.length && !coc.length) { canh.push(`Mặt bằng "${e.ten}" không có cấu kiện thuộc loại đã khai báo, bỏ qua.`); continue; }
+        if (!z.xac_nhan) canh.push(`"${e.ten}" chưa xác nhận căn đúng.`);
+        const truoc = ti > 0 ? tangs[ti - 1] : null, soTang = tangs.filter(x => x.loai !== "mong" && x.loai !== "mai" && x.loai !== "tum" && x.cao_do_kc <= t.cao_do_kc).length;
+        mb.push({key:e.id + "|" + (e.vung || []).map(v => Math.round(v * 100)).join(","), ten:e.ten, tang_goi_y:z.tang, ck, coc,
+          hq:{ma:t.ma, loai:t.loai === "mong" ? "mong" : t.loai === "mai" || t.loai === "tum" ? "mai" : "tang", tang:t.loai === "mong" ? 0 : Math.max(1, soTang), Z:t.cao_do_kc, cao:t.chieu_cao || null, cao_duoi:truoc ? +(t.cao_do_kc - truoc.cao_do_kc).toFixed(4) : null}});
+      } catch (err) { canh.push(`Mặt bằng "${e.ten}": ${err.message}`); }
+    }
+    if (!mb.length) { canh.forEach(c => lenh(c, "loi")); return lenh("Không có mặt bằng nào dựng được.", "loi"); }
+    canh.forEach(c => lenh(c, "loi"));
+    const quayNgang = Math.abs(kq.goc.goc_quay || 0) < 0.01;
+    const hqTruc = quayNgang ? {x:kq.luoi.doc.map(t => ({ten:t.ten, v:+(t.v - kq.goc.x).toFixed(4)})), y:kq.luoi.ngang.map(t => ({ten:t.ten, v:+(t.v - kq.goc.y).toFixed(4)}))} : null;
+    const d = {ten_file:($("du-an").value || "Công trình") + " (hệ quy chiếu)", don_vi:d0.don_vi, thong_so:d0.thong_so, cau_kien:[], coc:[], mat_bang:mb, coc_bang:bang, ong_gio:[], mep:[], hq_truc:hqTruc,
+      chan_doan:[...canh, `Dựng theo hệ quy chiếu: gốc ${kq.goc.ten}, ${tangs.length} tầng trong bảng, ${mb.length} mặt bằng đã căn vào lưới trục.${quayNgang ? "" : " Gốc có xoay nên chưa vẽ lưới trục trong 3D."}`]};
+    window.xem3D(gan3D(d, S.files[ds[0]]));
+  } catch (e) { lenh(e.message, "loi"); }
+}
+$("p-hq").addEventListener("click", e => { if (e.target.closest("#hq-th-3d")) hqDung3D(); });
 
 // ---------- Tách nhiều mặt bằng trong một file (chỉ đề xuất vùng; người dùng tick rồi bấm Tạo mới có hiệu lực) ----------
 const TM_VAI = {mat_bang:"Mặt bằng", chi_tiet:"Chi tiết", ghi_chu:"Ghi chú / bảng"};
