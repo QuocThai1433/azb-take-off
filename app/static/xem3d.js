@@ -459,6 +459,7 @@
     const r = new THREE.WebGLRenderer({antialias: true, powerPreference: "high-performance"});
     r.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
     r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
+    r.shadowMap.autoUpdate = false;   // bóng của khối tĩnh: chỉ tính lại khi mô hình đổi, không tính lại mỗi khung hình
     kg.insertBefore(r.domElement, kg.firstChild);
     const cam = new THREE.PerspectiveCamera(40, 1, 0.1, 5000);
     const dk = new THREE.OrbitControls(cam, r.domElement);
@@ -861,12 +862,27 @@
 
     // ---------- áp trạng thái hiển thị lên mô hình ----------
     function ganEmi(o, c, k) { if (o.mat && o.mat.emissive) { o.mat.emissive.setHex(c); o.mat.emissiveIntensity = k; } }
+    // Chỉ vẽ lại khi có thay đổi (camera / trạng thái): cảnh lớn không còn render 60 khung/giây khi đứng yên.
+    let bao = 3, baoBong = true, nhe = false;   // nhe: cảnh quá nặng -> bỏ viền cạnh, hạ độ phân giải, tắt khử răng cưa bóng
+    const veLai = (bong = true) => { bao = 3; if (bong) baoBong = true; };
+    // Rê chuột chỉ đổi màu 2 đối tượng (cũ và mới) thay vì duyệt lại toàn bộ cấu kiện.
+    function apRuoi(truoc) {
+      const sel0 = st.chon && objs.get(st.chon);
+      [truoc, st.ruoi].forEach(id => { const o = id && objs.get(id); if (o) apMot(o, sel0); });
+      veLai(false);
+    }
     function ap() {
-      objs.forEach(o => {
+      veLai();
+      const sel0 = st.chon && objs.get(st.chon);
+      objs.forEach(o => apMot(o, sel0));
+      apChung();
+    }
+    function apMot(o, sel0) {
+      {
         const hien = !!st.loc[o.loai] && !st.an.has(o.base || o.id) && !st.an.has(o.id) && (!st.co || st.co.has(o.id));
         o.hien = hien;
-        const vt = vaiTro(o), sel0 = st.chon && objs.get(st.chon);
-        o.meshes.forEach(m => m.visible = hien); o.edges.forEach(v => v.visible = hien && vt > 0);
+        const vt = vaiTro(o);
+        o.meshes.forEach(m => m.visible = hien); o.edges.forEach(v => v.visible = hien && vt > 0 && !nhe);
         const mat = o.mat; if (!mat) return;
         const loiMau = MEPK.includes(o.loai) ? o.va : (st.canhBao && o.coLoi) || o.va;
         const mauBT = st.mauKhoi && BE_TONG.includes(o.loai) && o.loai !== "coc" ? 0xaeb4bd : LOAI[o.loai].mau;
@@ -885,7 +901,9 @@
         else if (sel0 && sel0.lk && sel0.lk.has(o.id)) ganEmi(o, 0x4c9aff, 0.22); else ganEmi(o, 0x000000, 0);
         if (tr0 !== mat.transparent) mat.needsUpdate = true;
         o.meshes.forEach(m => m.castShadow = st.bong && !st.xray && o.loai !== "san" && !o.bo);
-      });
+      }
+    }
+    function apChung() {
       holes.forEach(h => { const ob = objs.get(h.id); const v = st.khoet && st.loc.dam && ob && ob.hien; h.mesh.visible = h.ln.visible = !!v; });
       r.shadowMap.enabled = st.bong; den.castShadow = st.bong;
       if (luoi) luoi.visible = st.luoi;
@@ -937,7 +955,7 @@
 
     function datLai() {
       const w = Math.max(kg.clientWidth, 10), h = Math.max(kg.clientHeight, 10);
-      r.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix();
+      r.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); veLai();
     }
 
     // ---------- chọn, rê chuột, đo ----------
@@ -1092,7 +1110,7 @@
       }
       const hit = ban(e), o = hit && objs.get(hit.object.userData.id);
       const id = o ? o.id : null;
-      if (id !== st.ruoi) { st.ruoi = id; ap(); }
+      if (id !== st.ruoi) { const truoc = st.ruoi; st.ruoi = id; apRuoi(truoc); }
       if (!st.cc) r.domElement.style.cursor = timTruc(e, hit) ? "grab" : "";
       if (o && st.cc !== "do") {
         const nl = o.lk ? o.lk.size : 0;
@@ -1780,7 +1798,12 @@
     }
 
     // ---------- khởi động ----------
-    dung(); datMoiTruong(); ap();
+    dung(); datMoiTruong();
+    {
+      let nMesh = 0; objs.forEach(o => { nMesh += o.meshes.length; });
+      if (nMesh > 1500) { nhe = true; r.setPixelRatio(1); den.shadow.mapSize.set(1024, 1024); }
+    }
+    ap();
     // Khung nhìn đầu tiên: ôm cụm khối chính. Khi cấu kiện rải rác trên cả bản vẽ, ôm toàn bản vẽ sẽ làm khối nhỏ chỉ còn vài pixel.
     let khungNote = "";
     {
@@ -1803,6 +1826,10 @@
       }
       dk.update();
     }
+    // Mọi thao tác của người dùng (và camera đổi) đều đánh dấu cần vẽ lại; kéo chuột để xoay chỉ vẽ lại, không tính lại bóng.
+    dk.addEventListener("change", () => veLai(false));
+    ["pointerdown", "pointerup", "click", "dblclick", "input", "change", "keydown", "wheel"].forEach(t => lop.addEventListener(t, () => veLai(true), true));
+    lop.addEventListener("pointermove", () => veLai(false), true);
     datLai(); addEventListener("resize", datLai);
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(datLai) : null; ro && ro.observe(kg);
     capNhatPn(); capLuu();
@@ -1813,7 +1840,11 @@
     (function vong() {
       if (!chay) return;
       if (anim) { const k = Math.min(1, (performance.now() - anim.s) / anim.ms), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; cam.position.lerpVectors(anim.p0, anim.p1, e); dk.target.lerpVectors(anim.t0, anim.t1, e); if (k >= 1) anim = null; }
-      dk.update(); r.render(scene, cam);
+      dk.update();
+      if (bao <= 0 && !anim) { requestAnimationFrame(vong); return; }   // đứng yên: không vẽ lại
+      if (bao > 0) bao--;
+      if (baoBong) { r.shadowMap.needsUpdate = true; baoBong = false; }
+      r.render(scene, cam);
       if (soDo.length) { const b = r.domElement.getBoundingClientRect(), kb = kg.getBoundingClientRect(); soDo.forEach(m => { bnd.copy(m.a).add(m.b).multiplyScalar(.5).project(cam); const vis = bnd.z < 1; m.el.style.display = vis ? "" : "none"; m.el.style.left = ((bnd.x + 1) / 2 * b.width + b.left - kb.left) + "px"; m.el.style.top = ((1 - bnd.y) / 2 * b.height + b.top - kb.top) + "px"; }); }
       if (nhan.length) { const b = r.domElement.getBoundingClientRect(), kb = kg.getBoundingClientRect(); nhan.forEach(n => { bnd.copy(n.p).project(cam); const v = bnd.z < 1 && n.o.hien; n.el.style.display = v ? "" : "none"; if (v) { n.el.style.left = ((bnd.x + 1) / 2 * b.width + b.left - kb.left) + "px"; n.el.style.top = ((1 - bnd.y) / 2 * b.height + b.top - kb.top) + "px"; } }); }
       if (nhanPhu.length) { const b = r.domElement.getBoundingClientRect(), kb = kg.getBoundingClientRect(); nhanPhu.forEach(n => { bnd.copy(n.p).project(cam); const v = bnd.z < 1 && n.o.hien; n.el.style.display = v ? "" : "none"; if (v) { n.el.style.left = ((bnd.x + 1) / 2 * b.width + b.left - kb.left) + "px"; n.el.style.top = ((1 - bnd.y) / 2 * b.height + b.top - kb.top) + "px"; } }); }
