@@ -21,7 +21,7 @@ from .excel_thep import xuat_excel_thep
 from .goi_y_hinh_hoc import do_layer_tuong
 from .tach_mat_bang import do_mat_bang
 from .dxf_reader import _doc_file, cat_vung, doc_ban_ve, doc_ban_ve_cache, hinh_xem, nap_doc, tom_tat_layer, tong_quan
-from . import cong_cu
+from . import cong_cu, he_quy_chieu
 from .bang_boc import xuat_excel as xuat_excel_bang_boc
 from .chon_doi_tuong import boc_chon
 from .thong_ke import thong_ke, xuat_excel as xuat_excel_thong_ke
@@ -457,6 +457,40 @@ def khoi_phuc_sao_luu(yc: YeuCauKhoiPhuc):
     except ValueError as ex:
         raise HTTPException(400, str(ex))
     return _thay_du_an(lambda: luu_tru.nap_tu_zip(io.BytesIO(du_lieu)))
+
+
+
+# ---------- Hệ quy chiếu dự án: lưới trục chuẩn, điểm gốc, bảng tầng ----------
+class YeuCauDoTruc(BaseModel):
+    id: str
+    vung: list = []        # [x0, y0, x1, y1] mét; rỗng = cả bản vẽ
+    layer_truc: list = []  # layer người dùng chọn làm layer trục; rỗng = tự nhận theo tên
+
+
+@app.post("/api/he-quy-chieu/do-truc")
+def do_truc_api(yc: YeuCauDoTruc):
+    """Chỉ ĐỀ XUẤT lưới trục (đường + tên đọc từ bong bóng). Người dùng xem lại, sửa rồi mới lưu."""
+    bv = _phien(yc.id)["ban_ve"]
+    vung = [float(v) for v in yc.vung] if len(yc.vung) == 4 else None
+    kq = he_quy_chieu.do_luoi_truc(bv, vung, yc.layer_truc)
+    kq["cao_do_goi_y"] = he_quy_chieu.cao_do_goi_y(bv)
+    kq["layer_co_san"] = sorted(bv.layers)
+    return kq
+
+
+@app.post("/api/he-quy-chieu/kiem-tra")
+async def kiem_tra_hqc_api(request: Request):
+    """Chuẩn hoá và kiểm tra hệ quy chiếu đang nhập (đọc số, tính chiều cao tầng, góc quay, cảnh báo)."""
+    try:
+        hqc = await request.json()
+    except Exception:
+        raise HTTPException(400, "Dữ liệu gửi lên không phải JSON.")
+    if not isinstance(hqc, dict):
+        raise HTTPException(400, "Hệ quy chiếu không hợp lệ.")
+    try:
+        return he_quy_chieu.kiem_tra(hqc)
+    except (KeyError, TypeError, ValueError) as ex:
+        raise HTTPException(400, f"Hệ quy chiếu không hợp lệ: {ex}")
 
 
 def _tinh(yc):

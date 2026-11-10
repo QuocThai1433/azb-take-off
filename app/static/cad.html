@@ -700,13 +700,14 @@
 
   <div class="chia" id="chia-p" title="Kéo để đổi độ rộng (kéo hết cỡ để ẩn, bấm đúp: về mặc định)"></div>
   <div class="cot phai" id="pn-p">
-    <div class="tab-phai"><span class="grip" data-pn="p" title="Kéo tay nắm này tới mép trái / phải / dưới để gắn bảng vào đó" style="align-self:center;margin-left:4px">⠿</span><span class="tab-cuon"><div data-t="cc" class="act" title="Công cụ">Công cụ</div><div data-t="dt" title="Đối tượng chọn">Đối tượng chọn</div><div data-t="tk" title="Thống kê">Thống kê</div><div data-t="gn" title="Gán nhãn">Gán nhãn</div><div data-t="ct" title="Cốt thép">Cốt thép</div><div data-t="tm" title="Tách mặt bằng">Tách mặt bằng</div><div data-t="ai" title="Gán layer">Gán layer</div><div data-t="kl" title="Khối lượng">Khối lượng</div><div data-t="gc" title="Ghi chú chung">Ghi chú chung</div></span><button class="dong-x" id="dong-p" title="Ẩn bảng này (mở lại bằng nút trên thanh tiêu đề)">✕</button></div>
+    <div class="tab-phai"><span class="grip" data-pn="p" title="Kéo tay nắm này tới mép trái / phải / dưới để gắn bảng vào đó" style="align-self:center;margin-left:4px">⠿</span><span class="tab-cuon"><div data-t="cc" class="act" title="Công cụ">Công cụ</div><div data-t="dt" title="Đối tượng chọn">Đối tượng chọn</div><div data-t="tk" title="Thống kê">Thống kê</div><div data-t="gn" title="Gán nhãn">Gán nhãn</div><div data-t="ct" title="Cốt thép">Cốt thép</div><div data-t="tm" title="Tách mặt bằng">Tách mặt bằng</div><div data-t="hq" title="Hệ quy chiếu: lưới trục, điểm gốc, bảng tầng">Hệ quy chiếu</div><div data-t="ai" title="Gán layer">Gán layer</div><div data-t="kl" title="Khối lượng">Khối lượng</div><div data-t="gc" title="Ghi chú chung">Ghi chú chung</div></span><button class="dong-x" id="dong-p" title="Ẩn bảng này (mở lại bằng nút trên thanh tiêu đề)">✕</button></div>
     <div class="noi-dung" id="p-cc"></div>
     <div class="noi-dung" id="p-dt" hidden></div>
     <div class="noi-dung" id="p-tk" hidden></div>
     <div class="noi-dung" id="p-gn" hidden></div>
     <div class="noi-dung" id="p-ct" hidden></div>
     <div class="noi-dung" id="p-tm" hidden></div>
+    <div class="noi-dung" id="p-hq" hidden></div>
     <div class="noi-dung" id="p-ai" hidden></div>
     <div class="noi-dung" id="p-kl" hidden></div>
     <div class="noi-dung" id="p-gc" hidden></div>
@@ -1260,6 +1261,7 @@ function ve() {
       nhomSang().forEach(g => { const v = g.vung; ctx.rect(sx(Math.min(v[0], v[2])), sy(Math.max(v[1], v[3])), Math.abs(v[2] - v[0]) * s, Math.abs(v[3] - v[1]) * s); });
       ctx.fill("evenodd");
     }
+    veLuoiHQ(f);
     veHover(f);
     if (S.keo && S.keo.kieu === "hop" && S.keo.moved) {  // khung chọn: Window (xanh dương, nét liền) hoặc Crossing (xanh lá, nét đứt)
       const cat = S.keo.b[0] < S.keo.a[0], x = sx(Math.min(S.keo.a[0], S.keo.b[0])), y = sy(Math.max(S.keo.a[1], S.keo.b[1]));
@@ -1384,6 +1386,7 @@ window.addEventListener("mouseup", e => {
     const m = chuotToa(e);  // lấy toạ độ lúc thả chuột, phòng khi kéo nhanh không kịp phát sự kiện di chuyển
     if (Math.hypot(m.x - S.keo.px, m.y - S.keo.py) > 4) { S.keo.moved = true; S.keo.b = [wx(m.x), wy(m.y)]; }
     if (LAY.hoi && !S.keo.moved) hoiLayerTaiDiem({x:S.keo.px, y:S.keo.py});
+    else if (S.hqChon && !S.keo.moved) hqBat(wx(S.keo.px), wy(S.keo.py));
     else if (S.ctCho) { if (S.keo.moved) docThepCad(S.keo.a, S.keo.b); else lenh("Kéo khung (giữ chuột trái và kéo) quanh bảng thống kê thép, trùm cả dòng tiêu đề. Esc để hủy.", "loi"); }
     else if (S.gnMode && !S.keo.moved) { const x = wx(S.keo.px), y = wy(S.keo.py); if (S.gnMode === "them") themNhanTai(x, y); else suaNhanTaiDiem(x, y); }
     else if (S.gnCho) { if (S.keo.moved) chayGanNhan(S.keo.a, S.keo.b); else lenh("Gán nhãn: kéo khung (giữ chuột trái và kéo) quanh một mặt bằng. Esc để hủy.", "loi"); }
@@ -2564,10 +2567,11 @@ $("p-gn").addEventListener("click", async e => {
 // ---------- Tab phải ----------
 document.querySelectorAll(".tab-phai div").forEach(d => d.onclick = () => {
   document.querySelectorAll(".tab-phai div").forEach(x => x.classList.toggle("act", x === d));
-  ["cc", "dt", "tk", "gn", "ct", "tm", "ai", "kl", "gc"].forEach(k => $("p-" + k).hidden = k !== d.dataset.t);
+  ["cc", "dt", "tk", "gn", "ct", "tm", "hq", "ai", "kl", "gc"].forEach(k => $("p-" + k).hidden = k !== d.dataset.t);
   $("ds-cc").hidden = d.dataset.t === "gn";  // đang gán nhãn: ẩn danh sách công cụ tính (không liên quan)
   if (d.dataset.t === "ct") ve_CT();
   if (d.dataset.t === "ai") veAI();
+  if (d.dataset.t === "hq") veHQ();
   if (d.dataset.t === "tm") veTM(false); else veLai();
 });
 function chonTab(t) { document.querySelector(`.tab-phai div[data-t="${t}"]`).click(); }
@@ -2643,6 +2647,139 @@ $("p-ct").addEventListener("click", async e => {
     catch (err) { lenh(err.message, "loi"); }
   }
 });
+
+// ---------- Hệ quy chiếu dự án: lưới trục chuẩn, điểm gốc, bảng tầng ----------
+// Chọn một lần ngay từ đầu; máy chỉ đề xuất (dò trục, gợi ý cao độ), Sếp xem lại và xác nhận.
+const HQ_LOAI = {mong:"Móng", ham:"Hầm", tang:"Tầng", lung:"Tầng lửng", ky_thuat:"Tầng kỹ thuật", mai:"Mái", tum:"Tum"};
+const hqMacDinh = () => ({luoi:{doc:[], ngang:[]}, goc:null, diem2:null, tang:[], fileId:null, layer_truc:[]});
+S.hqc = hqMacDinh(); S.hqKq = null; S.hqChon = null; S.hqGoiY = []; S.hqHien = true;
+let hqHen = 0;
+const hqSo = v => v === "" || v == null ? "" : String(v);
+const hqNhan = d => !d ? "" : (/^[A-Za-z]/.test(d.doc) && !/^[A-Za-z]/.test(d.ngang) ? `${d.doc}-${d.ngang}` : `${d.ngang}-${d.doc}`);
+function hqKiemTra() {   // hỏi server: đọc số, chiều cao tầng, điểm gốc, cảnh báo
+  clearTimeout(hqHen);
+  hqHen = setTimeout(async () => {
+    try { S.hqKq = await json("/api/he-quy-chieu/kiem-tra", S.hqc); } catch (e) { S.hqKq = {canh_bao:[e.message], tang:[], luoi:S.hqc.luoi, goc:null, du:false}; }
+    hqVeKetQua(); veLai();
+  }, 250);
+}
+function hqVeKetQua() {
+  const o = $("hq-kq"); if (!o) return; const k = S.hqKq;
+  if (!k) { o.innerHTML = ""; return; }
+  o.innerHTML = (k.du ? '<div style="color:#4cc38a">✓ Đủ: lưới trục, điểm gốc và bảng tầng.</div>' : '<div class="nho">Chưa đủ dữ liệu để dựng 3D chuẩn.</div>')
+    + (k.goc ? `<div class="nho">Gốc <b>${esc(k.goc.ten)}</b> = (${k.goc.x}; ${k.goc.y}) m trên bản vẽ${k.goc.diem2 ? `, trục X hướng về ${esc(k.goc.diem2)} (quay ${k.goc.goc_quay}°)` : ", trục X theo bản vẽ"}.</div>` : "")
+    + k.canh_bao.map(c => `<div class="cb">⚠ ${esc(c)}</div>`).join("");
+  const cao = Object.fromEntries((k.tang || []).map(t => [t.ma, t.chieu_cao]));
+  document.querySelectorAll("[data-hq-cao]").forEach(e => { const v = cao[e.dataset.hqCao]; e.textContent = v == null ? "–" : so(v, 3); });
+  document.querySelectorAll("[data-hq-cg]").forEach(e => { const t = ((k.luoi || {})[e.dataset.hx] || [])[+e.dataset.i]; e.textContent = t && t.cach_goc != null ? so(t.cach_goc, 3) : "–"; });
+}
+function veHQ() {
+  const p = $("p-hq"), h = S.hqc, f = F();
+  const dsTruc = (hx, nhan, g, ten) => `<select data-hq-diem="${ten}" data-hx="${hx}"><option value="">${nhan}</option>${h.luoi[hx].map(t => `<option ${g && g[hx] === t.ten ? "selected" : ""}>${esc(t.ten)}</option>`).join("")}</select>`;
+  const hangTruc = hx => h.luoi[hx].map((t, i) => `<tr><td><input type="text" data-hq-ten="${hx}:${i}" value="${esc(t.ten)}" style="width:54px"></td>
+      <td><input type="number" step="0.001" data-hq-v="${hx}:${i}" value="${t.v}" style="width:84px"></td><td class="so" data-hq-cg data-hx="${hx}" data-i="${i}">–</td>
+      <td class="nho">${esc(t.nguon_ten || "")}</td><td><button class="x" data-hq-xoa="${hx}:${i}" title="Xóa trục này">✕</button></td></tr>`).join("");
+  const bangTruc = (hx, tieu) => `<div style="margin-top:6px"><b>${tieu}</b> <span class="nho">(${h.luoi[hx].length})</span> <button data-hq-them="${hx}">+ Thêm trục</button>
+    <table><tr><th>Tên</th><th>Vị trí ${hx === "doc" ? "X" : "Y"} (m)</th><th>Cách gốc</th><th>Nguồn tên</th><th></th></tr>${hangTruc(hx) || '<tr><td colspan="5" class="nho">Chưa có trục.</td></tr>'}</table></div>`;
+  const hangTang = h.tang.map((t, i) => `<tr><td><input type="text" data-hq-t="${i}:ma" value="${esc(t.ma)}" style="width:56px"></td>
+      <td><input type="text" data-hq-t="${i}:ten" value="${esc(t.ten)}" style="width:90px"></td>
+      <td><select data-hq-t="${i}:loai">${Object.entries(HQ_LOAI).map(([k, v]) => `<option value="${k}" ${k === (t.loai || "tang") ? "selected" : ""}>${v}</option>`).join("")}</select></td>
+      <td><input type="text" list="hq-cd" data-hq-t="${i}:cao_do_kc" value="${esc(hqSo(t.cao_do_kc))}" style="width:70px" title="Cao độ mặt kết cấu (m), dùng để dựng 3D"></td>
+      <td><input type="text" list="hq-cd" data-hq-t="${i}:cao_do_ht" value="${esc(hqSo(t.cao_do_ht))}" style="width:70px" title="Cao độ hoàn thiện (m), chỉ tham khảo"></td>
+      <td class="so" data-hq-cao="${esc(t.ma)}">–</td>
+      <td><input type="number" data-hq-t="${i}:day_san" value="${hqSo(t.day_san)}" style="width:56px" title="mm"></td>
+      <td><input type="number" data-hq-t="${i}:cao_dam" value="${hqSo(t.cao_dam)}" style="width:56px" title="mm"></td>
+      <td><input type="text" data-hq-t="${i}:ghi_chu" value="${esc(t.ghi_chu || "")}" style="width:100%;min-width:70px"></td>
+      <td><button class="x" data-hq-xt="${i}" title="Xóa tầng">✕</button></td></tr>`).join("");
+  const goiY = S.hqGoiY.slice(0, 14).map(g => (g.gia_tri > 0 ? "+" : g.gia_tri < 0 ? "" : "±") + g.gia_tri.toFixed(3)).join(", ");
+  p.innerHTML = `<div style="padding:8px 10px">
+    <details style="margin:0 0 8px;font-size:12px"><summary style="cursor:pointer;font-weight:600">Tính năng này làm gì?</summary>
+      <div class="nho" style="margin-top:4px">Chọn <b>một lần ngay từ đầu</b> làm chuẩn cho cả dự án (móng, cột, dầm sàn, 3D): (1) lưới trục chuẩn, (2) điểm gốc là giao của hai trục, (3) bảng cao độ từng tầng.
+      Máy dò trục và gợi ý cao độ từ bản vẽ, Sếp xem lại và sửa. Dữ liệu lưu theo dự án.</div></details>
+    <div><b>1. Lưới trục chuẩn</b> <span class="nho">${h.fileId && f && f.id === h.fileId ? "(đang vẽ trên bản vẽ này)" : h.fileId ? "(dò từ bản vẽ khác)" : ""}</span></div>
+    <div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <button id="hq-do" ${f ? "" : "disabled"}>Dò trục từ bản vẽ này${f && f.vung ? " (trong vùng chọn)" : ""}</button>
+      <select id="hq-layer" title="Layer chứa đường trục (để trống: tự nhận theo tên TRUC / GRID / AXIS)"><option value="">Layer trục: tự nhận</option>${(f ? f.layers.map(l => l.ten) : []).map(l => `<option ${h.layer_truc[0] === l ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>
+      <label class="nho"><input type="checkbox" id="hq-hien" ${S.hqHien ? "checked" : ""}> Vẽ lưới trục lên bản vẽ</label>
+      <button id="hq-xoa-het">Xóa lưới</button></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:8px">${bangTruc("doc", "Trục dọc (x = const)")}${bangTruc("ngang", "Trục ngang (y = const)")}</div>
+    <div style="margin-top:12px"><b>2. Điểm gốc</b> <span class="nho">giao của hai trục = (0; 0) của công trình</span></div>
+    <div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      Gốc: ${dsTruc("doc", "trục dọc", h.goc, "goc")} ${dsTruc("ngang", "trục ngang", h.goc, "goc")} <button id="hq-bat-goc">${S.hqChon === "goc" ? "Bấm vào giao trục... (Esc)" : "Chọn trên bản vẽ"}</button>
+      <span class="nho">= <b>${esc(hqNhan(h.goc)) || "chưa chọn"}</b></span></div>
+    <div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      Điểm hướng (tuỳ chọn, khi bản vẽ vẽ xoay): ${dsTruc("doc", "trục dọc", h.diem2, "diem2")} ${dsTruc("ngang", "trục ngang", h.diem2, "diem2")} <button id="hq-bat-d2">${S.hqChon === "diem2" ? "Bấm vào giao trục... (Esc)" : "Chọn trên bản vẽ"}</button>
+      <button id="hq-bo-d2">Bỏ</button></div>
+    <div style="margin-top:12px"><b>3. Bảng tầng</b> <span class="nho">cao độ kết cấu (m) dùng dựng 3D; chiều cao tầng tự tính</span></div>
+    <div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button id="hq-them-tang">+ Thêm tầng</button><button id="hq-mau">Tạo bảng mẫu (Móng, T1-T3, Mái)</button>
+      <span class="nho">Gõ cao độ kiểu +3.600 / 3,6 / ±0.000 / -1.500. Gợi ý từ bản vẽ: ${goiY || "chưa có (bấm Dò trục)"}</span></div>
+    <datalist id="hq-cd">${S.hqGoiY.map(g => `<option value="${(g.gia_tri > 0 ? "+" : "") + g.gia_tri.toFixed(3)}">`).join("")}</datalist>
+    <div style="overflow:auto"><table><tr><th>Mã</th><th>Tên tầng</th><th>Loại</th><th>Cao độ KC</th><th>Cao độ HT</th><th>Cao tầng (m)</th><th>Dày sàn (mm)</th><th>Cao dầm (mm)</th><th>Ghi chú</th><th></th></tr>
+      ${hangTang || '<tr><td colspan="10" class="nho">Chưa có tầng: bấm Thêm tầng hoặc Tạo bảng mẫu.</td></tr>'}</table></div>
+    <div id="hq-kq" style="margin-top:10px"></div></div>`;
+  hqVeKetQua(); if (h.luoi.doc.length || h.luoi.ngang.length || h.tang.length || h.goc) hqKiemTra();
+}
+function hqThemTang(ma, ten, loai, cd) { S.hqc.tang.push({ma, ten, loai, cao_do_kc:cd, cao_do_ht:"", day_san:"", cao_dam:"", ghi_chu:""}); }
+async function hqDo() {
+  const f = F(); if (!f) return;
+  try {
+    lenh("Đang dò lưới trục...");
+    const r = await json("/api/he-quy-chieu/do-truc", {id:f.id, vung:f.vung || [], layer_truc:S.hqc.layer_truc});
+    S.hqc.luoi = {doc:r.doc, ngang:r.ngang}; S.hqc.fileId = f.id; S.hqGoiY = r.cao_do_goi_y || [];
+    if (S.hqc.goc && !(r.doc.some(t => t.ten === S.hqc.goc.doc) && r.ngang.some(t => t.ten === S.hqc.goc.ngang))) S.hqc.goc = null;
+    S.hqKq = null; veHQ(); veLai();
+    lenh(`Dò được ${r.doc.length} trục dọc, ${r.ngang.length} trục ngang.${r.canh_bao.length ? " " + r.canh_bao[0] : " Kiểm tra tên trục rồi chọn điểm gốc."}`, r.doc.length && r.ngang.length ? "ok" : "loi");
+  } catch (e) { lenh(e.message, "loi"); }
+}
+$("p-hq").addEventListener("click", e => {
+  const d = e.target.closest("button, input[type=checkbox]"); if (!d) return; const h = S.hqc;
+  if (d.id === "hq-do") return hqDo();
+  if (d.id === "hq-hien") { S.hqHien = d.checked; return veLai(); }
+  if (d.id === "hq-xoa-het") { h.luoi = {doc:[], ngang:[]}; h.goc = h.diem2 = null; h.fileId = null; S.hqKq = null; veHQ(); return veLai(); }
+  if (d.dataset.hqThem) { const hx = d.dataset.hqThem, a = h.luoi[hx], ult = a.length ? a[a.length - 1].v : 0; a.push({ten:"", v:+(ult + 3).toFixed(3), tu:0, den:0, nguon_ten:"nhập tay"}); veHQ(); return; }
+  if (d.dataset.hqXoa) { const [hx, i] = d.dataset.hqXoa.split(":"); h.luoi[hx].splice(+i, 1); veHQ(); return veLai(); }
+  if (d.id === "hq-bat-goc" || d.id === "hq-bat-d2") { S.hqChon = S.hqChon ? null : (d.id === "hq-bat-goc" ? "goc" : "diem2"); veHQ(); if (S.hqChon) lenh("Bấm vào giao của hai trục trên bản vẽ (Esc để hủy).", "ok"); return; }
+  if (d.id === "hq-bo-d2") { h.diem2 = null; veHQ(); return veLai(); }
+  if (d.id === "hq-them-tang") { const n = h.tang.length, ult = h.tang.map(t => parseFloat(String(t.cao_do_kc).replace(",", "."))).filter(Number.isFinite); hqThemTang("T" + (n + 1), "", "tang", ult.length ? "+" + (Math.max(...ult) + 3.6).toFixed(3) : "±0.000"); veHQ(); return; }
+  if (d.id === "hq-mau") { h.tang = []; hqThemTang("MONG", "Móng", "mong", "-1.500"); hqThemTang("T1", "Tầng 1", "tang", "±0.000"); hqThemTang("T2", "Tầng 2", "tang", "+3.600"); hqThemTang("T3", "Tầng 3", "tang", "+7.200"); hqThemTang("MAI", "Mái", "mai", "+10.800"); veHQ(); return; }
+  if (d.dataset.hqXt) { h.tang.splice(+d.dataset.hqXt, 1); veHQ(); return; }
+});
+$("p-hq").addEventListener("change", e => {
+  const d = e.target, h = S.hqc;
+  if (d.id === "hq-layer") { h.layer_truc = d.value ? [d.value] : []; return; }
+  if (d.dataset.hqDiem) {   // chọn điểm gốc / điểm hướng bằng danh sách
+    const k = d.dataset.hqDiem, cu = h[k] || {doc:"", ngang:""}; cu[d.dataset.hx] = d.value;
+    h[k] = cu.doc || cu.ngang ? cu : null; veHQ(); return veLai();
+  }
+  if (d.dataset.hqTen != null) {
+    const [hx, i] = d.dataset.hqTen.split(":"), t = h.luoi[hx][+i], cu = t.ten; t.ten = d.value.trim(); t.nguon_ten = "nhập tay";
+    ["goc", "diem2"].forEach(k => { if (h[k] && h[k][hx] === cu) h[k][hx] = t.ten; }); veHQ(); return veLai();
+  }
+  if (d.dataset.hqV != null) { const [hx, i] = d.dataset.hqV.split(":"); h.luoi[hx][+i].v = parseFloat(d.value) || 0; veHQ(); return veLai(); }
+  if (d.dataset.hqT != null) { const [i, k] = d.dataset.hqT.split(":"); h.tang[+i][k] = d.value; if (k === "ma" || k === "loai") veHQ(); else hqKiemTra(); }
+});
+// Bấm trên bản vẽ để chọn giao trục gần nhất (bắt dính trong 25 px)
+function hqBat(x, y) {
+  const h = S.hqc; let tot = null, dt = 25 / S.v.s;
+  h.luoi.doc.forEach(a => h.luoi.ngang.forEach(b => { const k = Math.hypot(a.v - x, b.v - y); if (k < dt) { dt = k; tot = {doc:a.ten, ngang:b.ten}; } }));
+  if (!tot) return lenh("Không có giao trục nào gần chỗ bấm: bấm gần hơn vào giao của hai trục.", "loi");
+  h[S.hqChon] = tot; lenh(`Đã chọn ${S.hqChon === "goc" ? "điểm gốc" : "điểm hướng"} ${hqNhan(tot)}.`, "ok"); S.hqChon = null; veHQ(); veLai();
+}
+addEventListener("keydown", e => { if (e.key === "Escape" && S.hqChon) { S.hqChon = null; if (!$("p-hq").hidden) veHQ(); lenh("Đã hủy chọn giao trục.", "ok"); } });
+// Vẽ lưới trục chuẩn lên bản vẽ đã dò
+function veLuoiHQ(f) {
+  const h = S.hqc; if (!S.hqHien || !h.fileId || h.fileId !== f.id || !(h.luoi.doc.length || h.luoi.ngang.length)) return;
+  ctx.save(); ctx.lineWidth = 1.2; ctx.setLineDash([14, 4, 2, 4]); ctx.strokeStyle = "rgba(255,120,120,.85)"; ctx.fillStyle = "#ff9a9a"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  h.luoi.doc.forEach(t => { ctx.beginPath(); ctx.moveTo(sx(t.v), sy(t.tu ?? 0)); ctx.lineTo(sx(t.v), sy(t.den ?? 0)); ctx.stroke(); ctx.fillText(t.ten, sx(t.v), sy(t.den ?? 0) - 12); });
+  h.luoi.ngang.forEach(t => { ctx.beginPath(); ctx.moveTo(sx(t.tu ?? 0), sy(t.v)); ctx.lineTo(sx(t.den ?? 0), sy(t.v)); ctx.stroke(); ctx.fillText(t.ten, sx(t.tu ?? 0) - 12, sy(t.v)); });
+  ctx.setLineDash([]); ctx.textAlign = "left";
+  [["goc", "#4cc38a", "Gốc"], ["diem2", "#ffa534", "Hướng"]].forEach(([k, mau, nhan]) => {
+    const g = h[k], a = g && h.luoi.doc.find(t => t.ten === g.doc), b = g && h.luoi.ngang.find(t => t.ten === g.ngang); if (!a || !b) return;
+    ctx.strokeStyle = mau; ctx.fillStyle = mau; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(sx(a.v), sy(b.v), 9, 0, 7); ctx.stroke(); ctx.fillText(`${nhan} ${hqNhan(g)}`, sx(a.v) + 13, sy(b.v) - 12);
+  });
+  if (S.hqChon && S.mouse) { ctx.strokeStyle = "#ffd60a"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(S.mouse.x, S.mouse.y, 25, 0, 7); ctx.stroke(); }
+  ctx.restore();
+}
 
 // ---------- Tách nhiều mặt bằng trong một file (chỉ đề xuất vùng; người dùng tick rồi bấm Tạo mới có hiệu lực) ----------
 const TM_VAI = {mat_bang:"Mặt bằng", chi_tiet:"Chi tiết", ghi_chu:"Ghi chú / bảng"};
@@ -3015,6 +3152,7 @@ window.themBanVe = themBanVe;  // dùng khi kiểm thử
     phien_ban: 1, du_an: $("du-an").value, don_vi: $("don-vi").value, act: S.act,
     ts: Object.fromEntries(TS.map(([k]) => [k, ($("ts-" + k) || {}).value ?? ""])),
     files: S.files.map(f => ({id:f.id, ten:f.ten, vai_tro:f.vai_tro, layers:f.layers.filter(l => l.ten !== TEN_NHAN), vung:f.vung, ve3d:f.ve3d, tang_tm:f.tang_tm})).concat(giu),
+    he_quy_chieu: S.hqc,   // lưới trục chuẩn, điểm gốc, bảng tầng
     da_dong: S.daDong,   // bản vẽ đã đóng: file còn trong data/uploads, nhớ thiết lập để mở lại
   });
 
@@ -3059,6 +3197,7 @@ window.themBanVe = themBanVe;  // dùng khi kiểm thử
     san = false; giu = [];
     S.files = []; S.act = -1; S.chon = []; S.hover = null;
     S.daDong = (tt.da_dong || []).filter(f => f && typeof f.id === "string");
+    S.hqc = Object.assign(hqMacDinh(), tt.he_quy_chieu || {}); S.hqKq = null; if (!$("p-hq").hidden) veHQ();
     try {
       const tin = {};
       for (const f of tt.files || []) {
