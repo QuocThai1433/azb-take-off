@@ -142,7 +142,7 @@ Chọn **một lần ngay từ đầu** lưới trục chuẩn, điểm gốc v�
 6. **Dựng 3D theo hệ quy chiếu** (nút cam ở mục 5): vị trí theo phép căn, cao độ theo bảng tầng, lưới trục chuẩn hiện sẵn. Cột, vách, tường, cửa của tầng T dựng từ cao độ T lên tầng trên; dầm, sàn, móng ở cao độ tầng (hàm `zHq` trong `app/static/xem3d.js`).
 
 Giới hạn: danh sách tổng hợp không lưu (bấm "Tính và tổng hợp" lại khi mở app); chưa dựng ống MEP ở chế độ này; lưới trục trong 3D luôn lấy lại từ mục 1 khi dựng lại.
-**Chưa xử lý mái khi thêm tầng**: ô "Số tầng dựng" trong 3D (chế độ một mặt bằng) chỉ nhân cột, dầm, sàn, vách, tường, cửa (`THEM_LOAI`), mái ở lại đỉnh tầng 1; nút "+ Thêm tầng" trong bảng tầng đặt tầng mới trên dòng MAI và chỉ cảnh báo. Test: `tests/test_he_quy_chieu.py`.
+**Mái khi thêm tầng (sửa 16/11/2026)**: ô "Số tầng dựng" trong 3D (chế độ một mặt bằng) nhân cột, dầm, sàn, vách, tường, cửa (`THEM_LOAI`) và **dời mái lên đỉnh tầng trên cùng** (mái không nhân bản; hàm `nhanTang` trong `app/static/xem3d.js`); nút "+ Thêm tầng" trong bảng tầng chèn tầng mới ngay dưới dòng MAI / TUM rồi dời MAI / TUM lên cùng một đoạn, giữ khoảng cách cũ giữa đỉnh tầng và mái (hàm `hqChenTang` trong `app/static/cad.html`). Test: `tests/test_he_quy_chieu.py`.
 
 ## 4. Bản vẽ cần như thế nào để bóc chính xác
 

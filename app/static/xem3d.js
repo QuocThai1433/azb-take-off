@@ -732,6 +732,14 @@
         objs.set(o.id, o);
         const tg = tong[o.loai]; tg.n++; if (!o.bo) tg.v += o.vol;
       });
+      // Mái không nhân bản: dời lên đỉnh tầng trên cùng (mỗi tầng thêm đẩy mái lên một chiều cao tầng)
+      const lenMai = (st.tang - 1) * H;
+      objs.forEach(o => {
+        if (o.loai !== "mai" || o.base) return;
+        o.dz = [o.dz[0] + lenMai, o.dz[1] + lenMai];
+        o.meshes.forEach(m => { m.position.y += lenMai; });
+        o.edges.forEach(v => { v.position.y += lenMai; });
+      });
     }
     // Liên kết: hai cấu kiện liên kết khi hình chiếu mặt bằng chạm / chồng nhau (trong dung sai) và khoảng cao độ chạm nhau
     function tinhLienKet() {

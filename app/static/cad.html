@@ -2743,7 +2743,7 @@ $("p-hq").addEventListener("click", e => {
   if (d.dataset.hqXoa) { const [hx, i] = d.dataset.hqXoa.split(":"); h.luoi[hx].splice(+i, 1); veHQ(); return veLai(); }
   if (d.id === "hq-bat-goc" || d.id === "hq-bat-d2") { S.hqChon = S.hqChon ? null : (d.id === "hq-bat-goc" ? "goc" : "diem2"); veHQ(); if (S.hqChon) lenh("Bấm vào giao của hai trục trên bản vẽ (Esc để hủy).", "ok"); return; }
   if (d.id === "hq-bo-d2") { h.diem2 = null; veHQ(); return veLai(); }
-  if (d.id === "hq-them-tang") { const n = h.tang.length, ult = h.tang.map(t => parseFloat(String(t.cao_do_kc).replace(",", "."))).filter(Number.isFinite); hqThemTang("T" + (n + 1), "", "tang", ult.length ? "+" + (Math.max(...ult) + 3.6).toFixed(3) : "±0.000"); veHQ(); return; }
+  if (d.id === "hq-them-tang") { hqChenTang(); return; }
   if (d.id === "hq-mau") { h.tang = []; hqThemTang("MONG", "Móng", "mong", "-1.500"); hqThemTang("T1", "Tầng 1", "tang", "±0.000"); hqThemTang("T2", "Tầng 2", "tang", "+3.600"); hqThemTang("T3", "Tầng 3", "tang", "+7.200"); hqThemTang("MAI", "Mái", "mai", "+10.800"); veHQ(); return; }
   if (d.dataset.hqXt) { h.tang.splice(+d.dataset.hqXt, 1); veHQ(); return; }
 });
@@ -3120,6 +3120,20 @@ async function hqDung3D() {
 }
 $("p-hq").addEventListener("click", e => { if (e.target.closest("#hq-th-3d")) hqDung3D(); });
 
+// Thêm tầng: chèn tầng mới ngay dưới dòng mái / tum và dời mái / tum lên cùng một đoạn (giữ khoảng cách cũ giữa đỉnh tầng và mái)
+const hqCD = v => { const t = String(v ?? "").replace(/\s/g, "").replace("−", "-").replace(/^(±|\+-|\+\/-)/, ""), n = parseFloat(t.replace(",", ".")); return t !== "" && Number.isFinite(n) ? n : null; };
+const hqFmtCD = v => (v > 0.0005 ? "+" : v < -0.0005 ? "-" : "±") + Math.abs(v).toFixed(3);
+function hqChenTang() {
+  const h = S.hqc, tren = t => t.loai === "mai" || t.loai === "tum", ds = h.tang.filter(t => !tren(t) && t.loai !== "mong" && hqCD(t.cao_do_kc) != null);
+  const cd = ds.map(t => hqCD(t.cao_do_kc)).sort((a, b) => a - b), top = cd.length ? cd[cd.length - 1] : null;
+  const cao = cd.length > 1 ? +(cd[cd.length - 1] - cd[cd.length - 2]).toFixed(3) : 3.6, moi = top == null ? 0 : +(top + cao).toFixed(3);
+  let n = h.tang.filter(t => t.loai === "tang").length + 1; while (h.tang.some(t => t.ma === "T" + n)) n++;
+  const dong = {ma:"T" + n, ten:"", loai:"tang", cao_do_kc:hqFmtCD(moi), cao_do_ht:"", day_san:"", cao_dam:"", ghi_chu:""};
+  const vt = h.tang.findIndex(tren), nho = [];
+  if (vt < 0) h.tang.push(dong); else h.tang.splice(vt, 0, dong);
+  if (top != null) h.tang.forEach(t => { if (!tren(t) || t === dong) return; const c = hqCD(t.cao_do_kc); if (c == null) return; t.cao_do_kc = hqFmtCD(+(c + (moi - top)).toFixed(3)); if (hqCD(t.cao_do_ht) != null) t.cao_do_ht = hqFmtCD(+(hqCD(t.cao_do_ht) + (moi - top)).toFixed(3)); nho.push(`${t.ma} lên ${t.cao_do_kc}`); });
+  lenh(`Đã thêm tầng ${dong.ma} ở ${dong.cao_do_kc}${nho.length ? " và dời " + nho.join(", ") : ""}.`, "ok"); veHQ();
+}
 // ---------- Tách nhiều mặt bằng trong một file (chỉ đề xuất vùng; người dùng tick rồi bấm Tạo mới có hiệu lực) ----------
 const TM_VAI = {mat_bang:"Mặt bằng", chi_tiet:"Chi tiết", ghi_chu:"Ghi chú / bảng"};
 async function veTM(doLai, kc) {
