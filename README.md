@@ -131,6 +131,19 @@ Dựng khung kết cấu 3D từ bản vẽ đang mở để kiểm tra nhanh. B
 - **Hiện tên** cấu kiện (`L`), **xuất .glb** mở bằng SketchUp, Blender, Revit.
 - **Mặt cắt** (`C`) theo cao độ, **xuyên thấu** (`X`), **đo khoảng cách** (`M`), **chụp ảnh PNG**, **tự xoay** (`R`).
 
+## 3h. Hệ quy chiếu dự án (tab "Hệ quy chiếu", thêm 16/11/2026)
+Chọn **một lần ngay từ đầu** lưới trục chuẩn, điểm gốc và bảng cao độ từng tầng; mọi mặt bằng (móng, cột, dầm sàn...) được căn vào đó rồi mới dựng 3D. Máy chỉ đề xuất, Sếp xem lại và xác nhận. Dữ liệu lưu trong trạng thái dự án (khóa `he_quy_chieu` và trường `hq` của từng mục bản vẽ), đi theo sao lưu và gói .zip.
+
+1. **Lưới trục**: "Dò trục từ bản vẽ này" (layer tên TRUC / GRID / AXIS hoặc chọn layer), đọc tên trong bong bóng; trục chưa đọc được tên bị đặt tên tạm và cảnh báo. Module `app/he_quy_chieu.py` (`do_luoi_truc`).
+2. **Điểm gốc**: giao một trục dọc và một trục ngang (vd A-1) = (0; 0) công trình; điểm hướng tuỳ chọn để tính góc xoay (`kiem_tra`).
+3. **Bảng tầng**: mã, loại, cao độ kết cấu (dựng 3D), cao độ hoàn thiện, dày sàn, cao dầm; chiều cao tầng tự tính (`chuan_hoa_bang_tang`). Gõ cao độ kiểu `+3.600`, `3,6`, `±0.000`.
+4. **Gán vùng**: mỗi mặt bằng chọn tầng, cấu kiện, điểm căn A (và B nếu xoay) bằng giao trục; "Dò + căn tự động" dựa trên tên trục trùng lưới chuẩn; kiểm tra chéo độ lệch từng trục (ngưỡng 50 mm); phải tick "đã xác nhận" (`goi_y_diem_vung`, `tinh_can_vung`, `kiem_tra_gan_vung`).
+5. **Tổng hợp**: cây Tầng -> Cấu kiện -> Đối tượng, toạ độ theo gốc công trình, cao độ đáy/đỉnh từ bảng tầng, diện tích, thể tích; bấm dòng để tô sáng trên bản vẽ; "Đưa về tim trục" và xuất CSV (`tong_hop_cong_trinh`). Mặt bằng chỉ lấy loại cấu kiện đã khai báo ("Khác" lấy hết).
+6. **Dựng 3D theo hệ quy chiếu** (nút cam ở mục 5): vị trí theo phép căn, cao độ theo bảng tầng, lưới trục chuẩn hiện sẵn. Cột, vách, tường, cửa của tầng T dựng từ cao độ T lên tầng trên; dầm, sàn, móng ở cao độ tầng (hàm `zHq` trong `app/static/xem3d.js`).
+
+Giới hạn: danh sách tổng hợp không lưu (bấm "Tính và tổng hợp" lại khi mở app); chưa dựng ống MEP ở chế độ này; lưới trục trong 3D luôn lấy lại từ mục 1 khi dựng lại.
+**Chưa xử lý mái khi thêm tầng**: ô "Số tầng dựng" trong 3D (chế độ một mặt bằng) chỉ nhân cột, dầm, sàn, vách, tường, cửa (`THEM_LOAI`), mái ở lại đỉnh tầng 1; nút "+ Thêm tầng" trong bảng tầng đặt tầng mới trên dòng MAI và chỉ cảnh báo. Test: `tests/test_he_quy_chieu.py`.
+
 ## 4. Bản vẽ cần như thế nào để bóc chính xác
 
 | Yêu cầu | Lý do |
