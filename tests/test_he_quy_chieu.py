@@ -54,6 +54,32 @@ def test_khong_co_ten_thi_dat_tam_va_canh_bao(tmp_path):
     assert any("tên tạm" in c for c in kq["canh_bao"])
 
 
+def test_dat_ten_truc_chon_tay(tmp_path):
+    """Trục chọn tay (tên rỗng) được đặt tên từ bong bóng; trục đã có tên giữ nguyên."""
+    bv = _tao(tmp_path)
+    luoi = {"doc": [{"ten": "", "v": 20, "tu": -1.5, "den": 6}, {"ten": "", "v": 26, "tu": -1.5, "den": 6},
+                    {"ten": "X9", "v": 32, "tu": -1.5, "den": 6}],
+            "ngang": [{"ten": "", "v": 0, "tu": 18.5, "den": 33.5}]}
+    kq = hq.dat_ten_luoi(bv, luoi)
+    assert [t["ten"] for t in kq["doc"]] == ["1", "2", "X9"]
+    assert kq["ngang"][0]["ten"] == "A" and kq["ngang"][0]["nguon_ten"] == "bong bóng"
+    assert luoi["doc"][0]["ten"] == ""   # không sửa dữ liệu vào
+
+
+def test_dat_ten_truc_khong_bong_thi_dat_tam(tmp_path):
+    kq = hq.dat_ten_luoi(_tao(tmp_path, co_ten=False), {"doc": [{"ten": "", "v": 20, "tu": 0, "den": 5}, {"ten": "", "v": 26, "tu": 0, "den": 5}], "ngang": []})
+    assert [t["ten"] for t in kq["doc"]] == ["1", "2"]
+    assert any("tên tạm" in c for c in kq["canh_bao"])
+
+
+def test_api_dat_ten_truc(tmp_path):
+    from app import main
+    bv = _tao(tmp_path)
+    main.PHIEN["t"] = {"ban_ve": bv, "kq": None}
+    r = TestClient(app).post("/api/he-quy-chieu/dat-ten-truc", json={"id": "t", "luoi": {"doc": [{"ten": "", "v": 26, "tu": -1.5, "den": 6}], "ngang": []}})
+    assert r.status_code == 200 and r.json()["doc"][0]["ten"] == "2"
+
+
 def test_khong_co_layer_truc(tmp_path):
     doc = ezdxf.new("R2010")
     doc.modelspace().add_line((0, 0), (5000, 0))

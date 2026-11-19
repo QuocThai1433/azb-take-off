@@ -478,6 +478,21 @@ def do_truc_api(yc: YeuCauDoTruc):
     return kq
 
 
+class YeuCauTenTruc(BaseModel):
+    id: str
+    luoi: dict = {}   # {"doc": [{ten, v, tu, den}], "ngang": [...]} - trục người dùng chọn tay trên bản vẽ
+
+
+@app.post("/api/he-quy-chieu/dat-ten-truc")
+def dat_ten_truc_api(yc: YeuCauTenTruc):
+    """Đặt tên cho trục vừa chọn tay (ô tên rỗng): đọc từ bong bóng gần đầu trục, không có thì đặt tạm."""
+    bv = _phien(yc.id)["ban_ve"]
+    try:
+        return he_quy_chieu.dat_ten_luoi(bv, yc.luoi)
+    except (KeyError, TypeError, ValueError) as ex:
+        raise HTTPException(400, f"Lưới trục không hợp lệ: {ex}")
+
+
 @app.post("/api/he-quy-chieu/kiem-tra")
 async def kiem_tra_hqc_api(request: Request):
     """Chuẩn hoá và kiểm tra hệ quy chiếu đang nhập (đọc số, tính chiều cao tầng, góc quay, cảnh báo)."""

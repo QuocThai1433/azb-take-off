@@ -201,6 +201,42 @@ def do_luoi_truc(ban_ve, vung=None, layer_truc=None):
     return {"doc": ds_doc, "ngang": ds_ngang, "layer": dung_layer, "canh_bao": canh_bao}
 
 
+def dat_ten_luoi(ban_ve, luoi):
+    """Đặt tên cho các trục NGƯỜI DÙNG VỪA CHỌN TAY trên bản vẽ (ten rỗng); trục đã có tên giữ nguyên.
+    Đọc tên từ bong bóng / chữ gần đầu trục như khi dò tự động; không đọc được thì đặt tạm (1, 2, 3 / A, B, C).
+    luoi = {"doc": [{ten, v, tu, den}], "ngang": [...]}. Trả {"doc", "ngang", "canh_bao"} (thứ tự giữ nguyên)."""
+    ds = {hx: [dict(t) for t in (luoi.get(hx) or [])] for hx in ("doc", "ngang")}
+    tat_ca = [t for hx in ds for t in ds[hx]]
+    if not tat_ca:
+        return {"doc": [], "ngang": [], "canh_bao": []}
+    x0 = min(min(t["tu"], t["v"]) if hx == "ngang" else t["v"] for hx in ds for t in ds[hx])
+    x1 = max(max(t["den"], t["v"]) if hx == "ngang" else t["v"] for hx in ds for t in ds[hx])
+    y0 = min(t["v"] if hx == "ngang" else min(t["tu"], t["den"]) for hx in ds for t in ds[hx])
+    y1 = max(t["v"] if hx == "ngang" else max(t["tu"], t["den"]) for hx in ds for t in ds[hx])
+    vb = box(x0, y0, x1, y1)
+    bong, chu = _bong(ban_ve, vb), _chu_ten(ban_ve, vb)
+    da_co = {t["ten"] for t in tat_ca if t.get("ten")}
+    for hx in ds:
+        goi = _dat_ten([(t["v"], t["tu"], t["den"]) for t in ds[hx]], hx, bong, chu)
+        for t, g in zip(ds[hx], goi):
+            if not t.get("ten") and g["ten"] and g["ten"] not in da_co:
+                t["ten"], t["nguon_ten"] = g["ten"], g["nguon_ten"]
+                da_co.add(g["ten"])
+    so_doc = sum(1 for t in ds["doc"] if t.get("ten", "")[:1].isdigit())
+    chu_doc = sum(1 for t in ds["doc"] if t.get("ten", "")[:1].isalpha())
+    kieu_doc = "chu" if chu_doc > so_doc else "so"
+    thieu = sum(1 for t in tat_ca if not t.get("ten"))
+    for hx, kieu in (("doc", kieu_doc), ("ngang", "so" if kieu_doc == "chu" else "chu")):
+        for t in ds[hx]:
+            t.setdefault("ten", "")
+        _ten_mac_dinh(ds[hx], kieu)
+    canh_bao = []
+    if thieu:
+        canh_bao.append(f"{thieu} trục không đọc được tên trong bong bóng: đã đặt tên tạm, Sếp sửa lại cho đúng bản vẽ.")
+    canh_bao += kiem_tra_luoi(ds)
+    return {"doc": ds["doc"], "ngang": ds["ngang"], "canh_bao": canh_bao}
+
+
 def kiem_tra_luoi(luoi):
     """Cảnh báo lưới trục: trùng tên, hai trục quá gần nhau, thiếu một hướng."""
     cb = []

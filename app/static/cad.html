@@ -1386,6 +1386,7 @@ window.addEventListener("mouseup", e => {
     const m = chuotToa(e);  // lấy toạ độ lúc thả chuột, phòng khi kéo nhanh không kịp phát sự kiện di chuyển
     if (Math.hypot(m.x - S.keo.px, m.y - S.keo.py) > 4) { S.keo.moved = true; S.keo.b = [wx(m.x), wy(m.y)]; }
     if (LAY.hoi && !S.keo.moved) hoiLayerTaiDiem({x:S.keo.px, y:S.keo.py});
+    else if (S.hqTruc) hqChonTruc(S.keo.moved ? S.keo.a : null, S.keo.moved ? S.keo.b : null, wx(S.keo.px), wy(S.keo.py));
     else if (S.hqChon && !S.keo.moved) hqBat(wx(S.keo.px), wy(S.keo.py));
     else if (S.hqChonVung && !S.keo.moved) hqBatVung(wx(S.keo.px), wy(S.keo.py));
     else if (S.ctCho) { if (S.keo.moved) docThepCad(S.keo.a, S.keo.b); else lenh("Kéo khung (giữ chuột trái và kéo) quanh bảng thống kê thép, trùm cả dòng tiêu đề. Esc để hủy.", "loi"); }
@@ -2653,7 +2654,7 @@ $("p-ct").addEventListener("click", async e => {
 // Chọn một lần ngay từ đầu; máy chỉ đề xuất (dò trục, gợi ý cao độ), Sếp xem lại và xác nhận.
 const HQ_LOAI = {mong:"Móng", ham:"Hầm", tang:"Tầng", lung:"Tầng lửng", ky_thuat:"Tầng kỹ thuật", mai:"Mái", tum:"Tum"};
 const hqMacDinh = () => ({luoi:{doc:[], ngang:[]}, goc:null, diem2:null, tang:[], fileId:null, layer_truc:[]});
-S.hqc = hqMacDinh(); S.hqKq = null; S.hqChon = null; S.hqGoiY = []; S.hqHien = true;
+S.hqc = hqMacDinh(); S.hqKq = null; S.hqChon = null; S.hqGoiY = []; S.hqHien = true; S.hqTruc = false;
 let hqHen = 0;
 const hqSo = v => v === "" || v == null ? "" : String(v);
 const hqNhan = d => !d ? "" : (/^[A-Za-z]/.test(d.doc) && !/^[A-Za-z]/.test(d.ngang) ? `${d.doc}-${d.ngang}` : `${d.ngang}-${d.doc}`);
@@ -2699,6 +2700,7 @@ function veHQ() {
       Máy dò trục và gợi ý cao độ từ bản vẽ, Sếp xem lại và sửa. Dữ liệu lưu theo dự án.</div></details>
     <div><b>1. Lưới trục chuẩn</b> <span class="nho">${h.fileId && f && f.id === h.fileId ? "(đang vẽ trên bản vẽ này)" : h.fileId ? "(dò từ bản vẽ khác)" : ""}</span></div>
     <div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <button id="hq-chon-truc" class="${S.hqTruc ? "cam" : ""}" ${f ? "" : "disabled"} title="Bấm vào từng đường thẳng (dọc / ngang) hoặc kéo khung quanh nhiều đường trên bản vẽ: mỗi đường thành một trục. Bấm lại vào trục đã chọn để bỏ.">${S.hqTruc ? "Đang chọn trục... (Esc để xong)" : "Chọn đường trục trên bản vẽ"}</button>
       <button id="hq-do" ${f ? "" : "disabled"}>Dò trục từ bản vẽ này${f && f.vung ? " (trong vùng chọn)" : ""}</button>
       <select id="hq-layer" title="Layer chứa đường trục (để trống: tự nhận theo tên TRUC / GRID / AXIS)"><option value="">Layer trục: tự nhận</option>${(f ? f.layers.map(l => l.ten) : []).map(l => `<option ${h.layer_truc[0] === l ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>
       <label class="nho"><input type="checkbox" id="hq-hien" ${S.hqHien ? "checked" : ""}> Vẽ lưới trục lên bản vẽ</label>
@@ -2737,6 +2739,10 @@ async function hqDo() {
 $("p-hq").addEventListener("click", e => {
   const d = e.target.closest("button, input[type=checkbox]"); if (!d) return; const h = S.hqc;
   if (d.id === "hq-do") return hqDo();
+  if (d.id === "hq-chon-truc") {
+    S.hqTruc = !S.hqTruc; if (S.hqTruc) { S.hqChon = null; S.hqChonVung = null; S.hqHien = true; lenh("Bấm vào đường trục (hoặc kéo khung quanh nhiều đường) trên bản vẽ. Bấm lại vào trục đã chọn để bỏ. Esc để xong.", "ok"); }
+    veHQ(); return veLai();
+  }
   if (d.id === "hq-hien") { S.hqHien = d.checked; return veLai(); }
   if (d.id === "hq-xoa-het") { h.luoi = {doc:[], ngang:[]}; h.goc = h.diem2 = null; h.fileId = null; S.hqKq = null; veHQ(); return veLai(); }
   if (d.dataset.hqThem) { const hx = d.dataset.hqThem, a = h.luoi[hx], ult = a.length ? a[a.length - 1].v : 0; a.push({ten:"", v:+(ult + 3).toFixed(3), tu:0, den:0, nguon_ten:"nhập tay"}); veHQ(); return; }
@@ -2768,7 +2774,66 @@ function hqBat(x, y) {
   if (!tot) return lenh("Không có giao trục nào gần chỗ bấm: bấm gần hơn vào giao của hai trục.", "loi");
   h[S.hqChon] = tot; lenh(`Đã chọn ${S.hqChon === "goc" ? "điểm gốc" : "điểm hướng"} ${hqNhan(tot)}.`, "ok"); S.hqChon = null; veHQ(); veLai();
 }
-addEventListener("keydown", e => { if (e.key === "Escape" && S.hqChon) { S.hqChon = null; if (!$("p-hq").hidden) veHQ(); lenh("Đã hủy chọn giao trục.", "ok"); } });
+// ----- Chọn đường trục trực tiếp trên bản vẽ: mỗi đoạn thẳng dọc / ngang thành một trục -----
+// Duyệt các đoạn thẳng đứng / nằm ngang của mọi nét hở trên layer đang hiện (kể cả layer đã khoá). Lệch quá 0,3% chiều dài thì coi là đường xiên.
+function hqCacDoanTruc(f) {
+  const kq = [];
+  for (const l of f.layers) {
+    if (!l.hien) continue; const g = f.hinh.layers[l.ten]; if (!g) continue;
+    for (const p of g.net) for (let i = 1; i < p.length; i++) {
+      const a = p[i - 1], b = p[i], dx = Math.abs(a[0] - b[0]), dy = Math.abs(a[1] - b[1]), dai = Math.max(dx, dy);
+      if (dai < 0.05 || Math.min(dx, dy) > 0.003 * dai) continue;
+      kq.push(dx < dy ? {hx:"doc", v:(a[0] + b[0]) / 2, tu:Math.min(a[1], b[1]), den:Math.max(a[1], b[1])}
+                      : {hx:"ngang", v:(a[1] + b[1]) / 2, tu:Math.min(a[0], b[0]), den:Math.max(a[0], b[0])});
+    }
+  }
+  return kq;
+}
+const hqTrucCo = (h, hx, v) => h.luoi[hx].findIndex(t => Math.abs(t.v - v) <= 0.02);
+function hqThemDoan(d) {   // gộp đoạn vào lưới: cùng toạ độ thì nối dài, chưa có thì thêm trục mới (tên đặt sau)
+  const h = S.hqc, i = hqTrucCo(h, d.hx, d.v);
+  if (i >= 0) { const t = h.luoi[d.hx][i]; t.tu = +Math.min(t.tu, d.tu).toFixed(4); t.den = +Math.max(t.den, d.den).toFixed(4); return false; }
+  h.luoi[d.hx].push({ten:"", v:+d.v.toFixed(4), tu:+d.tu.toFixed(4), den:+d.den.toFixed(4), nguon_ten:"chọn tay"});
+  h.luoi[d.hx].sort((a, b) => a.v - b.v); return true;
+}
+async function hqChonTruc(a, b, x, y) {   // a, b: góc khung kéo (hoặc null nếu chỉ bấm một điểm x, y)
+  const f = F(), h = S.hqc; if (!f) return;
+  if (h.fileId && h.fileId !== f.id && (h.luoi.doc.length || h.luoi.ngang.length)) {
+    if (!(await confirmBox("Thay lưới trục cũ?", "Lưới trục hiện có lấy từ một bản vẽ khác. Chọn trục trên bản vẽ này sẽ xoá lưới cũ.", {okText:"Thay lưới", danger:true}))) return;
+    h.luoi = {doc:[], ngang:[]}; h.goc = h.diem2 = null;
+  }
+  const ds = hqCacDoanTruc(f); let them = 0, bo = 0;
+  if (a) {
+    const x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]), y0 = Math.min(a[1], b[1]), y1 = Math.max(a[1], b[1]);
+    for (const d of ds) {
+      if (d.den - d.tu < 1) continue;   // đoạn ngắn hơn 1 m là nét ký hiệu, không phải trục
+      const ok = d.hx === "doc" ? d.v >= x0 && d.v <= x1 && d.den >= y0 && d.tu <= y1 : d.v >= y0 && d.v <= y1 && d.den >= x0 && d.tu <= x1;
+      if (ok && hqThemDoan(d)) them++;
+    }
+  } else {
+    const tol = 8 / S.v.s; let tot = null, dt = tol;
+    for (const d of ds) {
+      const k = d.hx === "doc" ? (y >= d.tu - tol && y <= d.den + tol ? Math.abs(x - d.v) : 1e9) : (x >= d.tu - tol && x <= d.den + tol ? Math.abs(y - d.v) : 1e9);
+      if (k < dt) { dt = k; tot = d; }
+    }
+    if (!tot) return lenh("Không có đường thẳng dọc / ngang nào gần chỗ bấm. Bấm sát vào đường hoặc kéo khung quanh các đường.", "loi");
+    const i = hqTrucCo(h, tot.hx, tot.v);
+    if (i >= 0) { const g = h.luoi[tot.hx].splice(i, 1)[0]; bo++; ["goc", "diem2"].forEach(k => { if (h[k] && h[k][tot.hx] === g.ten) h[k] = null; }); }
+    else if (hqThemDoan(tot)) them++;
+  }
+  if (!them && !bo) return lenh("Không có trục mới trong khung (đã chọn rồi, hoặc đường ngắn / xiên).", "loi");
+  h.fileId = f.id; S.hqKq = null;
+  if (them) {
+    try {
+      const r = await json("/api/he-quy-chieu/dat-ten-truc", {id:f.id, luoi:h.luoi});
+      h.luoi = {doc:r.doc, ngang:r.ngang};
+      lenh(`Đã thêm ${them} trục. Có ${h.luoi.doc.length} trục dọc, ${h.luoi.ngang.length} trục ngang.${r.canh_bao.length ? " " + r.canh_bao[0] : ""}`, "ok");
+    } catch (e) { lenh(`Đã thêm ${them} trục nhưng chưa đặt được tên: ${e.message}`, "loi"); }
+  } else lenh(`Đã bỏ ${bo} trục. Còn ${h.luoi.doc.length} trục dọc, ${h.luoi.ngang.length} trục ngang.`, "ok");
+  veHQ(); veLai();
+}
+addEventListener("keydown", e => { if (e.key === "Escape" && S.hqTruc) { S.hqTruc = false; if (!$("p-hq").hidden) veHQ(); veLai(); lenh("Đã xong chọn trục.", "ok"); return; }
+  if (e.key === "Escape" && S.hqChon) { S.hqChon = null; if (!$("p-hq").hidden) veHQ(); lenh("Đã hủy chọn giao trục.", "ok"); } });
 // Vẽ lưới trục chuẩn lên bản vẽ đã dò
 function veLuoiHQ(f) {
   const h = S.hqc; if (!S.hqHien || !h.fileId || h.fileId !== f.id || !(h.luoi.doc.length || h.luoi.ngang.length)) return;
@@ -2780,7 +2845,7 @@ function veLuoiHQ(f) {
     const g = h[k], a = g && h.luoi.doc.find(t => t.ten === g.doc), b = g && h.luoi.ngang.find(t => t.ten === g.ngang); if (!a || !b) return;
     ctx.strokeStyle = mau; ctx.fillStyle = mau; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(sx(a.v), sy(b.v), 9, 0, 7); ctx.stroke(); ctx.fillText(`${nhan} ${hqNhan(g)}`, sx(a.v) + 13, sy(b.v) - 12);
   });
-  if (S.hqChon && S.mouse) { ctx.strokeStyle = "#ffd60a"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(S.mouse.x, S.mouse.y, 25, 0, 7); ctx.stroke(); }
+  if ((S.hqChon || S.hqTruc) && S.mouse) { ctx.strokeStyle = "#ffd60a"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(S.mouse.x, S.mouse.y, 25, 0, 7); ctx.stroke(); }
   ctx.restore();
 }
 
