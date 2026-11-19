@@ -544,7 +544,7 @@
       // 2) cấu kiện bê tông (dầm, sàn, vách được khoét lỗ cho ống đi xuyên)
       const gh = dsMB ? ghepMB() : null;
       const dsCK = dsCauKien(gh);
-      const dsCoc = (gh ? gh.coc : (d.coc || []).map(c => Object.assign({}, c))).concat(st.them.filter(m => m.k === "coc").map(m => ({id: m.id, ten: m.ten, x: m.x, y: m.y, d: m.d, moi: true})));
+      const dsCoc = (gh ? gh.coc : (d.coc || []).map(c => Object.assign({}, c))).map(c => { const sc = st.sua[c.id]; return sc && (sc.dx || sc.dy) ? Object.assign({}, c, {x: c.x + (sc.dx || 0), y: c.y + (sc.dy || 0)}) : c; }).concat(st.them.filter(m => m.k === "coc").map(m => ({id: m.id, ten: m.ten, x: m.x, y: m.y, d: m.d, moi: true})));
       {
         let x0 = 1e18, y0 = 1e18, x1 = -1e18, y1 = -1e18;
         dsCK.forEach(ck => ck.hinh.forEach(p => p[0].forEach(q => { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); })));
@@ -684,8 +684,14 @@
       if (m.k === "san") return Object.assign(b0, {loai: "san", thong_so: {t: m.t}, hinh: [[[[m.x0, m.y0], [m.x1, m.y0], [m.x1, m.y1], [m.x0, m.y1]]]]});
       return null;
     }
+    // Độ dời tay của cấu kiện gốc: st.sua[id] = {dx, dy, dz} (m), cộng vào hình học khi dựng; bản vẽ gốc không bị sửa
+    function dichCK(c) {
+      const sc = st.sua[c.id]; if (!sc || (!sc.dx && !sc.dy)) return c;
+      const dx = sc.dx || 0, dy = sc.dy || 0;
+      return Object.assign({}, c, {hinh: c.hinh.map(p => p.map(rg => rg.map(q => [q[0] + dx, q[1] + dy])))});
+    }
     function dsCauKien(gh) {
-      const ds = (gh ? gh.ck : d.cau_kien || []).slice();
+      const ds = (gh ? gh.ck : d.cau_kien || []).map(dichCK);
       st.them.forEach(m => { const c = itemCK(m); if (c) ds.push(c); });
       soNoi = 0;
       // Hình "dầm" rộng hơn 1,2 m không phải một dầm mà là đường bao khung dầm / ô dầm: dựng thành khối đặc sẽ thành một tấm lớn, nên bỏ khỏi 3D
@@ -722,8 +728,9 @@
       });
     }
     function dzCua(ck) {
-      const dz = khoiDoc(ck, H); if (!dz) return null;
-      const sc = st.sua[ck.id]; if (!sc) return dz;
+      const dz0 = khoiDoc(ck, H); if (!dz0) return null;
+      const sc = st.sua[ck.id]; if (!sc) return dz0;
+      const dz = sc.dz ? [dz0[0] + sc.dz, dz0[1] + sc.dz] : dz0;
       const y0 = sc.y0 != null ? sc.y0 : dz[0], y1 = sc.y1 != null ? sc.y1 : dz[1];
       return y1 > y0 + 0.01 ? [y0, y1] : dz;
     }
@@ -1282,12 +1289,13 @@
     let keoCK = null;
     r.domElement.addEventListener("pointerdown", e => {
       if (e.button !== 0 || st.cc) return;
-      const o = st.chon && objs.get(st.chon); if (!o || !(o.moi || (o.ck && o.ck.moi)) || o.truc) return;
-      const m = st.them.find(x => x.id === o.id); if (!m) return;
+      const o = st.chon && objs.get(st.chon); if (!o || o.truc || !(o.ck || o.loai === "coc")) return;
+      const m = st.them.find(x => x.id === o.id) || null, bid = o.base || o.id;
+      if (!m && (o.moi || (o.ck && o.ck.moi))) return;
       const hit = ban(e); if (!hit || hit.object.userData.id !== o.id) return;
       e.stopImmediatePropagation(); dk.enabled = false; keo = false; dnx = e.clientX; dny = e.clientY;
       ghiLui();
-      keoCK = {o, m, org: JSON.parse(JSON.stringify(m)), lenXuong: e.shiftKey && m.k !== "coc", p0: hit.point.clone(), x0: e.clientX, y0: e.clientY, moved: false, dx: 0, dy: 0, dz: 0,
+      keoCK = {o, m, bid, org: JSON.parse(JSON.stringify(m || st.sua[bid] || {})), lenXuong: e.shiftKey && !(m ? m.k === "coc" : o.loai === "coc"), p0: hit.point.clone(), x0: e.clientX, y0: e.clientY, moved: false, dx: 0, dy: 0, dz: 0,
         pm: o.meshes.map(s => s.position.clone()), pe: o.edges.map(s => s.position.clone()), np: nhanPhu.filter(n => n.o === o).map(n => ({n, p: n.p.clone()}))};
       try { r.domElement.setPointerCapture(e.pointerId); } catch (x) {}
     }, true);
@@ -1302,15 +1310,18 @@
         k.dz = Math.round((q.y - k.p0.y) / 0.05) * 0.05; k.dx = 0; k.dy = 0;
       } else {
         const q = diemNen(e, k.p0.y); if (!q) return;
-        const ref = diemTham(k.org), nx = hitDich(ref[0] + (q.x - k.p0.x), "x", e.altKey), ny = hitDich(ref[1] + (-q.z + k.p0.z), "y", e.altKey);
-        k.dx = nx - ref[0]; k.dy = ny - ref[1]; k.dz = 0;
+        if (k.m) {
+          const ref = diemTham(k.org), nx = hitDich(ref[0] + (q.x - k.p0.x), "x", e.altKey), ny = hitDich(ref[1] + (-q.z + k.p0.z), "y", e.altKey);
+          k.dx = nx - ref[0]; k.dy = ny - ref[1];
+        } else { const g = e.altKey ? 0.001 : 0.05; k.dx = Math.round((q.x - k.p0.x) / g) * g; k.dy = Math.round((-q.z + k.p0.z) / g) * g; }
+        k.dz = 0;
       }
       k.o.meshes.forEach((s, i) => s.position.set(k.pm[i].x + k.dx, k.pm[i].y + k.dz, k.pm[i].z - k.dy));
       k.o.edges.forEach((s, i) => s.position.set(k.pe[i].x + k.dx, k.pe[i].y + k.dz, k.pe[i].z - k.dy));
       k.np.forEach(a => a.n.p.set(a.p.x + k.dx, a.p.y + k.dz, a.p.z - k.dy));
       veLai(true);
       const bb = r.domElement.getBoundingClientRect();
-      tip.innerHTML = `<b>${esc(k.m.ten || k.m.id)}</b> · ${k.lenXuong ? "dời lên xuống " + (k.dz >= 0 ? "+" : "") + f2(k.dz, 2) + " m" : `dời ${f2(k.dx, 3)} ; ${f2(k.dy, 3)} m`}`;
+      tip.innerHTML = `<b>${esc(k.o.ten)}</b> · ${k.lenXuong ? "dời lên xuống " + (k.dz >= 0 ? "+" : "") + f2(k.dz, 2) + " m" : `dời ${f2(k.dx, 3)} ; ${f2(k.dy, 3)} m`}`;
       tip.style.left = (e.clientX - bb.left + 14) + "px"; tip.style.top = (e.clientY - bb.top + 14) + "px"; tip.style.display = "block";
     }, true);
     addEventListener("pointerup", () => {
@@ -1318,12 +1329,22 @@
       if (!keoCK) return;
       const k = keoCK; keoCK = null; dk.enabled = true; tip.style.display = "none";
       if (!k.moved || (!k.dx && !k.dy && !k.dz)) { lui.pop(); ap(); return; }
-      keo = true; dich(k.m, k.org, k.dx, k.dy, k.dz); luu(); dung(); ap(); capNhatPn();
+      keo = true; if (k.m) dich(k.m, k.org, k.dx, k.dy, k.dz); else dichGoc(k.bid, k.org, k.dx, k.dy, k.dz);
+      luu(); dung(); ap(); capNhatPn();
     });
+    // cấu kiện gốc: lưu độ dời cộng dồn vào st.sua (dx, dy, dz); về 0 thì xóa
+    function dichGoc(bid, org, dx, dy, dz) {
+      const sc = st.sua[bid] = st.sua[bid] || {};
+      [["dx", dx], ["dy", dy], ["dz", dz]].forEach(([k, v]) => { const t = +(((org[k] || 0) + v)).toFixed(3); if (t) sc[k] = t; else delete sc[k]; });
+      if (!Object.keys(sc).length) delete st.sua[bid];
+    }
     function nhich(k, nhanh) {
-      const m = st.them.find(x => x.id === st.chon); if (!m) return false;
+      const o = objs.get(st.chon); if (!o || o.truc || !(o.ck || o.loai === "coc")) return false;
+      const m = st.them.find(x => x.id === st.chon), bid = o.base || o.id;
+      if (!m && (o.moi || (o.ck && o.ck.moi))) return false;
       const b = nhanh ? 0.5 : 0.05, dx = k === "arrowleft" ? -b : k === "arrowright" ? b : 0, dy = k === "arrowup" ? b : k === "arrowdown" ? -b : 0, dz = k === "pageup" ? b : k === "pagedown" ? -b : 0;
-      ghiLui(); dich(m, JSON.parse(JSON.stringify(m)), dx, dy, dz); luu(); dung(); ap(); capNhatPn(); return true;
+      ghiLui(); if (m) dich(m, JSON.parse(JSON.stringify(m)), dx, dy, dz); else dichGoc(bid, st.sua[bid] || {}, dx, dy, o.loai === "coc" ? 0 : dz);
+      luu(); dung(); ap(); capNhatPn(); return true;
     }
 
     // Kéo tim trục bằng chuột: bấm giữ vào trục rồi kéo, tự bắt vào mép / tâm cột, dầm, vách gần nhất
@@ -1518,6 +1539,10 @@
       return tang + s;
     }
 
+    function dichTxt(o) {
+      const sc = !o.moi && !(o.ck && o.ck.moi) && st.sua[o.base || o.id]; if (!sc || !(sc.dx || sc.dy || sc.dz)) return "";
+      return `<div class="x3-cb">Đã dời tay so với bản vẽ gốc: X ${f2(sc.dx || 0, 3)} · Y ${f2(sc.dy || 0, 3)} · cao ${f2(sc.dz || 0, 3)} m. <button data-a="reset-dich">Về vị trí gốc</button></div>`;
+    }
     function chonHTML() {
       const o = st.chon && objs.get(st.chon);
       if (!o) return `<div class="x3-sec"><h5>Đối tượng đang chọn</h5><div class="x3-mut">Bấm vào một khối để xem và chỉnh theo loại của nó. <b>Nhấp đúp</b> hoặc phím <kbd>W</kbd> để làm việc riêng với cấu kiện đó (các phần khác mờ đi, chỉ giữ phần liên kết).</div></div>`;
@@ -1533,6 +1558,7 @@
         ${o.va ? '<div class="x3-cb">Va chạm giữa ống và cột/vách: không khoét được, cần dời ống hoặc hạ cao độ.</div>' : ""}
         ${ck ? (ck.canh_bao || []).map(c => `<div class="x3-cb">${esc(c.noi_dung)}</div>`).join("") : ""}
         ${loi}
+        ${dichTxt(o)}
         <div class="x3-row" style="margin-top:8px;flex-wrap:wrap"><button class="cam" data-a="lv" ${st.lv === o.id ? "disabled" : ""}>◎ Làm việc với phần này (W)</button><button data-a="zoom">⌖ Zoom</button><button data-a="an">Ẩn (H)</button><button data-a="co">Chỉ hiện nó (I)</button></div>
         <h5 style="margin-top:10px">Liên kết (${lk.length})</h5>${lkHtml}
         ${lk.length ? '<div class="x3-row" style="flex-wrap:wrap"><button data-a="cum">Chỉ hiện cụm liên kết</button></div>' : ""}</div>`;
@@ -1802,6 +1828,7 @@
       else if (k === "csv") xuatCSV();
       else if (k === "glb") xuatGLB();
       else if (k === "mb") matBangXem();
+      else if (k === "reset-dich" && o) { ghiLui(); const sc = st.sua[o.base || o.id]; if (sc) { delete sc.dx; delete sc.dy; delete sc.dz; if (!Object.keys(sc).length) delete st.sua[o.base || o.id]; } luu(); dung(); ap(); capNhatPn(); }
       else if (k === "reset-sua" && o) { ghiLui(); delete st.sua[o.base || o.id]; luu(); dung(); ap(); capNhatPn(); }
       else if (k === "coc-all" && o && o.coc) {
         ghiLui(); st.cocCfg.head = o.coc.head; st.cocCfg.cut = o.coc.cut; st.cocCfg.L = o.coc.L;
@@ -1972,7 +1999,7 @@
         <li>Nút <b>▦ Mặt bằng</b>: nhìn từ trên, cắt ngang qua dầm và hiện nét 2D như bản vẽ mặt bằng; bật / tắt riêng ở lớp <i>Mặt bằng</i>.</li></ul>
         <h4>2d. Vẽ thêm trong 3D (nút ✏ Vẽ hoặc phím V)</h4><ul>
         <li>Chọn công cụ: <b>Móng, Cột, Dầm, Sàn, Cầu thang, Cọc, Trục, Đường, Đường cong, Ghi chú</b>, nhập kích thước, đặt <b>mức vẽ</b> (cao độ mặt phẳng vẽ) rồi bấm lên mô hình. Điểm tự bắt vào giao trục, góc cấu kiện, tâm cọc, lưới 50 mm. Đường: nhấp đúp hoặc Enter để kết thúc; chuột phải hoặc Esc hủy thao tác. <b>Móng</b>: bấm tâm móng (mặt trên ở mức vẽ, dày đi xuống). <b>Cầu thang</b>: bấm chân thang rồi điểm cuối, bậc tự chia theo chiều cao lên và chiều cao bậc. <b>Đường cong</b>: bấm 3 điểm (đầu, một điểm trên cung, cuối), vẽ thành nét hoặc dầm cong.</li>
-        <li><b>Mặt bằng chuẩn</b>: chọn cao độ mặt bằng (nền, các tầng) ở ô <i>Mặt bằng chuẩn</i> hoặc nhập mức vẽ; bật <i>Hiện mặt chuẩn</i> (tự hiện khi đang vẽ) để thấy mặt phẳng xanh trong 3D, <b>kéo tay nắm xanh</b> ở góc để dời nó lên xuống (hít vào cao độ các tầng và bước 50 mm). <b>Dời phần vẽ thêm</b>: chọn nó rồi kéo trên mô hình (giữ <kbd>Shift</kbd> để dời lên xuống, <kbd>Alt</kbd> để không hít vào trục / lưới) hoặc dùng phím mũi tên, <kbd>PgUp</kbd> / <kbd>PgDn</kbd>.</li>
+        <li><b>Mặt bằng chuẩn</b>: chọn cao độ mặt bằng (nền, các tầng) ở ô <i>Mặt bằng chuẩn</i> hoặc nhập mức vẽ; bật <i>Hiện mặt chuẩn</i> (tự hiện khi đang vẽ) để thấy mặt phẳng xanh trong 3D, <b>kéo tay nắm xanh</b> ở góc để dời nó lên xuống (hít vào cao độ các tầng và bước 50 mm). <b>Dời cấu kiện</b> (cả phần vẽ thêm lẫn cấu kiện từ bản vẽ gốc; bản gốc không bị sửa, có nút Về vị trí gốc): chọn nó rồi kéo trên mô hình (giữ <kbd>Shift</kbd> để dời lên xuống, <kbd>Alt</kbd> để không hít vào trục / lưới) hoặc dùng phím mũi tên, <kbd>PgUp</kbd> / <kbd>PgDn</kbd>.</li>
         <li>Phần vẽ thêm là cấu kiện thật: liên kết, khoét lỗ, chọn và sửa số liệu được; <kbd>Delete</kbd> xóa, <kbd>Ctrl</kbd>+<kbd>Z</kbd> hoàn tác. Dữ liệu lưu theo bản vẽ trong trình duyệt; <b>Xuất DXF</b> để ghép vào bản vẽ gốc (bản vẽ gốc không bị sửa).</li></ul>
         <h4>3. Hệ thống MEP và khoét lỗ tự động</h4><ul>
         <li>Hiển thị: <b>ống gió</b>, <b>ống cấp thoát nước</b>, <b>ống PCCC</b> (tròn) và <b>khay cáp</b> (chữ nhật). Ở cột trái, gán layer tương ứng cho loại <i>Ống nước, Ống PCCC, Khay cáp</i> (app tự đoán theo tên layer). Kích thước đọc từ tên layer, ví dụ <kbd>P-WATER-D100</kbd>, <kbd>PCCC DN65</kbd>, <kbd>KHAY CAP 400x100</kbd>; không ghi thì dùng mặc định và sửa được ở bảng bên phải.</li>
