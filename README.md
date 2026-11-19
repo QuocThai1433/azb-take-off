@@ -128,6 +128,11 @@ Dựng khung kết cấu 3D từ bản vẽ đang mở để kiểm tra nhanh. B
 - **MEP và khoét lỗ tự động:** hiển thị ống gió, ống cấp thoát nước, ống PCCC, khay cáp. Gán layer cho loại *Ống nước / Ống PCCC / Khay cáp* (app đoán theo tên layer). Kích thước đọc từ tên layer (`P-WATER-D100`, `PCCC DN65`, `KHAY CAP 400x100`), không ghi thì lấy mặc định trong `config/mep.yaml` và sửa được ngay trong màn hình 3D.
   - Khoét lỗ thật trên **dầm, sàn, vách** tại chỗ ống đi xuyên, đánh giá từng lỗ (đạt / lỗ lớn / lẹm mép / cắt đứt), chỉnh được cao độ từng hệ thống và khe hở quanh ống. Ngưỡng chỉ để tham khảo, kỹ sư kết cấu quyết định. Sàn / vách hình phức tạp chưa khoét được, app báo tên.
   - Tự báo **va chạm** ống đụng cột, ống giao cắt ống khác, và **cao thông thủy** thấp nhất. Xuất danh sách lỗ và va chạm ra CSV.
+- **Vẽ thêm trong 3D** (nút ✏ Vẽ hoặc phím `V`, cập nhật 19/11/2026): công cụ **Móng, Cột, Dầm, Sàn, Cầu thang, Cọc, Trục, Đường, Đường cong, Ghi chú**.
+  - Móng: bấm tâm móng, nhập b × l và độ dày (mặt trên móng ở mức vẽ, dày đi xuống). Cầu thang: bấm chân thang rồi điểm cuối, nhập bề rộng, chiều cao lên và chiều cao bậc; số bậc tự chia, bậc dựng đặc từ cao độ chân thang. Đường cong: bấm 3 điểm (đầu, một điểm trên cung, cuối), vẽ thành nét hoặc **dầm cong** (dầm cong là dầm thật, nhưng khoét lỗ MEP trên dầm cong chưa chính xác như dầm thẳng).
+  - **Mặt bằng chuẩn**: chọn cao độ mặt bằng ở ô *Mặt bằng chuẩn* (nền, các tầng; khi ghép nhiều mặt bằng thì lấy theo bảng tầng) hoặc nhập *Mức vẽ*; bật *Hiện mặt chuẩn* (tự hiện khi đang vẽ) để thấy mặt phẳng xanh trong 3D, **kéo tay nắm xanh** ở góc để dời mặt chuẩn lên xuống (hít vào cao độ các tầng, bước 50 mm).
+  - **Dời phần vẽ thêm**: chọn rồi kéo trên mô hình (hít lưới 50 mm và tim trục; giữ `Shift` để dời lên xuống, `Alt` để không hít), hoặc phím mũi tên / `PgUp` `PgDn` (thêm `Shift` bước 500 mm); cao độ mặt trên (Z) sửa được trong bảng bên phải. Chỉ dời được phần vẽ thêm; cấu kiện đọc từ bản vẽ gốc chưa dời tay được.
+  - Lưu vào bản vẽ thì hiện lại trên 2D và xuất DXF (lớp `AZB-MONG`, `AZB-THANG`...). Test hình học cung: `tests/test_ve_them_3d.py`.
 - **Hiện tên** cấu kiện (`L`), **xuất .glb** mở bằng SketchUp, Blender, Revit.
 - **Mặt cắt** (`C`) theo cao độ, **xuyên thấu** (`X`), **đo khoảng cách** (`M`), **chụp ảnh PNG**, **tự xoay** (`R`).
 

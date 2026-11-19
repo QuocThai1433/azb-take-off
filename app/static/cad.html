@@ -2052,9 +2052,18 @@ function veThem3D(f) {
   const rect = (cx, cy, b, h) => [[cx - b / 2, cy - h / 2], [cx + b / 2, cy - h / 2], [cx + b / 2, cy + h / 2], [cx - b / 2, cy + h / 2]];
   (v.them || []).forEach(m => {
     if (m.k === "cot") { const P = rect(m.x, m.y, m.b, m.h); vong(P, "#ff6b5e", "rgba(255,107,94,.35)"); chu(m.ten, m.x, m.y, "#fff"); }
+    else if (m.k === "mong") { const P = rect(m.x, m.y, m.b, m.h); vong(P, "#9aa3ad", "rgba(154,163,173,.35)"); chu(`${m.ten} ${Math.round(m.b * 1000)}x${Math.round(m.h * 1000)}`, m.x, m.y, "#e6ebf5"); }
+    else if (m.k === "thang") {
+      const dx = m.b[0] - m.a[0], dy = m.b[1] - m.a[1], L = Math.hypot(dx, dy) || 1, nx = -dy / L * m.w / 2, ny = dx / L * m.w / 2, n = Math.max(1, Math.round(m.rise / Math.max(m.bac, 0.05)));
+      const P = [[m.a[0] + nx, m.a[1] + ny], [m.b[0] + nx, m.b[1] + ny], [m.b[0] - nx, m.b[1] - ny], [m.a[0] - nx, m.a[1] - ny]];
+      vong(P, "#c9b79c", "rgba(201,183,156,.25)");
+      ctx.beginPath(); for (let i = 1; i < n; i++) { const cx = m.a[0] + dx * i / n, cy = m.a[1] + dy * i / n; ctx.moveTo(sx(cx + nx), sy(cy + ny)); ctx.lineTo(sx(cx - nx), sy(cy - ny)); }
+      ctx.moveTo(sx(m.a[0]), sy(m.a[1])); ctx.lineTo(sx(m.b[0]), sy(m.b[1])); ctx.strokeStyle = "#c9b79c"; ctx.lineWidth = 1; ctx.stroke();
+      chu(`${m.ten} ${n} bậc`, ...tam(P), "#f1e6d3");
+    }
     else if (m.k === "dam") {
       const dx = m.b[0] - m.a[0], dy = m.b[1] - m.a[1], L = Math.hypot(dx, dy) || 1, nx = -dy / L * m.w / 2, ny = dx / L * m.w / 2;
-      const P = [[m.a[0] + nx, m.a[1] + ny], [m.b[0] + nx, m.b[1] + ny], [m.b[0] - nx, m.b[1] - ny], [m.a[0] - nx, m.a[1] - ny]];
+      const P = m.cung && m.vong ? m.vong : [[m.a[0] + nx, m.a[1] + ny], [m.b[0] + nx, m.b[1] + ny], [m.b[0] - nx, m.b[1] - ny], [m.a[0] - nx, m.a[1] - ny]];
       vong(P, "#ffc447", "rgba(255,196,71,.3)"); chu(`${m.ten} ${Math.round(m.w * 1000)}x${Math.round(m.h * 1000)}`, ...tam(P), "#fff");
     }
     else if (m.k === "san") { const P = [[m.x0, m.y0], [m.x1, m.y0], [m.x1, m.y1], [m.x0, m.y1]]; vong(P, "#6fb4ff", "rgba(111,180,255,.18)"); chu(`${m.ten} d${Math.round(m.t * 1000)}`, ...tam(P), "#cfe6ff"); }

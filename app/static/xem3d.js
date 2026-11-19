@@ -17,6 +17,7 @@
     ong_pccc:{ten: "Ống PCCC", mau: 0xd946a8},
     khay_cap:{ten: "Khay cáp",  mau: 0xc9a46a},
     truc:   {ten: "Tim trục", mau: 0xe14b4b},
+    thang:  {ten: "Cầu thang", mau: 0xc9b79c},
     ve:     {ten: "Nét vẽ thêm", mau: 0xffd166},
     chu:    {ten: "Ghi chú",  mau: 0xffffff},
   };
@@ -135,6 +136,39 @@
     const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, nx = -dy / L * w / 2, ny = dx / L * w / 2;
     return [[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny]];
   }
+  // Cung tròn đi qua 3 điểm (đầu, điểm giữa bất kỳ trên cung, cuối): trả về dãy điểm; 3 điểm thẳng hàng thì trả về đoạn thẳng
+  function cungDiem(a, m, b) {
+    const [x1, y1] = a, [x2, y2] = m, [x3, y3] = b;
+    const D = 2 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
+    if (Math.abs(D) < 1e-9) return [a.slice(), b.slice()];
+    const s1 = x1 * x1 + y1 * y1, s2 = x2 * x2 + y2 * y2, s3 = x3 * x3 + y3 * y3;
+    const cx = (s1 * (y2 - y3) + s2 * (y3 - y1) + s3 * (y1 - y2)) / D, cy = (s1 * (x3 - x2) + s2 * (x1 - x3) + s3 * (x2 - x1)) / D;
+    const R = Math.hypot(x1 - cx, y1 - cy), TWO = 2 * Math.PI, norm = t => ((t % TWO) + TWO) % TWO;
+    const ta = Math.atan2(y1 - cy, x1 - cx);
+    let sweep = norm(Math.atan2(y3 - cy, x3 - cx) - ta);
+    if (norm(Math.atan2(y2 - cy, x2 - cx) - ta) > sweep) sweep -= TWO;   // điểm giữa không nằm trên chiều ngược kim đồng hồ: đi chiều kim đồng hồ
+    const n = Math.max(6, Math.ceil(Math.abs(sweep) / (Math.PI / 18)));
+    const P = Array.from({length: n + 1}, (_, i) => [cx + R * Math.cos(ta + sweep * i / n), cy + R * Math.sin(ta + sweep * i / n)]);
+    P[0] = a.slice(); P[n] = b.slice();
+    return P;
+  }
+  // Dầm cong: bề rộng w quanh đường tim P (dãy điểm), trả về một vòng kín
+  function vongDamCong(P, w) {
+    const L = [], R = [];
+    P.forEach((p, i) => {
+      const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)];
+      let tx = b[0] - a[0], ty = b[1] - a[1]; const l = Math.hypot(tx, ty) || 1; tx /= l; ty /= l;
+      L.push([p[0] - ty * w / 2, p[1] + tx * w / 2]); R.push([p[0] + ty * w / 2, p[1] - tx * w / 2]);
+    });
+    return L.concat(R.reverse());
+  }
+  // Đồng bộ phần vẽ thêm dạng cong (m.cung = [đầu, giữa, cuối]) với dãy điểm / vòng hình học của nó
+  function chinhCung(m) {
+    if (!m.cung) return;
+    const pts = cungDiem(m.cung[0], m.cung[1], m.cung[2]);
+    if (m.k === "duong") m.pts = pts;
+    else if (m.k === "dam") { m.a = m.cung[0].slice(); m.b = m.cung[2].slice(); m.vong = vongDamCong(pts, m.w); }
+  }
   const vongTron = (cx, cy, r, n = 14) => Array.from({length: n}, (_, i) => [cx + r * Math.cos(2 * Math.PI * i / n), cy + r * Math.sin(2 * Math.PI * i / n)]);
   function chuCai(i) { let s = ""; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
   const gom = (xs, tol) => {      // gộp các giá trị gần nhau (cột thẳng hàng) thành tim trục
@@ -216,9 +250,9 @@
       // liên kết, làm việc từng phần, tim trục, cọc, vẽ thêm
       tab: "dt", lv: null, tang: 1, noi: true, noiMm: 300, dungSai: 50, mauKhoi: false, matBang: false,
       mb: {}, mbRef: null, sua: {}, truc: {x: [], y: []}, them: [], cocCfg: {head: null, cut: null, L: 15},
-      ve: {tool: "cot", pts: [], b: 300, h: 300, w: 200, hd: 500, t: 120, d: 300, dir: "x", muc: null},
+      ve: {tool: "cot", pts: [], b: 300, h: 300, w: 200, hd: 500, t: 120, d: 300, dir: "x", muc: null, mgb: 1500, mgl: 1500, mgd: 500, tw: 1200, tz: Math.round(H * 1000), tb: 175, cl: "net"}, matChuan: false,
     };
-    st.loc.coc = st.loc.truc = st.loc.ve = st.loc.chu = true;
+    st.loc.coc = st.loc.truc = st.loc.ve = st.loc.chu = st.loc.thang = true;
     const KHOA = "azb-3d-" + (d.ten_file || "");
     const goiY = () => ({sua: st.sua, truc: st.truc, them: st.them, cocCfg: st.cocCfg, tang: st.tang, noi: st.noi, mb: st.mb, mbRef: st.mbRef});
     const dsMB = Array.isArray(d.mat_bang) && d.mat_bang.length ? d.mat_bang : null;   // nhiều mặt bằng (móng, các tầng) ghép thành một công trình
@@ -232,7 +266,7 @@
         if (j.noi != null) st.noi = j.noi;
       } catch (e) {}
     }
-    function luu() { try { localStorage.setItem(KHOA, JSON.stringify(goiY())); } catch (e) {} capLuu(); }
+    function luu() { st.them.forEach(chinhCung); try { localStorage.setItem(KHOA, JSON.stringify(goiY())); } catch (e) {} capLuu(); }
     const chuaLuuBV = () => JSON.stringify(goiY()) !== daLuuBV;
     function capLuu() {
       const b = lop.querySelector("#x3-luu"); if (!b) return;
@@ -634,6 +668,7 @@
       tinhLienKet();
       dungTruc();
       dungMatBang();
+      dungMat();
       if (st.chon && !objs.has(st.chon)) st.chon = null;
       if (st.lv && !objs.has(st.lv)) st.lv = null;
       dungNhan();
@@ -644,7 +679,8 @@
       const b0 = {id: m.id, ten: m.ten || m.id, nhan: "", layer: "Vẽ thêm trong 3D", nguon: "3D", canh_bao: [], loai_bo: false, moi: true, item: m};
       if (m.Z != null) { b0.Z = m.Z; b0.Hc = H; }
       if (m.k === "cot") return Object.assign(b0, {loai: "cot", thong_so: {}, hinh: [[vongHCN(m.x, m.y, m.b, m.h)]]});
-      if (m.k === "dam") return Object.assign(b0, {loai: "dam", thong_so: {h: m.h, b: m.w}, hinh: [[vongDam(m.a, m.b, m.w)]]});
+      if (m.k === "dam") return Object.assign(b0, {loai: "dam", thong_so: {h: m.h, b: m.w}, hinh: [[m.cung && m.vong ? m.vong : vongDam(m.a, m.b, m.w)]]});
+      if (m.k === "mong") { b0.Z = m.Z != null ? m.Z : 0; return Object.assign(b0, {loai: "mong", thong_so: {day: m.day}, hinh: [[vongHCN(m.x, m.y, m.b, m.h)]]}); }
       if (m.k === "san") return Object.assign(b0, {loai: "san", thong_so: {t: m.t}, hinh: [[[[m.x0, m.y0], [m.x1, m.y0], [m.x1, m.y1], [m.x0, m.y1]]]]});
       return null;
     }
@@ -653,7 +689,7 @@
       st.them.forEach(m => { const c = itemCK(m); if (c) ds.push(c); });
       soNoi = 0;
       // Hình "dầm" rộng hơn 1,2 m không phải một dầm mà là đường bao khung dầm / ô dầm: dựng thành khối đặc sẽ thành một tấm lớn, nên bỏ khỏi 3D
-      const ra = ds.filter(c => { if (c.loai !== "dam" || c.hinh.length < 1 || !c.hinh[0][0] || c.hinh[0][0].length < 3) return true; const r = dai_rong(lamSach(c.hinh[0][0])); return Math.min(r[0], r[1]) <= 1.2; });
+      const ra = ds.filter(c => { if (c.moi || c.loai !== "dam" || c.hinh.length < 1 || !c.hinh[0][0] || c.hinh[0][0].length < 3) return true; const r = dai_rong(lamSach(c.hinh[0][0])); return Math.min(r[0], r[1]) <= 1.2; });
       soKhungLon = ds.length - ra.length; ds.length = 0; ra.forEach(c => ds.push(c));
       return st.noi ? noiDam(ds) : ds;
     }
@@ -838,6 +874,23 @@
             o.meshes.push(mesh); nhomMain.add(mesh);
           }
           objs.set(m.id, o); nv++;
+        } else if (m.k === "thang") {
+          // Cầu thang: bậc đặc từ cao độ chân thang (m.Z) lên m.rise, chạy từ điểm a tới điểm b, rộng m.w
+          const z0 = m.Z != null ? m.Z : H, dx = m.b[0] - m.a[0], dy = m.b[1] - m.a[1], L = Math.hypot(dx, dy);
+          if (L < 1e-6) return;
+          const n = Math.max(1, Math.round(m.rise / Math.max(m.bac, 0.05))), dh = m.rise / n, dl = L / n, ux = dx / L, uy = dy / L, ang = Math.atan2(dy, dx);
+          const mat = new THREE.MeshStandardMaterial({color: LOAI.thang.mau, roughness: 0.8, emissive: 0x000000});
+          const o = {id: m.id, loai: "thang", ten: m.ten || m.id, dz: [z0, z0 + m.rise], meshes: [], edges: [], bo: false, coLoi: false, vol: 0, ck: null, mat, moi: true, item: m, lk: new Set()};
+          for (let i = 0; i < n; i++) {
+            const h = dh * (i + 1), geo = new THREE.BoxGeometry(dl, h, m.w), c = (i + 0.5) * dl;
+            const mesh = new THREE.Mesh(geo, mat); mesh.position.set(m.a[0] + ux * c, z0 + h / 2, -(m.a[1] + uy * c)); mesh.rotation.y = ang; mesh.userData.id = m.id;
+            mesh.castShadow = true; mesh.receiveShadow = true; o.meshes.push(mesh); nhomMain.add(mesh);
+            const vien = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({color: 0x07090e, transparent: true, opacity: 0.45}));
+            vien.position.copy(mesh.position); vien.rotation.copy(mesh.rotation); o.edges.push(vien); nhomMain.add(vien);
+            o.vol += dl * h * m.w;
+          }
+          o.nBac = n;
+          objs.set(m.id, o); const tg = tong.thang = tong.thang || {n: 0, v: 0}; tg.n++; tg.v += o.vol;
         } else if (m.k === "chu") {
           const mat = new THREE.MeshStandardMaterial({color: LOAI.ve.mau, roughness: 0.5, emissive: 0x000000});
           const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 8), mat); mesh.position.set(m.x, y + 0.1, -m.y); mesh.userData.id = m.id;
@@ -864,7 +917,7 @@
       nhan.forEach(n => n.el.remove()); nhan = [];
       if (!st.ten) return;
       let dem = 0;
-      ["cot", "dam", "vach", "san", "mong", "coc"].forEach(k => objs.forEach(o => {
+      ["cot", "dam", "vach", "san", "mong", "coc", "thang"].forEach(k => objs.forEach(o => {
         if (o.loai !== k || dem >= 250 || !o.meshes.length) return;
         const b = new THREE.Box3(); o.meshes.forEach(m => b.expandByObject(m));
         const c = b.getCenter(new THREE.Vector3()); c.y = b.max.y + 0.05;
@@ -1050,7 +1103,11 @@
       mk.position.set(p.x, y, -p.y); mk.renderOrder = 10; nhomVe.add(mk);
       let ring = null, open = null;
       if (t === "cot") ring = vongHCN(p.x, p.y, v.b / 1000, v.h / 1000);
+      else if (t === "mong") ring = vongHCN(p.x, p.y, v.mgb / 1000, v.mgl / 1000);
       else if (t === "coc") ring = vongTron(p.x, p.y, v.d / 2000, 20);
+      else if (t === "thang" && pts.length === 1) ring = vongDam(pts[0], [p.x, p.y], v.tw / 1000);
+      else if (t === "cong" && pts.length === 1) open = [pts[0], [p.x, p.y]];
+      else if (t === "cong" && pts.length === 2) open = cungDiem(pts[0], pts[1], [p.x, p.y]);
       else if (t === "dam" && pts.length === 1) ring = vongDam(pts[0], [p.x, p.y], v.w / 1000);
       else if (t === "san" && pts.length === 1) ring = [[pts[0][0], pts[0][1]], [p.x, pts[0][1]], [p.x, p.y], [pts[0][0], p.y]];
       else if (t === "duong" && pts.length) open = pts.concat([[p.x, p.y]]);
@@ -1062,23 +1119,38 @@
       if (ring) lin(ring, true);
       if (open) lin(open, false);
     }
-    const TIEN_TO = {cot: "CM", dam: "DM", san: "SM", coc: "PM", duong: "Nét ", chu: "GC"};
+    const TIEN_TO = {cot: "CM", dam: "DM", san: "SM", coc: "PM", mong: "MM", thang: "CT", duong: "Nét ", chu: "GC"};
     function themMoi(m) {
       ghiLui(); m.id = "moi" + (++seq);
-      if (m.k === "cot" || m.k === "dam" || m.k === "san") m.Z = mucY();
+      if (["cot", "dam", "san", "mong", "thang"].includes(m.k)) m.Z = mucY();
+      chinhCung(m);
       m.ten = TIEN_TO[m.k] + (st.them.filter(x => x.k === m.k).length + 1);
       st.them.push(m); luu(); dung(); ap(); st.chon = m.id; ap(); capNhatPn();
     }
     function xongDuong() {
       const v = st.ve;
-      if (v.tool === "duong" && v.pts.length >= 2) themMoi({k: "duong", pts: v.pts.slice(), muc: mucY()});
+      if (v.tool !== "duong") return;   // các công cụ khác tự kết thúc sau số điểm cố định
+      if (v.pts.length >= 2) themMoi({k: "duong", pts: v.pts.slice(), muc: mucY()});
       huyVe();
     }
     function veBam(p) {
       const v = st.ve, t = v.tool, mm = x => x / 1000;
       if (t === "cot") themMoi({k: "cot", x: p.x, y: p.y, b: mm(v.b), h: mm(v.h)});
       else if (t === "coc") themMoi({k: "coc", x: p.x, y: p.y, d: mm(v.d)});
-      else if (t === "dam" || t === "san") {
+      else if (t === "mong") themMoi({k: "mong", x: p.x, y: p.y, b: mm(v.mgb), h: mm(v.mgl), day: mm(v.mgd)});
+      else if (t === "thang") {
+        if (!v.pts.length) { v.pts = [[p.x, p.y]]; veGhost(p); return; }
+        const a = v.pts[0]; v.pts = []; xoaNhomVe();
+        if (Math.hypot(p.x - a[0], p.y - a[1]) < 0.1) return;
+        themMoi({k: "thang", a, b: [p.x, p.y], w: mm(v.tw), rise: mm(v.tz), bac: mm(v.tb)});
+      } else if (t === "cong") {
+        const l = v.pts[v.pts.length - 1]; if (l && Math.hypot(l[0] - p.x, l[1] - p.y) < 0.02) return;
+        v.pts.push([p.x, p.y]);
+        if (v.pts.length < 3) { veGhost(p); return; }
+        const c = v.pts.map(q => q.slice()); v.pts = []; xoaNhomVe();
+        if (v.cl === "dam") themMoi({k: "dam", cung: c, a: c[0], b: c[2], w: mm(v.w), h: mm(v.hd)});
+        else themMoi({k: "duong", cung: c, pts: [], muc: mucY()});
+      } else if (t === "dam" || t === "san") {
         if (!v.pts.length) { v.pts = [[p.x, p.y]]; veGhost(p); return; }
         const a = v.pts[0]; v.pts = []; xoaNhomVe();
         if (Math.hypot(p.x - a[0], p.y - a[1]) < 0.02) return;
@@ -1103,7 +1175,9 @@
     }
     const HUONG_DAN_VE = {
       cot: "Bấm 1 điểm để đặt cột (kích thước nhập bên dưới).", dam: "Bấm điểm đầu rồi điểm cuối của dầm.", san: "Bấm 2 góc đối diện của mảng sàn.",
-      coc: "Bấm vị trí đặt cọc (tự bắt tâm cọc / giao trục).", truc: "Bấm một điểm: dựng tim trục đi qua điểm đó.", duong: "Bấm các điểm của đường; nhấp đúp hoặc Enter để kết thúc.",
+      coc: "Bấm vị trí đặt cọc (tự bắt tâm cọc / giao trục).", mong: "Bấm 1 điểm để đặt móng (tâm móng; kích thước và độ dày nhập bên dưới, mặt trên móng ở mức vẽ).",
+      thang: "Bấm chân thang rồi điểm cuối của vế thang (chiều đi lên): bậc tự chia theo chiều cao lên và chiều cao bậc.",
+      cong: "Bấm 3 điểm: điểm đầu, một điểm bất kỳ trên cung, điểm cuối. Chọn dạng Nét vẽ hoặc Dầm cong ở bên dưới.", truc: "Bấm một điểm: dựng tim trục đi qua điểm đó.", duong: "Bấm các điểm của đường; nhấp đúp hoặc Enter để kết thúc.",
       chu: "Bấm vị trí rồi gõ nội dung ghi chú.",
     };
 
@@ -1113,6 +1187,7 @@
       r.domElement.style.cursor = on ? "crosshair" : "";
       diemDo = null; huyVe();
       if (on && k === "ve") { st.tab = "ve"; st.pn = true; }
+      dungMat(); veLai();
       capNhatPn();
     }
 
@@ -1138,6 +1213,119 @@
         tip.style.left = (e.clientX - bb.left + 14) + "px"; tip.style.top = (e.clientY - bb.top + 14) + "px"; tip.style.display = "block";
       } else tip.style.display = "none";
     });
+    // ---------- mặt bằng chuẩn: mặt phẳng ngang ở mức vẽ, có tay nắm xanh để kéo lên xuống ----------
+    const nhomMat = new THREE.Group(); scene.add(nhomMat);
+    function xoaNhomMat() { while (nhomMat.children.length) { const c = nhomMat.children.pop(); c.geometry && c.geometry.dispose(); c.material && c.material.dispose(); } xoaNhanPhu("matchuan"); }
+    function dungMat() {
+      xoaNhomMat();
+      if (!st.matChuan && st.cc !== "ve") return;
+      const [x0, y0, x1, y1] = khungMo, mg = Math.max(1, (x1 - x0 + y1 - y0) * 0.04), y = mucY(), cx = (x0 + x1) / 2, cz = -(y0 + y1) / 2, W = x1 - x0 + 2 * mg, D = y1 - y0 + 2 * mg;
+      const mp = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshBasicMaterial({color: 0x4cffb0, transparent: true, opacity: 0.1, side: THREE.DoubleSide, depthWrite: false}));
+      mp.rotation.x = -Math.PI / 2; mp.position.set(cx, y, cz); mp.renderOrder = 4; nhomMat.add(mp);
+      const vien = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([[-W / 2, -D / 2], [W / 2, -D / 2], [W / 2, D / 2], [-W / 2, D / 2]].map(q => new THREE.Vector3(cx + q[0], y, cz + q[1]))), new THREE.LineBasicMaterial({color: 0x4cffb0, transparent: true, opacity: 0.8}));
+      vien.renderOrder = 4; nhomMat.add(vien);
+      // tay nắm: quả cầu xanh + hai mũi tên lên / xuống ở góc mặt phẳng
+      const rr = Math.max(bk * 0.012, 0.14), hx = x1 + mg, hz = -(y0 - mg), vl = new THREE.MeshBasicMaterial({color: 0x4cffb0, depthTest: false});
+      const cau = new THREE.Mesh(new THREE.SphereGeometry(rr, 16, 12), vl); cau.position.set(hx, y, hz);
+      const len = new THREE.Mesh(new THREE.ConeGeometry(rr * 0.6, rr * 1.3, 12), vl); len.position.set(hx, y + rr * 1.8, hz);
+      const xuong = new THREE.Mesh(new THREE.ConeGeometry(rr * 0.6, rr * 1.3, 12), vl); xuong.position.set(hx, y - rr * 1.8, hz); xuong.rotation.x = Math.PI;
+      [cau, len, xuong].forEach(m => { m.userData.tay = true; m.renderOrder = 11; nhomMat.add(m); });
+      nhanPhu.push({k: "matchuan", o: {hien: true}, el: nhanHTML("x3-nh", `Mặt chuẩn ${y >= 0 ? "+" : ""}${f2(y, 2)} m`), p: new THREE.Vector3(hx, y + rr * 3.2, hz)});
+    }
+    const lamTronMuc = y => { const g = Math.round(y / 0.05) * 0.05, m = dsMuc().find(x => Math.abs(x.z - y) < 0.08); return +(m ? m.z : g).toFixed(3); };
+    // giao tia chuột với mặt phẳng thẳng đứng (hướng về camera) đi qua điểm p: lấy cao độ khi kéo lên xuống
+    function diemDung(e, p) {
+      const b = r.domElement.getBoundingClientRect();
+      pt.set(((e.clientX - b.left) / b.width) * 2 - 1, -((e.clientY - b.top) / b.height) * 2 + 1); ray.setFromCamera(pt, cam);
+      const n = new THREE.Vector3(); cam.getWorldDirection(n); n.y = 0; if (n.lengthSq() < 1e-6) return null; n.normalize();
+      const q = new THREE.Vector3(); return ray.ray.intersectPlane(new THREE.Plane().setFromNormalAndCoplanarPoint(n, p), q) ? q : null;
+    }
+    let keoMat = null;
+    r.domElement.addEventListener("pointerdown", e => {
+      if (e.button !== 0 || (st.cc && st.cc !== "ve") || !nhomMat.children.length) return;
+      const b = r.domElement.getBoundingClientRect();
+      pt.set(((e.clientX - b.left) / b.width) * 2 - 1, -((e.clientY - b.top) / b.height) * 2 + 1); ray.setFromCamera(pt, cam);
+      const hit = ray.intersectObjects(nhomMat.children.filter(c => c.userData.tay), false)[0]; if (!hit) return;
+      e.stopImmediatePropagation(); dk.enabled = false; keo = false;
+      keoMat = {p0: hit.object.position.clone(), y0: mucY(), moved: false, x0: e.clientX, y1: e.clientY};
+      try { r.domElement.setPointerCapture(e.pointerId); } catch (x) {}
+    }, true);
+    r.domElement.addEventListener("pointermove", e => {
+      if (!keoMat) return;
+      e.stopImmediatePropagation();
+      if (Math.hypot(e.clientX - keoMat.x0, e.clientY - keoMat.y1) > 3) keoMat.moved = true;
+      if (!keoMat.moved) return;
+      const q = diemDung(e, keoMat.p0); if (!q) return;
+      st.ve.muc = lamTronMuc(keoMat.y0 + (q.y - keoMat.p0.y)); dungMat(); veLai();
+      const bb = r.domElement.getBoundingClientRect();
+      tip.innerHTML = `<b>Mặt chuẩn</b> = ${f2(st.ve.muc, 2)} m`; tip.style.left = (e.clientX - bb.left + 14) + "px"; tip.style.top = (e.clientY - bb.top + 14) + "px"; tip.style.display = "block";
+    }, true);
+    // ---------- kéo cấu kiện vẽ thêm: chọn rồi kéo trên mô hình (Shift = lên xuống); phím mũi tên dời từng bước ----------
+    function dich(m, o, dx, dy, dz) {
+      const P = q => [q[0] + dx, q[1] + dy];
+      if (["cot", "coc", "chu", "mong"].includes(m.k)) { m.x = o.x + dx; m.y = o.y + dy; }
+      else if (m.k === "dam" || m.k === "thang") { m.a = P(o.a); m.b = P(o.b); }
+      else if (m.k === "san") { m.x0 = o.x0 + dx; m.y0 = o.y0 + dy; m.x1 = o.x1 + dx; m.y1 = o.y1 + dy; }
+      else if (m.k === "duong") m.pts = o.pts.map(P);
+      if (o.cung) m.cung = o.cung.map(P);
+      if (dz) {
+        if (m.k === "duong" || m.k === "chu") m.muc = +((o.muc != null ? o.muc : H) + dz).toFixed(3);
+        else if (m.k !== "coc") m.Z = +((o.Z != null ? o.Z : H) + dz).toFixed(3);
+      }
+    }
+    const diemTham = m => m.k === "dam" || m.k === "thang" ? m.a : m.k === "san" ? [m.x0, m.y0] : m.k === "duong" ? m.pts[0] : [m.x, m.y];
+    // hít điểm tham chiếu vào lưới 50 mm và vào tim trục gần (trong 100 mm)
+    function hitDich(v, hx, alt) {
+      if (alt) return v;
+      const tr = (st.truc[hx] || []).find(a => Math.abs(a.v - v) < 0.1); return tr ? tr.v : Math.round(v / 0.05) * 0.05;
+    }
+    let keoCK = null;
+    r.domElement.addEventListener("pointerdown", e => {
+      if (e.button !== 0 || st.cc) return;
+      const o = st.chon && objs.get(st.chon); if (!o || !(o.moi || (o.ck && o.ck.moi)) || o.truc) return;
+      const m = st.them.find(x => x.id === o.id); if (!m) return;
+      const hit = ban(e); if (!hit || hit.object.userData.id !== o.id) return;
+      e.stopImmediatePropagation(); dk.enabled = false; keo = false; dnx = e.clientX; dny = e.clientY;
+      ghiLui();
+      keoCK = {o, m, org: JSON.parse(JSON.stringify(m)), lenXuong: e.shiftKey && m.k !== "coc", p0: hit.point.clone(), x0: e.clientX, y0: e.clientY, moved: false, dx: 0, dy: 0, dz: 0,
+        pm: o.meshes.map(s => s.position.clone()), pe: o.edges.map(s => s.position.clone()), np: nhanPhu.filter(n => n.o === o).map(n => ({n, p: n.p.clone()}))};
+      try { r.domElement.setPointerCapture(e.pointerId); } catch (x) {}
+    }, true);
+    r.domElement.addEventListener("pointermove", e => {
+      if (!keoCK) return;
+      e.stopImmediatePropagation();
+      const k = keoCK;
+      if (Math.hypot(e.clientX - k.x0, e.clientY - k.y0) > 3) k.moved = true;
+      if (!k.moved) return;
+      if (k.lenXuong) {
+        const q = diemDung(e, k.p0); if (!q) return;
+        k.dz = Math.round((q.y - k.p0.y) / 0.05) * 0.05; k.dx = 0; k.dy = 0;
+      } else {
+        const q = diemNen(e, k.p0.y); if (!q) return;
+        const ref = diemTham(k.org), nx = hitDich(ref[0] + (q.x - k.p0.x), "x", e.altKey), ny = hitDich(ref[1] + (-q.z + k.p0.z), "y", e.altKey);
+        k.dx = nx - ref[0]; k.dy = ny - ref[1]; k.dz = 0;
+      }
+      k.o.meshes.forEach((s, i) => s.position.set(k.pm[i].x + k.dx, k.pm[i].y + k.dz, k.pm[i].z - k.dy));
+      k.o.edges.forEach((s, i) => s.position.set(k.pe[i].x + k.dx, k.pe[i].y + k.dz, k.pe[i].z - k.dy));
+      k.np.forEach(a => a.n.p.set(a.p.x + k.dx, a.p.y + k.dz, a.p.z - k.dy));
+      veLai(true);
+      const bb = r.domElement.getBoundingClientRect();
+      tip.innerHTML = `<b>${esc(k.m.ten || k.m.id)}</b> · ${k.lenXuong ? "dời lên xuống " + (k.dz >= 0 ? "+" : "") + f2(k.dz, 2) + " m" : `dời ${f2(k.dx, 3)} ; ${f2(k.dy, 3)} m`}`;
+      tip.style.left = (e.clientX - bb.left + 14) + "px"; tip.style.top = (e.clientY - bb.top + 14) + "px"; tip.style.display = "block";
+    }, true);
+    addEventListener("pointerup", () => {
+      if (keoMat) { const k = keoMat; keoMat = null; dk.enabled = true; tip.style.display = "none"; if (k.moved) keo = true; capNhatPn(); }
+      if (!keoCK) return;
+      const k = keoCK; keoCK = null; dk.enabled = true; tip.style.display = "none";
+      if (!k.moved || (!k.dx && !k.dy && !k.dz)) { lui.pop(); ap(); return; }
+      keo = true; dich(k.m, k.org, k.dx, k.dy, k.dz); luu(); dung(); ap(); capNhatPn();
+    });
+    function nhich(k, nhanh) {
+      const m = st.them.find(x => x.id === st.chon); if (!m) return false;
+      const b = nhanh ? 0.5 : 0.05, dx = k === "arrowleft" ? -b : k === "arrowright" ? b : 0, dy = k === "arrowup" ? b : k === "arrowdown" ? -b : 0, dz = k === "pageup" ? b : k === "pagedown" ? -b : 0;
+      ghiLui(); dich(m, JSON.parse(JSON.stringify(m)), dx, dy, dz); luu(); dung(); ap(); capNhatPn(); return true;
+    }
+
     // Kéo tim trục bằng chuột: bấm giữ vào trục rồi kéo, tự bắt vào mép / tâm cột, dầm, vách gần nhất
     let keoTruc = null;
     function giaTriBat(hx, v) {
@@ -1307,20 +1495,25 @@
           <div class="x3-row"><button data-a="xoa-moi">Xóa ghi chú</button></div>`;
       } else if (o.loai === "ve") {
         const m = o.item, L = m.pts.reduce((t, p, i) => i ? t + Math.hypot(p[0] - m.pts[i - 1][0], p[1] - m.pts[i - 1][1]) : 0, 0);
-        s = `<div class="x3-kv">${kvr("Số điểm", m.pts.length)}${kvr("Tổng dài", f2(L, 3) + " m")}${kvr("Cao độ", fN("mi", "muc", m.muc != null ? m.muc : H) + " m")}</div>
+        const cg = m.cung ? kvr("Điểm đầu X / Y", fN("mi", "c0x", m.cung[0][0]) + fN("mi", "c0y", m.cung[0][1])) + kvr("Điểm giữa X / Y", fN("mi", "c1x", m.cung[1][0]) + fN("mi", "c1y", m.cung[1][1])) + kvr("Điểm cuối X / Y", fN("mi", "c2x", m.cung[2][0]) + fN("mi", "c2y", m.cung[2][1])) : "";
+        s = `<div class="x3-kv">${cg}${kvr("Số điểm", m.pts.length)}${kvr("Tổng dài", f2(L, 3) + " m")}${kvr("Cao độ", fN("mi", "muc", m.muc != null ? m.muc : H) + " m")}</div>
           <div class="x3-row"><button data-a="xoa-moi">Xóa nét vẽ</button></div>`;
       } else if (o.duct) {
         s = `<div class="x3-kv">${kvr("Kích thước", `${f2(o.duct.o.rong * 1000, 0)} × ${f2(o.duct.o.cao * 1000, 0)} mm`)}${kvr("Dài", f2(o.duct.daiTrue.L) + " m")}${kvr("Cao độ", `${f2(o.dz[0])} → ${f2(o.dz[1])} m`)}</div>`;
       }
       // hình học của phần vẽ thêm: sửa được
-      const m = o.ck && o.ck.moi ? o.ck.item : (o.loai === "coc" && o.moi ? st.them.find(x => x.id === o.id) : null);
+      const m = o.ck && o.ck.moi ? o.ck.item : ((o.loai === "coc" || o.loai === "thang") && o.moi ? st.them.find(x => x.id === o.id) : null);
       if (m && m.k) {
         let f = "";
         if (m.k === "cot") f = kvr("Tâm X / Y", fN("mi", "x", m.x) + fN("mi", "y", m.y)) + kvr("b × h (mm)", fN("mi", "b", m.b, {mm: true}) + fN("mi", "h", m.h, {mm: true}));
         else if (m.k === "coc") f = kvr("Tâm X / Y", fN("mi", "x", m.x) + fN("mi", "y", m.y));
+        else if (m.k === "mong") f = kvr("Tâm X / Y", fN("mi", "x", m.x) + fN("mi", "y", m.y)) + kvr("b × l (mm)", fN("mi", "b", m.b, {mm: true}) + fN("mi", "h", m.h, {mm: true})) + kvr("Dày (mm)", fN("mi", "day", m.day, {mm: true}));
+        else if (m.k === "thang") f = kvr("Chân thang X / Y", fN("mi", "ax", m.a[0]) + fN("mi", "ay", m.a[1])) + kvr("Cuối thang X / Y", fN("mi", "bx", m.b[0]) + fN("mi", "by", m.b[1])) + kvr("Rộng (mm)", fN("mi", "w", m.w, {mm: true})) + kvr("Lên cao (mm)", fN("mi", "rise", m.rise, {mm: true})) + kvr("Bậc cao (mm)", fN("mi", "bac", m.bac, {mm: true})) + kvr("Số bậc", String(o.nBac || ""));
+        else if (m.k === "dam" && m.cung) f = kvr("Điểm đầu X / Y", fN("mi", "c0x", m.cung[0][0]) + fN("mi", "c0y", m.cung[0][1])) + kvr("Điểm giữa X / Y", fN("mi", "c1x", m.cung[1][0]) + fN("mi", "c1y", m.cung[1][1])) + kvr("Điểm cuối X / Y", fN("mi", "c2x", m.cung[2][0]) + fN("mi", "c2y", m.cung[2][1])) + kvr("Rộng b (mm)", fN("mi", "w", m.w, {mm: true})) + kvr("Cao h (mm)", fN("mi", "h", m.h, {mm: true}));
         else if (m.k === "dam") f = kvr("Đầu 1 X / Y", fN("mi", "ax", m.a[0]) + fN("mi", "ay", m.a[1])) + kvr("Đầu 2 X / Y", fN("mi", "bx", m.b[0]) + fN("mi", "by", m.b[1])) + kvr("Rộng b (mm)", fN("mi", "w", m.w, {mm: true})) + kvr("Cao h (mm)", fN("mi", "h", m.h, {mm: true}));
         else if (m.k === "san") f = kvr("Góc 1 X / Y", fN("mi", "x0", m.x0) + fN("mi", "y0", m.y0)) + kvr("Góc 2 X / Y", fN("mi", "x1", m.x1) + fN("mi", "y1", m.y1)) + kvr("Dày (mm)", fN("mi", "t", m.t, {mm: true}));
-        s += mauTieuDe("Phần vẽ thêm") + `<div class="x3-kv">${f}</div><div class="x3-row"><button data-a="xoa-moi">Xóa phần vẽ thêm này</button></div>`;
+        if (["cot", "dam", "san", "mong", "thang"].includes(m.k)) f += kvr("Cao độ mặt trên (Z)", fN("mi", "Z", m.Z != null ? m.Z : H) + " m");
+        s += mauTieuDe("Phần vẽ thêm") + `<div class="x3-kv">${f}</div><div class="x3-mut">Kéo khối này trên mô hình để dời; giữ Shift để dời lên xuống.</div><div class="x3-row"><button data-a="xoa-moi">Xóa phần vẽ thêm này</button></div>`;
       }
       return tang + s;
     }
@@ -1401,6 +1594,17 @@
         <div class="x3-mut" style="margin-top:4px">Tự động: cao độ cắt = đáy móng + 0,1 m; đầu cọc = cắt + 0,5 m. Phần cọc từ cao độ cắt lên đầu cọc tô đỏ mờ (đoạn phải đập bỏ).</div></div>`;
     }
 
+    // Các cao độ mặt bằng có thể chọn làm chuẩn: theo các mặt bằng đã ghép (hệ quy chiếu) hoặc nền + các tầng đang dựng
+    function dsMuc() {
+      const l = [];
+      if (dsMB) dsMB.forEach(p => { const c = st.mb[p.key]; if (c && isFinite(c.Z)) l.push({ten: p.ten + (c.hq ? " · " + c.hq : ""), z: +c.Z}); });
+      else { l.push({ten: "Nền / đỉnh móng", z: 0}); for (let k = 1; k <= Math.max(1, st.tang); k++) l.push({ten: "Mặt bằng tầng " + k, z: +(k * H).toFixed(3)}); }
+      return l.sort((a, b) => a.z - b.z);
+    }
+    function dsMucHTML() {
+      const cur = mucY(), ds = dsMuc(), kh = ds.findIndex(x => Math.abs(x.z - cur) < 1e-3);
+      return ds.map((x, i) => `<option value="${x.z}" ${i === kh ? "selected" : ""}>${esc(x.ten)} (${x.z >= 0 ? "+" : ""}${f2(x.z, 2)} m)</option>`).join("") + `<option value="" ${kh < 0 ? "selected" : ""}>Tùy chỉnh (${f2(cur, 2)} m)</option>`;
+    }
     function veHTML() {
       const v = st.ve, T = (k, ten) => `<button data-a="ve-${k}" class="${v.tool === k ? "on" : ""}">${ten}</button>`;
       const tsl = {
@@ -1408,22 +1612,28 @@
         dam: `Dầm b <input type="number" data-ve="w" value="${v.w}" step="50" min="50"> × h <input type="number" data-ve="hd" value="${v.hd}" step="50" min="50"> mm`,
         san: `Sàn dày <input type="number" data-ve="t" value="${v.t}" step="10" min="40"> mm`,
         coc: `Cọc D <input type="number" data-ve="d" value="${v.d}" step="50" min="50"> mm`,
+        mong: `Móng b × l <input type="number" data-ve="mgb" value="${v.mgb}" step="100" min="100"> × <input type="number" data-ve="mgl" value="${v.mgl}" step="100" min="100"> mm · dày <input type="number" data-ve="mgd" value="${v.mgd}" step="50" min="50"> mm`,
+        thang: `Thang rộng <input type="number" data-ve="tw" value="${v.tw}" step="100" min="300"> mm · lên cao <input type="number" data-ve="tz" value="${v.tz}" step="100" min="100"> mm · bậc cao <input type="number" data-ve="tb" value="${v.tb}" step="5" min="50"> mm`,
+        cong: `Vẽ thành <select data-ve="cl"><option value="net" ${v.cl === "net" ? "selected" : ""}>Nét đường cong</option><option value="dam" ${v.cl === "dam" ? "selected" : ""}>Dầm cong</option></select>${v.cl === "dam" ? ` · b <input type="number" data-ve="w" value="${v.w}" step="50" min="50"> × h <input type="number" data-ve="hd" value="${v.hd}" step="50" min="50"> mm` : ""}`,
         truc: `Hướng <select data-ve="dir"><option value="x" ${v.dir === "x" ? "selected" : ""}>Trục số (đường đứng)</option><option value="y" ${v.dir === "y" ? "selected" : ""}>Trục chữ (đường ngang)</option></select>`,
         duong: v.pts.length >= 2 ? '<button data-a="xong-duong">Kết thúc đường (Enter)</button>' : "", chu: "",
       };
       const n = st.them.length;
       return `<div class="x3-sec x3-ve"><h5>Vẽ thêm vào bản vẽ 3D</h5>
         <div class="x3-mut">Vẽ trực tiếp trên mặt phẳng ngang ở cao độ chọn dưới đây. Điểm tự bắt vào giao trục, góc cấu kiện, tâm cọc, lưới 50 mm. Phần vẽ thêm là cấu kiện thật: liên kết, khoét lỗ, chọn và sửa được như cấu kiện từ bản vẽ.</div>
-        <div class="x3-row" style="flex-wrap:wrap;margin-top:6px">${T("cot", "Cột")}${T("dam", "Dầm")}${T("san", "Sàn")}${T("coc", "Cọc")}${T("truc", "Trục")}${T("duong", "Đường")}${T("chu", "Ghi chú")}</div>
+        <div class="x3-row" style="flex-wrap:wrap;margin-top:6px">${T("mong", "Móng")}${T("cot", "Cột")}${T("dam", "Dầm")}${T("san", "Sàn")}${T("thang", "Cầu thang")}${T("coc", "Cọc")}${T("truc", "Trục")}${T("duong", "Đường")}${T("cong", "Đường cong")}${T("chu", "Ghi chú")}</div>
         <div class="x3-row" style="flex-wrap:wrap;gap:6px;margin-top:6px">${tsl[v.tool] || ""}</div>
+        <div class="x3-row" style="flex-wrap:wrap;gap:6px">Mặt bằng chuẩn <select data-ve="mucsel" title="Chọn cao độ mặt bằng làm chuẩn để vẽ">${dsMucHTML()}</select></div>
         <div class="x3-row">Mức vẽ (cao độ) <input type="number" data-ve="muc" step="0.1" value="${f2(mucY())}"> m <button data-a="muc-chon" style="height:24px" title="Lấy cao độ đỉnh cấu kiện đang chọn">⌖ Từ đối tượng chọn</button></div>
+        <div class="x3-row"><label><input type="checkbox" data-o="matChuan" ${st.matChuan ? "checked" : ""}>Hiện mặt chuẩn trong 3D (kéo tay nắm xanh để dời lên xuống)</label></div>
         <div class="x3-row" style="margin-top:6px"><button class="${st.cc === "ve" ? "cam" : ""}" data-a="bat-ve">${st.cc === "ve" ? "■ Dừng vẽ (Esc)" : "✏ Bắt đầu vẽ (V)"}</button><button data-a="hoan-tac" ${lui.length ? "" : "disabled"}>↶ Hoàn tác (Ctrl+Z)</button></div>
         ${st.cc === "ve" ? `<div class="x3-cb" style="border-color:#4cffb0;background:rgba(76,255,176,.08)">${HUONG_DAN_VE[v.tool]}</div>` : ""}</div>
         <div class="x3-sec"><h5>Đã vẽ thêm (${n})</h5>
-        ${n ? `<div style="max-height:200px;overflow:auto">${st.them.map(m => `<div class="x3-ho ${st.chon === m.id ? "sel" : ""}" data-go="${esc(m.id)}"><span><b>${esc(m.k === "chu" ? m.text : m.ten)}</b></span><span class="x3-chip" style="background:${m.k === "duong" || m.k === "chu" ? "#ffd166" : MAU_HEX(m.k === "dam" ? "dam" : m.k)}">${{cot: "Cột", dam: "Dầm", san: "Sàn", coc: "Cọc", duong: "Đường", chu: "Ghi chú"}[m.k]}</span></div>`).join("")}</div>` : '<div class="x3-mut">Chưa có.</div>'}
+        ${n ? `<div style="max-height:200px;overflow:auto">${st.them.map(m => `<div class="x3-ho ${st.chon === m.id ? "sel" : ""}" data-go="${esc(m.id)}"><span><b>${esc(m.k === "chu" ? m.text : m.ten)}</b></span><span class="x3-chip" style="background:${m.k === "duong" || m.k === "chu" ? "#ffd166" : MAU_HEX(m.k)}">${{cot: "Cột", dam: m.cung ? "Dầm cong" : "Dầm", san: "Sàn", coc: "Cọc", mong: "Móng", thang: "Thang", duong: m.cung ? "Đường cong" : "Đường", chu: "Ghi chú"}[m.k]}</span></div>`).join("")}</div>` : '<div class="x3-mut">Chưa có.</div>'}
         <div class="x3-row" style="flex-wrap:wrap;margin-top:6px"><button class="cam" data-a="luu-bv" ${d.luuVe3d ? "" : "disabled"}>💾 Lưu vào bản vẽ (Ctrl+S)</button><button data-a="dxf" ${n || st.truc.x.length + st.truc.y.length ? "" : "disabled"}>⬇ Xuất DXF phần vẽ thêm &amp; trục</button><button data-a="xoa-het-moi" ${n ? "" : "disabled"}>Xóa hết phần vẽ thêm</button></div>
+        <div class="x3-mut" style="margin-top:4px"><b>Di chuyển:</b> chọn một phần vẽ thêm rồi <b>kéo</b> nó trên mô hình (giữ <kbd>Shift</kbd> khi kéo để dời lên xuống), hoặc dùng phím mũi tên (<kbd>PgUp</kbd> / <kbd>PgDn</kbd> lên xuống; thêm <kbd>Shift</kbd> bước 500 mm). Giữ <kbd>Alt</kbd> khi kéo để không hít vào trục.</div>
         <div class="x3-mut" style="margin-top:4px">DXF dùng đúng đơn vị bản vẽ (${esc(d.don_vi || "mm")}), mở được trong AutoCAD để ghép vào bản vẽ gốc. Bản vẽ gốc không bị sửa.</div>
-        <div class="x3-mut" style="margin-top:4px"><b>Lưu vào bản vẽ</b>: ghi vào dự án và hiện lại trên bản vẽ 2D (cột, dầm, sàn, cọc, trục, đường, ghi chú), lần sau mở 3D vẫn còn.</div></div>`;
+        <div class="x3-mut" style="margin-top:4px"><b>Lưu vào bản vẽ</b>: ghi vào dự án và hiện lại trên bản vẽ 2D (móng, cột, dầm, sàn, cầu thang, cọc, trục, đường, đường cong, ghi chú), lần sau mở 3D vẫn còn.</div></div>`;
     }
 
     function mepHTML() {
@@ -1502,7 +1712,7 @@
       if (dd.l) { st.loc[dd.l] = t.checked; ap(); return; }
       if (dd.o) {
         const k = dd.o; st[k] = t.checked;
-        if (k === "noi") { luu(); dung(); ap(); } else if (k === "khoet") { dung(); ap(); } else ap();
+        if (k === "noi") { luu(); dung(); ap(); } else if (k === "khoet") { dung(); ap(); } else if (k === "matChuan") { dungMat(); ap(); } else ap();
         capNhatPn(); return;
       }
       if (dd.mbh != null) { const c = st.mb[dsMB[+dd.mbh].key]; ghiLui(); c.hien = t.checked; luu(); dung(); ap(); capNhatPn(); return; }
@@ -1528,7 +1738,9 @@
         if (dd.mi === "text") m.text = t.value;
         else {
           let v = parseFloat(t.value); if (!isFinite(v)) return; if (dd.mm) v /= 1000;
-          if (dd.mi === "ax") m.a[0] = v; else if (dd.mi === "ay") m.a[1] = v; else if (dd.mi === "bx") m.b[0] = v; else if (dd.mi === "by") m.b[1] = v; else m[dd.mi] = v;
+          const mc = /^c([012])([xy])$/.exec(dd.mi);
+          if (mc && m.cung) m.cung[+mc[1]][mc[2] === "x" ? 0 : 1] = v;
+          else if (dd.mi === "ax") m.a[0] = v; else if (dd.mi === "ay") m.a[1] = v; else if (dd.mi === "bx") m.b[0] = v; else if (dd.mi === "by") m.b[1] = v; else m[dd.mi] = v;
         }
         luu(); dung(); ap(); capNhatPn(); return;
       }
@@ -1547,7 +1759,9 @@
       }
       if (dd.ve) {
         if (dd.ve === "dir") st.ve.dir = t.value;
-        else { const v = parseFloat(t.value); if (!isFinite(v)) return; st.ve[dd.ve] = dd.ve === "muc" ? v : Math.max(10, v); }
+        else if (dd.ve === "cl") st.ve.cl = t.value;
+        else if (dd.ve === "mucsel") { if (t.value === "") return; st.ve.muc = parseFloat(t.value); dungMat(); veLai(); }
+        else { const v = parseFloat(t.value); if (!isFinite(v)) return; st.ve[dd.ve] = dd.ve === "muc" ? v : Math.max(10, v); if (dd.ve === "muc") { dungMat(); veLai(); } }
         capNhatPn(); return;
       }
       if (dd.mo) { st.mep[dd.mo].off = Math.max(0, parseFloat(t.value) || 0); dung(); ap(); capNhatPn(); return; }
@@ -1631,7 +1845,7 @@
       else if (k === "bat-ve") datCC(st.cc !== "ve", "ve");
       else if (k === "xong-duong") { xongDuong(); }
       else if (k === "hoan-tac") hoanTac();
-      else if (k === "muc-chon") { if (o) { st.ve.muc = +o.dz[1].toFixed(3); capNhatPn(); } }
+      else if (k === "muc-chon") { if (o) { st.ve.muc = +o.dz[1].toFixed(3); dungMat(); veLai(); capNhatPn(); } }
       else if (k === "dxf") xuatDXF();
       else if (k === "luu-bv") luuBanVe();
       else if (k === "xoa-het-moi") { if (confirm("Xóa hết cấu kiện và nét đã vẽ thêm?")) { ghiLui(); st.them = []; st.chon = null; luu(); dung(); ap(); capNhatPn(); } }
@@ -1673,7 +1887,14 @@
       const vong = (ly, P) => P.forEach((p, i) => dong(ly, p, P[(i + 1) % P.length]));
       st.them.forEach(m => {
         if (m.k === "cot") { vong(L("AZB-COT", 1), vongHCN(m.x, m.y, m.b, m.h)); chu("AZB-COT", [m.x, m.y], 0.15, m.ten); }
-        else if (m.k === "dam") { const P = vongDam(m.a, m.b, m.w); vong(L("AZB-DAM", 2), P); chu("AZB-DAM", [(m.a[0] + m.b[0]) / 2, (m.a[1] + m.b[1]) / 2], 0.15, `${m.ten} ${f2(m.w * 1000, 0)}x${f2(m.h * 1000, 0)}`); }
+        else if (m.k === "mong") { vong(L("AZB-MONG", 8), vongHCN(m.x, m.y, m.b, m.h)); chu("AZB-MONG", [m.x, m.y], 0.15, `${m.ten} ${f2(m.b * 1000, 0)}x${f2(m.h * 1000, 0)}x${f2(m.day * 1000, 0)}`); }
+        else if (m.k === "thang") {
+          const dx = m.b[0] - m.a[0], dy = m.b[1] - m.a[1], Lt = Math.hypot(dx, dy) || 1, n = Math.max(1, Math.round(m.rise / Math.max(m.bac, 0.05)));
+          vong(L("AZB-THANG", 3), vongDam(m.a, m.b, m.w));
+          for (let i = 1; i < n; i++) { const c = [m.a[0] + dx * i / n, m.a[1] + dy * i / n], nx = -dy / Lt * m.w / 2, ny = dx / Lt * m.w / 2; dong("AZB-THANG", [c[0] + nx, c[1] + ny], [c[0] - nx, c[1] - ny]); }
+          dong("AZB-THANG", m.a, m.b); chu("AZB-THANG", [(m.a[0] + m.b[0]) / 2, (m.a[1] + m.b[1]) / 2], 0.15, `${m.ten} ${n} bậc`);
+        }
+        else if (m.k === "dam") { const P = m.cung && m.vong ? m.vong : vongDam(m.a, m.b, m.w); vong(L("AZB-DAM", 2), P); chu("AZB-DAM", [(m.a[0] + m.b[0]) / 2, (m.a[1] + m.b[1]) / 2], 0.15, `${m.ten} ${f2(m.w * 1000, 0)}x${f2(m.h * 1000, 0)}`); }
         else if (m.k === "san") { vong(L("AZB-SAN", 5), [[m.x0, m.y0], [m.x1, m.y0], [m.x1, m.y1], [m.x0, m.y1]]); chu("AZB-SAN", [(m.x0 + m.x1) / 2, (m.y0 + m.y1) / 2], 0.15, `${m.ten} dày ${f2(m.t * 1000, 0)}`); }
         else if (m.k === "coc") { L("AZB-COC", 30); E.push(`0\nCIRCLE\n8\nAZB-COC\n10\n${so(m.x)}\n20\n${so(m.y)}\n30\n0\n40\n${so(m.d / 2)}\n`); chu("AZB-COC", [m.x + m.d / 2, m.y], 0.15, m.ten); }
         else if (m.k === "duong") { L("AZB-NET", 2); for (let i = 0; i + 1 < m.pts.length; i++) dong("AZB-NET", m.pts[i], m.pts[i + 1]); }
@@ -1750,7 +1971,8 @@
         <li><b>Cọc</b> (layer gán loại Cọc, hình tròn): đặt <b>cao độ đầu cọc</b>, <b>cao độ cắt cọc</b>, chiều dài L chung cho mọi cọc hoặc riêng từng cọc. Đoạn từ cao độ cắt lên đầu cọc tô đỏ mờ (phần phải đập bỏ), có thể tích cọc còn lại và phần cắt bỏ.</li>
         <li>Nút <b>▦ Mặt bằng</b>: nhìn từ trên, cắt ngang qua dầm và hiện nét 2D như bản vẽ mặt bằng; bật / tắt riêng ở lớp <i>Mặt bằng</i>.</li></ul>
         <h4>2d. Vẽ thêm trong 3D (nút ✏ Vẽ hoặc phím V)</h4><ul>
-        <li>Chọn công cụ: <b>Cột, Dầm, Sàn, Cọc, Trục, Đường, Ghi chú</b>, nhập kích thước, đặt <b>mức vẽ</b> (cao độ mặt phẳng vẽ) rồi bấm lên mô hình. Điểm tự bắt vào giao trục, góc cấu kiện, tâm cọc, lưới 50 mm. Đường: nhấp đúp hoặc Enter để kết thúc; chuột phải hoặc Esc hủy thao tác.</li>
+        <li>Chọn công cụ: <b>Móng, Cột, Dầm, Sàn, Cầu thang, Cọc, Trục, Đường, Đường cong, Ghi chú</b>, nhập kích thước, đặt <b>mức vẽ</b> (cao độ mặt phẳng vẽ) rồi bấm lên mô hình. Điểm tự bắt vào giao trục, góc cấu kiện, tâm cọc, lưới 50 mm. Đường: nhấp đúp hoặc Enter để kết thúc; chuột phải hoặc Esc hủy thao tác. <b>Móng</b>: bấm tâm móng (mặt trên ở mức vẽ, dày đi xuống). <b>Cầu thang</b>: bấm chân thang rồi điểm cuối, bậc tự chia theo chiều cao lên và chiều cao bậc. <b>Đường cong</b>: bấm 3 điểm (đầu, một điểm trên cung, cuối), vẽ thành nét hoặc dầm cong.</li>
+        <li><b>Mặt bằng chuẩn</b>: chọn cao độ mặt bằng (nền, các tầng) ở ô <i>Mặt bằng chuẩn</i> hoặc nhập mức vẽ; bật <i>Hiện mặt chuẩn</i> (tự hiện khi đang vẽ) để thấy mặt phẳng xanh trong 3D, <b>kéo tay nắm xanh</b> ở góc để dời nó lên xuống (hít vào cao độ các tầng và bước 50 mm). <b>Dời phần vẽ thêm</b>: chọn nó rồi kéo trên mô hình (giữ <kbd>Shift</kbd> để dời lên xuống, <kbd>Alt</kbd> để không hít vào trục / lưới) hoặc dùng phím mũi tên, <kbd>PgUp</kbd> / <kbd>PgDn</kbd>.</li>
         <li>Phần vẽ thêm là cấu kiện thật: liên kết, khoét lỗ, chọn và sửa số liệu được; <kbd>Delete</kbd> xóa, <kbd>Ctrl</kbd>+<kbd>Z</kbd> hoàn tác. Dữ liệu lưu theo bản vẽ trong trình duyệt; <b>Xuất DXF</b> để ghép vào bản vẽ gốc (bản vẽ gốc không bị sửa).</li></ul>
         <h4>3. Hệ thống MEP và khoét lỗ tự động</h4><ul>
         <li>Hiển thị: <b>ống gió</b>, <b>ống cấp thoát nước</b>, <b>ống PCCC</b> (tròn) và <b>khay cáp</b> (chữ nhật). Ở cột trái, gán layer tương ứng cho loại <i>Ống nước, Ống PCCC, Khay cáp</i> (app tự đoán theo tên layer). Kích thước đọc từ tên layer, ví dụ <kbd>P-WATER-D100</kbd>, <kbd>PCCC DN65</kbd>, <kbd>KHAY CAP 400x100</kbd>; không ghi thì dùng mặc định và sửa được ở bảng bên phải.</li>
@@ -1790,6 +2012,7 @@
         return;
       }
       if (k === "enter" && st.cc === "ve") { xongDuong(); return; }
+      if (st.chon && !st.cc && ["arrowleft", "arrowright", "arrowup", "arrowdown", "pageup", "pagedown"].includes(k) && nhich(k, e.shiftKey)) { e.preventDefault(); return; }
       if ((k === "delete" || k === "backspace") && st.chon && !st.cc) { xoaChon(); return; }
       if (k === "?" || (k === "/" && e.shiftKey)) moGD(gd.hidden);
       else if (k === "1") nhin("iso"); else if (k === "2") nhin("top"); else if (k === "3") nhin("front"); else if (k === "4") nhin("right"); else if (k === "f") nhin("fit");
@@ -1875,11 +2098,12 @@
 
     function dong() {
       chay = false; removeEventListener("resize", datLai); removeEventListener("keydown", phim); ro && ro.disconnect();
-      xoaMo(); xoaDo(); nhan.forEach(n => n.el.remove()); nhanPhu.forEach(n => n.el.remove());
+      xoaMo(); xoaDo(); xoaNhomMat(); nhan.forEach(n => n.el.remove()); nhanPhu.forEach(n => n.el.remove());
       if (nhomTruc) { scene.remove(nhomTruc); nhomTruc.traverse(o => { o.geometry && o.geometry.dispose(); o.material && o.material.dispose(); }); } [nenDat, luoi].forEach(o => { if (o) { o.geometry.dispose(); o.material.dispose(); } });
       scene.background && scene.background.dispose && scene.background.dispose();
       dk.dispose(); r.dispose(); lop.remove(); dang = null;
     }
     dang = {dong};
   };
+  window.xem3D.hinhHoc = {cungDiem, vongDamCong};   // hàm thuần, để test (tests/test_ve_them_3d.py)
 })();
