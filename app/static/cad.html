@@ -2747,7 +2747,7 @@ $("p-hq").addEventListener("click", e => {
   if (d.id === "hq-xoa-het") { h.luoi = {doc:[], ngang:[]}; h.goc = h.diem2 = null; h.fileId = null; S.hqKq = null; veHQ(); return veLai(); }
   if (d.dataset.hqThem) { const hx = d.dataset.hqThem, a = h.luoi[hx], ult = a.length ? a[a.length - 1].v : 0; a.push({ten:"", v:+(ult + 3).toFixed(3), tu:0, den:0, nguon_ten:"nhập tay"}); veHQ(); return; }
   if (d.dataset.hqXoa) { const [hx, i] = d.dataset.hqXoa.split(":"); h.luoi[hx].splice(+i, 1); veHQ(); return veLai(); }
-  if (d.id === "hq-bat-goc" || d.id === "hq-bat-d2") { S.hqChon = S.hqChon ? null : (d.id === "hq-bat-goc" ? "goc" : "diem2"); veHQ(); if (S.hqChon) lenh("Bấm vào giao của hai trục trên bản vẽ (Esc để hủy).", "ok"); return; }
+  if (d.id === "hq-bat-goc" || d.id === "hq-bat-d2") { S.hqTruc = false; S.hqChonVung = null; S.hqChon = S.hqChon ? null : (d.id === "hq-bat-goc" ? "goc" : "diem2"); veHQ(); if (S.hqChon) lenh("Bấm vào giao của hai trục trên bản vẽ (Esc để hủy).", "ok"); return; }
   if (d.id === "hq-bo-d2") { h.diem2 = null; veHQ(); return veLai(); }
   if (d.id === "hq-them-tang") { hqChenTang(); return; }
   if (d.id === "hq-mau") { h.tang = []; hqThemTang("MONG", "Móng", "mong", "-1.500"); hqThemTang("T1", "Tầng 1", "tang", "±0.000"); hqThemTang("T2", "Tầng 2", "tang", "+3.600"); hqThemTang("T3", "Tầng 3", "tang", "+7.200"); hqThemTang("MAI", "Mái", "mai", "+10.800"); veHQ(); return; }
@@ -2962,7 +2962,7 @@ $("p-hq").addEventListener("click", async e => {
     const i = S.hqSel, z = S.files[i] && hqHQ(S.files[i]); if (!z) return;
     if (d.dataset.hqVb === "xb") { z.diem_b = null; z.goc_local_b = null; return hqTinhCan(i); }
     if (S.act !== i) moFile(i);
-    S.hqChonVung = S.hqChonVung && S.hqChonVung.which === d.dataset.hqVb ? null : {i, which:d.dataset.hqVb}; S.hqChon = null; veHQ();
+    S.hqChonVung = S.hqChonVung && S.hqChonVung.which === d.dataset.hqVb ? null : {i, which:d.dataset.hqVb}; S.hqChon = null; S.hqTruc = false; veHQ();
     if (S.hqChonVung) lenh("Bấm vào giao trục trên bản vẽ (bắt dính vào giao trục đã dò, Esc để hủy).", "ok");
   }
 });
