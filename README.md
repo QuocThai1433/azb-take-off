@@ -95,6 +95,8 @@ Giới hạn: dầm nhận diện theo hình học trên mặt bằng; dầm v�
 
 **Dầm suy ra khi chỉ có các ô sàn (20/11/2026):** mặt bằng dầm sàn tầng 2 mẫu chỉ vẽ các ô, không có hình khung ngoài. Khi layer Khung dầm chỉ có ô (không hình nào chứa hình khác), `suy_dam` lấy khung bao quanh các ô nới `BE_RONG_BAO` = 200 mm mỗi phía làm dầm biên, kèm cảnh báo ước lượng. Test: `test_suy_dam_chi_co_cac_o_trong_khong_co_khung_ngoai`.
 
+**Cao cột khi dựng 3D theo hệ quy chiếu (20/11/2026):** cột, vách của tầng T dựng cao đúng chiều cao tầng trong bảng tầng (cờ `hqCao` trong `ghepMB`, hàm `khoiDoc` của `app/static/xem3d.js`). Trước đây cột lấy `cao` mặc định 3,6 m của cấu kiện nên cột tầng 1 chỉ cao 3,6 m và hở 0,6 m dưới sàn tầng 2 (cao 4,2 m).
+
 ## 3d. Gán layer chuẩn (tab "Gán layer")
 
 Gán layer là bước quyết định độ chính xác: layer gán sai thì khối lượng sai mà không có lỗi báo ra. Phần mềm gợi ý loại cho từng layer từ ba nguồn, theo thứ tự:

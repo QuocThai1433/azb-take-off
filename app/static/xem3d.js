@@ -189,7 +189,7 @@
   // ---------- chiều đứng từng loại ----------
   function khoiDoc(ck, H) {
     const ts = ck.thong_so || {}, Z = ck.Z != null ? ck.Z : H, Hc = ck.Hc != null ? ck.Hc : H;   // Z = cao độ mặt sàn của mặt bằng chứa cấu kiện, Hc = chiều cao tầng bên dưới
-    if (ck.loai === "cot" || ck.loai === "vach") return [Z - Hc, Z - Hc + (ts.cao || Hc)];
+    if (ck.loai === "cot" || ck.loai === "vach") return [Z - Hc, Z - Hc + (ck.hqCao ? Hc : (ts.cao || Hc))];   // dựng theo hệ quy chiếu: cột cao đúng chiều cao tầng trong bảng tầng, không dùng cao mặc định 3,6 m (20/11/2026)
     if (ck.loai === "dam") { const h = ts.h || 0.5, ht = ts.h_tinh != null ? ts.h_tinh : h; return [Z - h, Z - h + ht]; }
     if (ck.loai === "san") { const t = ts.t || 0.12; return [Z - t, Z]; }
     if (ck.loai === "tuong") { const z0 = ts.z0 || 0; return [Z - Hc + z0, Z - Hc + z0 + (ts.cao || Hc - z0)]; }
@@ -365,7 +365,7 @@
           const hq = x.c.hq ? x.p.hq : null, cotMong = !hq && x.c.loai === "mong" && c.loai === "cot";
           if (cotMong && coTang) return;   // đã có mặt bằng tầng chứa cột thật: cột trong mặt bằng móng chỉ là cột chờ
           // chưa có mặt bằng tầng: giữ cột của mặt bằng móng, dựng từ cao độ 0 lên một tầng
-          ck.push(Object.assign({}, c, {id: `${x.i}:${c.id}`, ten: c.ten + nhan, hinh: tt(c.hinh), Z: cotMong ? H : zHq(hq, x.c, c, "Z", Hc), Hc: cotMong ? H : zHq(hq, x.c, c, "Hc", Hc), mbi: x.i}));
+          ck.push(Object.assign({}, c, {id: `${x.i}:${c.id}`, ten: c.ten + nhan, hinh: tt(c.hinh), Z: cotMong ? H : zHq(hq, x.c, c, "Z", Hc), Hc: cotMong ? H : zHq(hq, x.c, c, "Hc", Hc), mbi: x.i, hqCao: !!(hq && hq.cao)}));
         });
         (x.p.coc || []).forEach(c => coc.push(Object.assign({}, c, {id: `${x.i}:${c.id}`, x: c.x + dx, y: c.y + dy, mbi: x.i})));
       });
