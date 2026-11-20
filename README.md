@@ -97,6 +97,8 @@ Giới hạn: dầm nhận diện theo hình học trên mặt bằng; dầm v�
 
 **Cao cột khi dựng 3D theo hệ quy chiếu (20/11/2026):** cột, vách của tầng T dựng cao đúng chiều cao tầng trong bảng tầng (cờ `hqCao` trong `ghepMB`, hàm `khoiDoc` của `app/static/xem3d.js`). Trước đây cột lấy `cao` mặc định 3,6 m của cấu kiện nên cột tầng 1 chỉ cao 3,6 m và hở 0,6 m dưới sàn tầng 2 (cao 4,2 m).
 
+**Căn vùng tự động chính xác hơn (20/11/2026):** "Dò trục + căn tự động" (`goi_y_diem_vung`, `app/he_quy_chieu.py`) không còn lấy trục đầu tiên trùng tên. Hàm `_chon_truc_khop` bỏ phiếu: mỗi trục của vùng trùng tên với lưới chuẩn cho một độ dời, độ dời nào được nhiều trục (1, 2, 3, 4, A, B) đồng ý nhất thắng (dung sai `DUNG_SAI_TRUC_BO_PHIEU` 50 mm). Nhờ đó đường trục cùng tên ở mặt cắt / chi tiết không làm lệch cả vùng (trước đây dầm sàn tầng 2 lệch 7213 mm, dầm sàn tầng 3 lệch 8475 mm). Kiểm tra chéo trong `tinh_can_vung` cũng chỉ xét đường khớp nhất khi có nhiều đường cùng tên. Trên 5 mặt bằng của LH-NOTT-CD-SH1 (cột tầng 1, 2, dầm sàn tầng 1, 2, 3) cả 6 trục đều lệch 0 mm. Test: `test_diem_can_bo_phieu_khong_bi_duong_cung_ten_lam_lech`, `test_kiem_tra_cheo_chi_xet_duong_khop_nhat_trong_cac_duong_cung_ten`.
+
 ## 3d. Gán layer chuẩn (tab "Gán layer")
 
 Gán layer là bước quyết định độ chính xác: layer gán sai thì khối lượng sai mà không có lỗi báo ra. Phần mềm gợi ý loại cho từng layer từ ba nguồn, theo thứ tự:

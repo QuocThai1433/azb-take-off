@@ -23,6 +23,7 @@ RE_CAO_DO = re.compile(r"^(?:EL\.?\s*|CAO\s*[ĐD][ỘO]\s*|CĐ\s*|COTE\s*)?(±|\
 
 DAI_TOI_THIEU = 1.0          # m - nét ngắn hơn không phải trục
 TY_LE_DAI_TOI_THIEU = 0.3    # nét trục ngắn hơn 30% nét trục dài nhất cùng hướng thì bỏ (vạch kích thước, ký hiệu)
+DUNG_SAI_TRUC_BO_PHIEU = 0.05   # m: hai độ dời trục coi là cùng một chỗ khi lệch nhau không quá 50 mm
 DUNG_SAI_GOP = 0.02          # m - hai nét trục cách nhau dưới mức này là một trục
 BAN_KINH_BONG = (0.08, 1.2)  # m - bán kính bong bóng tên trục hợp lệ
 TIM_TEN_XA = 2.5             # m - tìm chữ tên trục quanh đầu trục trong bán kính này (khi không có bong bóng)
@@ -376,6 +377,27 @@ DUNG_SAI_TRUC = 0.05          # m - trục của vùng lệch khỏi lưới chu
 DUNG_SAI_KHOANG_CACH = 0.05   # m - khoảng cách hai điểm căn ở vùng khác ở lưới chuẩn quá mức này thì cảnh báo
 
 
+def _chon_truc_khop(local, chuan, ten_uu_tien=None, dung_sai=DUNG_SAI_TRUC_BO_PHIEU):
+    """Chọn trục của vùng làm điểm căn theo cách bỏ phiếu: mỗi trục local trùng tên với trục chuẩn cho một độ dời
+    (vị trí chuẩn - vị trí local). Độ dời nào được nhiều trục cùng đồng ý nhất thì thắng, nên một đường khác cùng tên
+    (mặt cắt, chi tiết vẽ ở chỗ khác) không thể làm lệch cả vùng. Trả (trục local được chọn, số trục đồng ý)."""
+    cv = {str(t["ten"]): t["v"] for t in chuan}
+    ds = [(cv[str(t["ten"])] - t["v"], t) for t in local if str(t["ten"]) in cv]
+    if not ds:
+        return None, 0
+    nhom = []
+    for d, t in ds:
+        for g in nhom:
+            if abs(g["d"] - d) <= dung_sai:
+                g["ts"].append(t)
+                break
+        else:
+            nhom.append({"d": d, "ts": [t]})
+    tot = max(nhom, key=lambda g: (len({str(t["ten"]) for t in g["ts"]}), len(g["ts"])))
+    chon = next((t for t in tot["ts"] if str(t["ten"]) == str(ten_uu_tien)), tot["ts"][0])
+    return chon, len({str(t["ten"]) for t in tot["ts"]})
+
+
 def goi_y_diem_vung(ban_ve, vung, hqc_da_kiem):
     """Đề xuất điểm căn của một vùng: dò lưới trục trong vùng, nếu có trục trùng tên với lưới chuẩn thì lấy giao
     của trục trùng tên (ưu tiên trục của điểm gốc chuẩn). Trả {luoi, diem, goc_local, ly_do, canh_bao}."""
@@ -392,11 +414,14 @@ def goi_y_diem_vung(ban_ve, vung, hqc_da_kiem):
         out["canh_bao"].append("Tên trục trong vùng không trùng tên trục chuẩn: kiểm tra tên trục, hoặc chọn điểm căn bằng tay.")
         return out
     uu_tien = (hqc_da_kiem.get("goc") or {}).get("diem") or {}   # ưu tiên trục của điểm gốc chuẩn
-    a = next((t for t in chung["doc"] if str(t["ten"]) == str(uu_tien.get("doc"))), chung["doc"][0])
-    b = next((t for t in chung["ngang"] if str(t["ten"]) == str(uu_tien.get("ngang"))), chung["ngang"][0])
+    a, na = _chon_truc_khop(kq["doc"], luoi_c.get("doc") or [], uu_tien.get("doc"))
+    b, nb = _chon_truc_khop(kq["ngang"], luoi_c.get("ngang") or [], uu_tien.get("ngang"))
     out["diem"] = {"doc": a["ten"], "ngang": b["ten"]}
     out["goc_local"] = [a["v"], b["v"]]
-    out["ly_do"] = f"Trục {a['ten']} và {b['ten']} trong vùng trùng tên với lưới chuẩn."
+    out["ly_do"] = (f"Trục {a['ten']} và {b['ten']} trong vùng trùng tên với lưới chuẩn "
+                    f"(chọn vị trí khớp nhiều trục nhất: {na} trục dọc, {nb} trục ngang).")
+    if na < 2 or nb < 2:
+        out["canh_bao"].append("Chỉ khớp được rất ít trục với lưới chuẩn: kiểm tra điểm căn trên bản vẽ.")
     return out
 
 
@@ -437,11 +462,15 @@ def tinh_can_vung(hqc_da_kiem, diem, goc_local, diem_b=None, goc_local_b=None, l
     elif luoi_local:
         for hx, i in (("doc", 0), ("ngang", 1)):
             chuan = {str(t["ten"]): t["v"] for t in luoi.get(hx) or []}
+            tot = {}   # nhiều đường cùng tên (mặt cắt, chi tiết...): chỉ xét đường khớp nhất với lưới chuẩn
             for t in luoi_local.get(hx) or []:
                 ten = str(t.get("ten"))
                 if ten not in chuan:
                     continue
                 lech = round(t["v"] + dich[i] - chuan[ten], 4)
+                if ten not in tot or abs(lech) < abs(tot[ten]):
+                    tot[ten] = lech
+            for ten, lech in tot.items():
                 kt.append({"truc": ten, "huong": hx, "lech_mm": round(lech * 1000)})
                 if abs(lech) > DUNG_SAI_TRUC:
                     cb.append(f"Trục {ten} trong vùng lệch {abs(lech) * 1000:.0f} mm so với lưới chuẩn sau khi căn.")

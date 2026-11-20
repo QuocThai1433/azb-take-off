@@ -332,3 +332,24 @@ def test_api_tong_hop():
     d = {"hqc": _hqc(), "ds": [_vung(0, "T1", "T1", "cot_vach", [_ck("c", "cot", "C", _hcn(0, 0, 1, 1))])]}
     r = c.post("/api/he-quy-chieu/tong-hop", json=d)
     assert r.status_code == 200 and r.json()["tong"]["so_doi_tuong"] == 1
+
+
+def test_diem_can_bo_phieu_khong_bi_duong_cung_ten_lam_lech():
+    """Bản vẽ có thêm một đường tên '1' ở chỗ khác (mặt cắt, chi tiết): điểm căn phải lấy theo vị trí khớp nhiều trục
+    chuẩn nhất, không lấy đường '1' đầu tiên."""
+    from app.he_quy_chieu import _chon_truc_khop
+
+    chuan = [{"ten": "1", "v": 0.0}, {"ten": "2", "v": 3.4}, {"ten": "3", "v": 7.2}, {"ten": "4", "v": 10.9}]
+    local = [{"ten": "1", "v": 49.99},                      # đường '1' nhầm, đứng ngoài lưới
+             {"ten": "1", "v": 58.47}, {"ten": "2", "v": 61.87}, {"ten": "3", "v": 65.67}, {"ten": "4", "v": 69.37}]
+    t, n = _chon_truc_khop(local, chuan, "1")
+    assert t["v"] == 58.47 and n == 4
+
+
+def test_kiem_tra_cheo_chi_xet_duong_khop_nhat_trong_cac_duong_cung_ten():
+    from app.he_quy_chieu import tinh_can_vung
+
+    hqc = {"luoi": {"doc": [{"ten": "1", "v": 0.0}, {"ten": "2", "v": 3.4}], "ngang": [{"ten": "A", "v": 0.0}]}}
+    luoi_local = {"doc": [{"ten": "1", "v": 49.99}, {"ten": "1", "v": 58.47}, {"ten": "2", "v": 61.87}], "ngang": [{"ten": "A", "v": 26.5}]}
+    c = tinh_can_vung(hqc, {"doc": "1", "ngang": "A"}, [58.47, 26.5], luoi_local=luoi_local)
+    assert c["ok"] and not c["canh_bao"] and all(k["lech_mm"] == 0 for k in c["kiem_tra_truc"])
