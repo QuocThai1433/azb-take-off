@@ -968,12 +968,12 @@
     function apCanh() {   // đổi giữa giao diện chân thực và giao diện phân loại màu: chỉ làm khi trạng thái đổi
       const ct = !!st.chanThuc; if (daCT === ct) return; daCT = ct;
       if (ct && !vanBeTong) taoVanBeTong();
-      r.toneMapping = ct && !DBG.includes("notone") ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping; r.toneMappingExposure = 0.8;
+      r.toneMapping = ct && !DBG.includes("notone") ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping; r.toneMappingExposure = 0.85;
       r.outputEncoding = ct ? THREE.sRGBEncoding : THREE.LinearEncoding;
       scene.background = ct ? nenSang : nenToi;
       scene.fog.color.setHex(ct ? 0xc9d6e3 : 0x121827);
-      hemi.intensity = ct ? 0.75 : 0.85; hemi.color.setHex(ct ? 0xdfeaff : 0xdbe7ff); hemi.groundColor.setHex(ct ? 0x6f6a62 : 0x2b2f3a);
-      den.intensity = ct ? 1.5 : 0.95; bu.intensity = ct ? 0.3 : 0.25;
+      hemi.intensity = ct ? 0.55 : 0.85; hemi.color.setHex(ct ? 0xdfeaff : 0xdbe7ff); hemi.groundColor.setHex(ct ? 0x6f6a62 : 0x2b2f3a);
+      den.intensity = ct ? 2.0 : 0.95; bu.intensity = ct ? 0.3 : 0.25;
       objs.forEach(o => { o.edges.forEach(v => { const m = v.material; if (m.userData.op0 == null) m.userData.op0 = m.opacity; m.opacity = m.userData.op0 * (ct ? 0.32 : 1); }); if (o.mat) { o.mat.needsUpdate = true; } });
       if (nhomMain) datMoiTruong();
     }
@@ -1034,7 +1034,7 @@
       // mặt đất: ở cao độ chân công trình (thấp nhất của cột / dầm / sàn / tường), móng và cọc nằm dưới, nhìn xuyên qua mặt đất mờ
       let yDat = hop.min.y; { let m = 1e9; objs.forEach(o => { if (["cot", "dam", "san", "vach", "tuong"].includes(o.loai) && o.dz && !o.bo) m = Math.min(m, o.dz[0]); }); if (m < 1e8 && m > hop.min.y + 0.2) yDat = m - 0.2; }
       const ct = !!st.chanThuc, datMo = ct && st.matDat;
-      nenDat = new THREE.Mesh(new THREE.PlaneGeometry(bk * 8, bk * 8), datMo ? new THREE.MeshStandardMaterial({color: 0x6c6961, roughness: 1, metalness: 0, transparent: true, opacity: 0.5, depthWrite: false}) : new THREE.ShadowMaterial({opacity: ct ? 0.3 : 0.38}));
+      nenDat = new THREE.Mesh(new THREE.PlaneGeometry(bk * 8, bk * 8), datMo ? new THREE.MeshStandardMaterial({color: 0x6c6961, roughness: 1, metalness: 0, transparent: true, opacity: 0.32, depthWrite: false}) : new THREE.ShadowMaterial({opacity: ct ? 0.3 : 0.38}));
       nenDat.rotation.x = -Math.PI / 2; nenDat.position.set(tam.x, datMo ? yDat : hop.min.y - 0.012, tam.z); nenDat.receiveShadow = true; scene.add(nenDat);
       const n = Math.min(Math.ceil(bk * 3), 200);
       luoi = new THREE.GridHelper(Math.ceil(bk * 3), n, ct ? 0x8a929d : 0x4a5876, ct ? 0xa9afb8 : 0x2a3348);
