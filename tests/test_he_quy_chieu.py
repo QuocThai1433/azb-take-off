@@ -353,3 +353,19 @@ def test_kiem_tra_cheo_chi_xet_duong_khop_nhat_trong_cac_duong_cung_ten():
     luoi_local = {"doc": [{"ten": "1", "v": 49.99}, {"ten": "1", "v": 58.47}, {"ten": "2", "v": 61.87}], "ngang": [{"ten": "A", "v": 26.5}]}
     c = tinh_can_vung(hqc, {"doc": "1", "ngang": "A"}, [58.47, 26.5], luoi_local=luoi_local)
     assert c["ok"] and not c["canh_bao"] and all(k["lech_mm"] == 0 for k in c["kiem_tra_truc"])
+
+
+def test_tong_hop_bo_dam_rong_hon_1m2_la_khung_ghi_chu():
+    """Hình 'dầm' 5 x 2,5 m (khung ghi chú đọc nhầm) không vào tổng hợp; dầm thật 6 x 0,2 m vẫn vào."""
+    from app.he_quy_chieu import tong_hop_cong_trinh
+
+    hqc = {"goc": {"diem": {"doc": "1", "ngang": "A"}, "x": 0.0, "y": 0.0, "goc_quay": 0.0}, "luoi": {"doc": [{"ten": "1", "v": 0.0}], "ngang": [{"ten": "A", "v": 0.0}]},
+           "tang": [{"ma": "T1", "ten": "Tầng 1", "loai": "tang", "cao_do_kc": 0.0, "chieu_cao": 3.6}]}
+    def hcn(x0, y0, x1, y1):
+        return [[[[x0, y0], [x1, y0], [x1, y1], [x0, y1]]]]
+    ck = [{"id": "d1", "loai": "dam", "ten": "D1", "hinh": hcn(0, 0, 6, 0.2), "thong_so": {"h": 0.4}, "canh_bao": []},
+          {"id": "d2", "loai": "dam", "ten": "D2", "hinh": hcn(10, 0, 15, 2.5), "thong_so": {"h": 0.4}, "canh_bao": []}]
+    can = {"ok": True, "dich": [0, 0], "quay": 0, "tam": [0, 0]}
+    r = tong_hop_cong_trinh(hqc, [{"fi": 0, "ten": "mb", "tang": "T1", "cau_kien": "dam_san", "xac_nhan": True, "can": can, "ck": ck, "coc": []}])
+    ten = [o["ten"] for t in r["tang"] for n in t["nhom"] for o in n["doi_tuong"]]
+    assert ten == ["D1"] and any("rộng hơn" in b["ly_do"] for b in r["bo_qua"])

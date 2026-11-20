@@ -101,6 +101,8 @@ Giới hạn: dầm nhận diện theo hình học trên mặt bằng; dầm v�
 
 **Sửa lỗi mất mặt bằng khi khởi động lại (20/11/2026):** khi nạp lại dự án mà máy chủ chưa sẵn sàng (vừa khởi động, đọc bản vẽ lớn chậm) và nạp bản vẽ lỗi tạm thời, hàm `nap` (`app/static/cad.html`) chỉ giữ **mục đầu tiên** dùng bản vẽ đó, bỏ cả chục mục mặt bằng còn lại rồi tự lưu đè, nên dự án chỉ còn 1 mục. Nay `nap` thử lại 3 lần (cách 4 giây) và nếu vẫn lỗi tạm thời thì giữ **mọi** mục cùng bản vẽ, báo cách tải lại trang. Lấy lại dự án đã mất: nút *Sao lưu* chọn bản gần nhất, hoặc API `/api/du-an/khoi-phuc`.
 
+**Bảng tổng hợp bỏ hình 'dầm' rộng hơn 1,2 m (20/11/2026):** hình có cạnh ngắn rộng hơn `BE_RONG_DAM_TOI_DA` = 1,2 m trong `tong_hop_cong_trinh` (`app/he_quy_chieu.py`) là khung ghi chú / đường bao khung dầm bị đọc nhầm, không đưa vào tổng hợp (3D vốn đã bỏ), nên không tính sai khối lượng dầm; số bị bỏ hiện ở mục `bo_qua`. Test: `test_tong_hop_bo_dam_rong_hon_1m2_la_khung_ghi_chu`.
+
 ## 3d. Gán layer chuẩn (tab "Gán layer")
 
 Gán layer là bước quyết định độ chính xác: layer gán sai thì khối lượng sai mà không có lỗi báo ra. Phần mềm gợi ý loại cho từng layer từ ba nguồn, theo thứ tự:

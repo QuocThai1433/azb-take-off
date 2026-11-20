@@ -24,6 +24,7 @@ RE_CAO_DO = re.compile(r"^(?:EL\.?\s*|CAO\s*[ĐD][ỘO]\s*|CĐ\s*|COTE\s*)?(±|\
 DAI_TOI_THIEU = 1.0          # m - nét ngắn hơn không phải trục
 TY_LE_DAI_TOI_THIEU = 0.3    # nét trục ngắn hơn 30% nét trục dài nhất cùng hướng thì bỏ (vạch kích thước, ký hiệu)
 DUNG_SAI_TRUC_BO_PHIEU = 0.05   # m: hai độ dời trục coi là cùng một chỗ khi lệch nhau không quá 50 mm
+BE_RONG_DAM_TOI_DA = 1.2      # m - "dầm" có cạnh ngắn rộng hơn mức này là đường bao khung / ô dầm / khung ghi chú bị đọc nhầm, không đưa vào tổng hợp (3D cũng bỏ)
 DUNG_SAI_GOP = 0.02          # m - hai nét trục cách nhau dưới mức này là một trục
 BAN_KINH_BONG = (0.08, 1.2)  # m - bán kính bong bóng tên trục hợp lệ
 TIM_TEN_XA = 2.5             # m - tìm chữ tên trục quanh đầu trục trong bán kính này (khi không có bong bóng)
@@ -608,7 +609,7 @@ def tong_hop_cong_trinh(hqc_da_kiem, ds_vung):
         coc = [{"id": c["id"], "loai": "coc", "ten": c["ten"], "layer": c.get("layer", ""), "thong_so": {"d": c.get("d")},
                 "hinh": [[[[c["x"] + math.cos(k * math.pi / 8) * c["d"] / 2, c["y"] + math.sin(k * math.pi / 8) * c["d"] / 2] for k in range(16)]]],
                 "canh_bao": []} for c in v.get("coc") or []]
-        so_bo = 0
+        so_bo = so_dam_rong = 0
         for c in doi_tuong + coc:
             if c.get("loai_bo"):
                 continue
@@ -623,6 +624,9 @@ def tong_hop_cong_trinh(hqc_da_kiem, ds_vung):
             ct = lambda x, y, can=can: ap_phep_vung(can, hqc_da_kiem, x, y)
             cx, cy = g.centroid.x, g.centroid.y
             kt = _kich_thuoc(g)
+            if c["loai"] == "dam" and len(kt) >= 2 and kt[1] > BE_RONG_DAM_TOI_DA:
+                so_dam_rong += 1
+                continue
             z_day, z_dinh, ghi = _cao_do(c["loai"], c.get("thong_so"), tang)
             dien_tich = round(g.area, 4)
             the_tich = round(dien_tich * (z_dinh - z_day), 4) if z_day is not None and z_dinh is not None else None
@@ -636,6 +640,8 @@ def tong_hop_cong_trinh(hqc_da_kiem, ds_vung):
             theo_tang.setdefault(tang["ma"], {}).setdefault(nhom, []).append(o)
         if so_bo:
             bo_qua.append({"vung": ten_v, "so": so_bo, "ly_do": f"khác loại khai báo ({CAU_KIEN.get(khai_bao, khai_bao)})"})
+        if so_dam_rong:
+            bo_qua.append({"vung": ten_v, "so": so_dam_rong, "ly_do": f"hình 'dầm' rộng hơn {BE_RONG_DAM_TOI_DA} m (khung ghi chú, đường bao khung dầm)"})
     tang_ds = []
     for ma, d in sorted(tang_theo_ma.items(), key=lambda kv: kv[1]["cao_do_kc"] if kv[1]["cao_do_kc"] is not None else 1e9):
         if ma not in theo_tang:
