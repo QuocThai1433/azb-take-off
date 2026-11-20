@@ -244,6 +244,7 @@
     const st = {
       loc: {cot: true, dam: true, san: true, mong: true, vach: true, tuong: true, cua: true, mai: true, ong_gio: true, ong_nuoc: true, ong_pccc: true, khay_cap: true},
       xray: false, bong: true, luoi: true, xoay: false, canhBao: false, ten: false,
+      chanThuc: true, sanTrong: false, matDat: true,   // giao diện chân thực (bê tông có vân, ánh sáng môi trường, nền trời), sàn đặc, mặt đất mờ
       khoet: true, hoMm: 25, tt: 2.4, mep: {},
       cat: false, catY: 0, an: new Set(), co: null, chon: null, ruoi: null, cc: null,
       pn: innerWidth > 900, dem: [],
@@ -507,6 +508,30 @@
     r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
     r.shadowMap.autoUpdate = false;   // bóng của khối tĩnh: chỉ tính lại khi mô hình đổi, không tính lại mỗi khung hình
     kg.insertBefore(r.domElement, kg.firstChild);
+    // ---------- giao diện chân thực (20/11/2026): ánh sáng môi trường, tone mapping, vân bê tông, nền trời ----------
+    const nenSangCv = document.createElement("canvas"); nenSangCv.width = 2; nenSangCv.height = 256;
+    { const g = nenSangCv.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, "#5f8fc9"); gr.addColorStop(.5, "#b9d0e8"); gr.addColorStop(.72, "#e4ebf2"); gr.addColorStop(1, "#e4ebf2"); g.fillStyle = gr; g.fillRect(0, 0, 2, 256); }
+    const nenToi = scene.background, nenSang = new THREE.CanvasTexture(nenSangCv); nenSang.encoding = THREE.sRGBEncoding;
+    let moiTruong = null, vanBeTong = null, vanBump = null, daCT = null;
+    function taoMoiTruong() {   // môi trường phản chiếu dựng bằng mã (không cần tải file HDR): vòm trời + mặt trời + vài tấm sáng
+      const es = new THREE.Scene();
+      es.add(new THREE.Mesh(new THREE.SphereGeometry(40, 32, 16), new THREE.ShaderMaterial({side: THREE.BackSide,
+        vertexShader: "varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+        fragmentShader: "varying vec3 vP; void main(){ float h = normalize(vP).y; vec3 top = vec3(0.38,0.58,0.88), hor = vec3(0.92,0.94,0.96), bot = vec3(0.30,0.29,0.28); vec3 c = h > 0.0 ? mix(hor, top, pow(h, 0.55)) : mix(hor, bot, pow(-h, 0.45)); gl_FragColor = vec4(c * 1.5, 1.0); }"})));
+      const sang = (rong, cao, x, y, z, k) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(rong, cao), new THREE.MeshBasicMaterial({color: new THREE.Color(k, k * .95, k * .85), side: THREE.DoubleSide})); m.position.set(x, y, z); m.lookAt(0, 0, 0); es.add(m); };
+      sang(14, 9, 22, 26, 14, 9); sang(18, 5, -26, 14, -10, 2.2); sang(30, 4, 0, 6, -34, 1.4);
+      const pm = new THREE.PMREMGenerator(r); const rt = pm.fromScene(es, 0.03); pm.dispose();
+      es.traverse(o => { o.geometry && o.geometry.dispose(); o.material && o.material.dispose(); });
+      return rt.texture;
+    }
+    function taoVanBeTong() {   // vân bê tông: nhiễu mịn + vài vệt loang, lặp mỗi 1 m
+      const mk = (lo, hi) => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d"), im = g.createImageData(256, 256);
+        for (let i = 0; i < 256 * 256; i++) { const x = i % 256, y = (i / 256) | 0, loang = Math.sin(x * 0.045) * Math.cos(y * 0.037) * 0.5 + Math.sin(x * 0.011 + y * 0.017) * 0.5;
+          const v = lo + (hi - lo) * Math.min(1, Math.max(0, 0.5 + 0.28 * loang + (Math.random() - 0.5) * 0.55)); im.data[i * 4] = im.data[i * 4 + 1] = im.data[i * 4 + 2] = v; im.data[i * 4 + 3] = 255; }
+        g.putImageData(im, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t; };
+      vanBeTong = mk(205, 255); vanBeTong.encoding = THREE.sRGBEncoding; vanBump = mk(60, 200);
+    }
+    const MAU_THAT = {cot: 0xcdc8bf, dam: 0xd6d2ca, san: 0xe2dfd8, mong: 0xaaa7a0, coc: 0xb9b5ad, vach: 0xd1cdc5, tuong: 0xebe3d2, mai: 0xb0604a};   // màu bê tông / vữa / ngói khi ở chế độ chân thực
     const cam = new THREE.PerspectiveCamera(40, 1, 0.1, 5000);
     const dk = new THREE.OrbitControls(cam, r.domElement);
     dk.enableDamping = true; dk.dampingFactor = 0.08; dk.rotateSpeed = 0.8; dk.maxPolarAngle = Math.PI / 2 - 0.02;
@@ -951,7 +976,20 @@
       [truoc, st.ruoi].forEach(id => { const o = id && objs.get(id); if (o) apMot(o, sel0); });
       veLai(false);
     }
+    function apCanh() {   // đổi giữa giao diện chân thực và giao diện phân loại màu: chỉ làm khi trạng thái đổi
+      const ct = !!st.chanThuc; if (daCT === ct) return; daCT = ct;
+      if (ct && !moiTruong) { moiTruong = taoMoiTruong(); taoVanBeTong(); }
+      r.toneMapping = ct ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping; r.toneMappingExposure = 1.05;
+      r.outputEncoding = ct ? THREE.sRGBEncoding : THREE.LinearEncoding;
+      scene.background = ct ? nenSang : nenToi; scene.environment = ct ? moiTruong : null;
+      scene.fog.color.setHex(ct ? 0xe4ebf2 : 0x121827);
+      hemi.intensity = ct ? 0.35 : 0.85; hemi.color.setHex(ct ? 0xeaf1ff : 0xdbe7ff); hemi.groundColor.setHex(ct ? 0x8a867e : 0x2b2f3a);
+      den.intensity = ct ? 2.1 : 0.95; bu.intensity = ct ? 0.35 : 0.25;
+      objs.forEach(o => { o.edges.forEach(v => { const m = v.material; if (m.userData.op0 == null) m.userData.op0 = m.opacity; m.opacity = m.userData.op0 * (ct ? 0.32 : 1); }); if (o.mat) { o.mat.needsUpdate = true; } });
+      if (nhomMain) datMoiTruong();
+    }
     function ap() {
+      apCanh();
       veLai();
       const sel0 = st.chon && objs.get(st.chon);
       objs.forEach(o => apMot(o, sel0));
@@ -966,9 +1004,14 @@
         const mat = o.mat; if (!mat) return;
         const loiMau = MEPK.includes(o.loai) ? o.va : (st.canhBao && o.coLoi) || o.va;
         const mauBT = st.mauKhoi && BE_TONG.includes(o.loai) && o.loai !== "coc" ? 0xaeb4bd : LOAI[o.loai].mau;
-        mat.color.setHex(o.bo ? 0x555b66 : loiMau ? 0xff3b3b : mauBT);
+        const that = !!st.chanThuc && MAU_THAT[o.loai] != null && !MEPK.includes(o.loai);
+        mat.color.setHex(o.bo ? 0x555b66 : loiMau ? 0xff3b3b : that ? MAU_THAT[o.loai] : mauBT);
+        if (that) {   // bê tông / vữa có vân và độ nhám cao; chỉ đổi khi chế độ đổi để không biên dịch lại shader
+          if (!mat.userData.that) { mat.userData.that = true; mat.map = vanBeTong; mat.bumpMap = vanBump; mat.bumpScale = 0.9; mat.roughness = 0.93; mat.metalness = 0; mat.needsUpdate = true; }
+        } else if (mat.userData.that) { mat.userData.that = false; mat.map = null; mat.bumpMap = null; mat.roughness = 0.62; mat.metalness = 0.05; mat.needsUpdate = true; }
         const tr0 = mat.transparent;
         if (st.xray) { mat.transparent = true; mat.opacity = 0.22; mat.depthWrite = false; }
+        else if (o.loai === "san" && st.chanThuc && !st.sanTrong) { mat.transparent = false; mat.opacity = 1; mat.depthWrite = true; }
         else if (o.loai === "san") { mat.transparent = true; mat.opacity = 0.42; mat.depthWrite = false; }
         else if (o.loai === "cua") { mat.transparent = true; mat.opacity = 0.45; mat.depthWrite = false; }
         else if (o.bo) { mat.transparent = true; mat.opacity = 0.25; mat.depthWrite = false; }
@@ -980,7 +1023,7 @@
         if (st.chon === o.id) ganEmi(o, 0xffd166, 0.55); else if (st.ruoi === o.id) ganEmi(o, 0x4c9aff, 0.35);
         else if (sel0 && sel0.lk && sel0.lk.has(o.id)) ganEmi(o, 0x4c9aff, 0.22); else ganEmi(o, 0x000000, 0);
         if (tr0 !== mat.transparent) mat.needsUpdate = true;
-        o.meshes.forEach(m => m.castShadow = st.bong && !st.xray && o.loai !== "san" && !o.bo);
+        o.meshes.forEach(m => m.castShadow = st.bong && !st.xray && (o.loai !== "san" || (st.chanThuc && !st.sanTrong)) && !o.bo);
       }
     }
     function apChung() {
@@ -999,11 +1042,14 @@
       bk = Math.max(kich.x, kich.z, kich.y, 1);
       if (nenDat) { scene.remove(nenDat); nenDat.geometry.dispose(); nenDat.material.dispose(); }
       if (luoi) { scene.remove(luoi); luoi.geometry.dispose(); luoi.material.dispose(); }
-      nenDat = new THREE.Mesh(new THREE.PlaneGeometry(bk * 8, bk * 8), new THREE.ShadowMaterial({opacity: 0.38}));
-      nenDat.rotation.x = -Math.PI / 2; nenDat.position.set(tam.x, hop.min.y - 0.012, tam.z); nenDat.receiveShadow = true; scene.add(nenDat);
+      // mặt đất: ở cao độ chân công trình (thấp nhất của cột / dầm / sàn / tường), móng và cọc nằm dưới, nhìn xuyên qua mặt đất mờ
+      let yDat = hop.min.y; { let m = 1e9; objs.forEach(o => { if (["cot", "dam", "san", "vach", "tuong"].includes(o.loai) && o.dz && !o.bo) m = Math.min(m, o.dz[0]); }); if (m < 1e8 && m > hop.min.y + 0.2) yDat = m - 0.2; }
+      const ct = !!st.chanThuc, datMo = ct && st.matDat;
+      nenDat = new THREE.Mesh(new THREE.PlaneGeometry(bk * 8, bk * 8), datMo ? new THREE.MeshStandardMaterial({color: 0xb7b3a9, roughness: 1, metalness: 0, transparent: true, opacity: 0.6, depthWrite: false}) : new THREE.ShadowMaterial({opacity: ct ? 0.3 : 0.38}));
+      nenDat.rotation.x = -Math.PI / 2; nenDat.position.set(tam.x, datMo ? yDat : hop.min.y - 0.012, tam.z); nenDat.receiveShadow = true; scene.add(nenDat);
       const n = Math.min(Math.ceil(bk * 3), 200);
-      luoi = new THREE.GridHelper(Math.ceil(bk * 3), n, 0x4a5876, 0x2a3348);
-      luoi.material.transparent = true; luoi.material.opacity = 0.55; luoi.position.set(tam.x, hop.min.y - 0.01, tam.z); scene.add(luoi);
+      luoi = new THREE.GridHelper(Math.ceil(bk * 3), n, ct ? 0x8a929d : 0x4a5876, ct ? 0xa9afb8 : 0x2a3348);
+      luoi.material.transparent = true; luoi.material.opacity = ct ? 0.35 : 0.55; luoi.position.set(tam.x, (datMo ? yDat : hop.min.y) + 0.004, tam.z); scene.add(luoi);
       scene.fog.near = bk * 2.2; scene.fog.far = bk * 6;
       den.position.set(tam.x + bk * 0.7, hop.max.y + bk * 1.1, tam.z + bk * 0.5); den.target.position.copy(tam);
       bu.position.set(tam.x - bk, hop.max.y + bk * 0.4, tam.z - bk * 0.8);
@@ -1691,6 +1737,9 @@
 
     function moHinhHTML() {
       let s = `<div class="x3-sec"><h5>Hiển thị</h5>
+        <div class="x3-row"><label><input type="checkbox" data-o="chanThuc" ${st.chanThuc ? "checked" : ""}>Giao diện chân thực (bê tông có vân, ánh sáng bầu trời)</label></div>
+        <div class="x3-row"><label><input type="checkbox" data-o="sanTrong" ${st.sanTrong ? "checked" : ""}>Sàn trong suốt (nhìn xuyên vào các tầng)</label></div>
+        <div class="x3-row"><label><input type="checkbox" data-o="matDat" ${st.matDat ? "checked" : ""}>Mặt đất mờ (móng, cọc nằm dưới)</label></div>
         <div class="x3-row"><label><input type="checkbox" data-o="bong" ${st.bong ? "checked" : ""}>Đổ bóng</label></div>
         <div class="x3-row"><label><input type="checkbox" data-o="luoi" ${st.luoi ? "checked" : ""}>Lưới nền</label></div>
         <div class="x3-row"><label><input type="checkbox" data-o="canhBao" ${st.canhBao ? "checked" : ""}>Tô đỏ cấu kiện có cảnh báo</label></div></div>`;
@@ -1738,7 +1787,7 @@
       if (dd.l) { st.loc[dd.l] = t.checked; ap(); return; }
       if (dd.o) {
         const k = dd.o; st[k] = t.checked;
-        if (k === "noi") { luu(); dung(); ap(); } else if (k === "khoet") { dung(); ap(); } else if (k === "matChuan") { dungMat(); ap(); } else ap();
+        if (k === "noi") { luu(); dung(); ap(); } else if (k === "khoet") { dung(); ap(); } else if (k === "matChuan") { dungMat(); ap(); } else if (k === "matDat") { datMoiTruong(); ap(); } else if (k === "chanThuc") { daCT = null; ap(); } else ap();
         capNhatPn(); return;
       }
       if (dd.mbh != null) { const c = st.mb[dsMB[+dd.mbh].key]; ghiLui(); c.hien = t.checked; luu(); dung(); ap(); capNhatPn(); return; }
