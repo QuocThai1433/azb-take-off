@@ -22,6 +22,7 @@ from shapely.ops import unary_union
 from .dxf_reader import HinhKin, LayerData
 
 TEN_LAYER_SUY_RA = "_DAM_SUY_RA"
+TEN_LAYER_SAN_SUY_RA = "_SAN_SUY_RA"   # ô trống giữa dầm = ô sàn (chỉ tạo khi chưa gán layer sàn nào)
 EPS = 1e-6
 PHU_KIN = 0.98      # dải được coi là dầm khi F phủ từ 98% diện tích dải
 O_NHO_NHAT = 0.01   # ô trống nhỏ hơn 1% diện tích khung bị bỏ (ký hiệu, nét vẽ nhỏ)
@@ -89,12 +90,13 @@ def suy_dam(ban_ve, loai_layer):
         if not any(k.intersection(u).area > 0.95 * k.area for u in khung_duy_nhat):
             khung_duy_nhat.append(k)
 
-    dai_dam, manh_le = [], []
+    dai_dam, manh_le, o_san = [], [], []
     for k in khung_duy_nhat:
         o_trong = [o.intersection(k) for o in ods if k.contains(o.centroid)]
         o_trong = [o for o in o_trong if O_NHO_NHAT * k.area <= o.area < O_LON_NHAT * k.area]
         if not o_trong:
             continue  # khung của mặt bằng khác (móng, định vị cột...) không có ô trống: bỏ qua
+        o_san.extend(o_trong)
         f = k.difference(unary_union(o_trong))
         ctx = {"f": f, "o": o_trong}
         ngang, dung = _cat_dai(k, ctx, "ngang"), _cat_dai(k, ctx, "dung")
@@ -120,4 +122,11 @@ def suy_dam(ban_ve, loai_layer):
         ten=TEN_LAYER_SUY_RA, hinh_kin=[HinhKin(g, "", "SUY_RA") for g in dai_dam])
     loai = dict(loai_layer)
     loai[TEN_LAYER_SUY_RA] = "dam"
+    if o_san and "san" not in loai_layer.values():
+        # Chưa gán layer sàn nào: coi mỗi ô trống giữa dầm là một ô sàn (dày theo bảng tầng / mặc định, nhãn t=... nếu có)
+        layers[TEN_LAYER_SAN_SUY_RA] = LayerData(
+            ten=TEN_LAYER_SAN_SUY_RA, hinh_kin=[HinhKin(g, "", "SUY_RA") for g in o_san if g.area > 1e-3])
+        loai[TEN_LAYER_SAN_SUY_RA] = "san"
+        canh_bao.append(f"Đã suy ra {len(layers[TEN_LAYER_SAN_SUY_RA].hinh_kin)} ô sàn = ô trống giữa dầm. "
+                        "Lỗ thang, lỗ kỹ thuật, ô không có sàn cần Sếp loại bỏ tay.")
     return replace(ban_ve, layers=layers, canh_bao=canh_bao), loai

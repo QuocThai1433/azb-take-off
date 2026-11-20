@@ -422,3 +422,17 @@ def test_doc_nhan_dam_co_so_tang_dung_truoc():
                         ("1HR(200x300)", "1HR", [0.2, 0.3]), ("1X2 (200x400/370)", "1X2", [0.2, 0.4])):
         n = doc_nhan(nd)
         assert n["loai"] == "dam" and n["ten"] == ten and n["kt"] == kt, nd
+
+
+def test_suy_dam_tao_o_san_tu_o_trong_khi_chua_gan_layer_san():
+    from shapely.geometry import box
+
+    from app.dam_suy_ra import TEN_LAYER_SAN_SUY_RA, suy_dam
+    from app.dxf_reader import BanVe, HinhKin, LayerData
+
+    hinh = [box(0, 0, 4, 4), box(0.2, 0.2, 3.8, 2.5), box(0.2, 2.7, 3.8, 3.8)]
+    bv = BanVe("x.dxf", 1.0, "m", {"BS": LayerData("BS", hinh_kin=[HinhKin(g, "", "LWPOLYLINE") for g in hinh])}, [])
+    moi, loai = suy_dam(bv, {"BS": "khung_dam"})
+    assert loai[TEN_LAYER_SAN_SUY_RA] == "san" and len(moi.layers[TEN_LAYER_SAN_SUY_RA].hinh_kin) == 2
+    moi2, loai2 = suy_dam(bv, {"BS": "khung_dam", "X": "san"})   # đã có layer sàn thì không tự thêm
+    assert TEN_LAYER_SAN_SUY_RA not in loai2
