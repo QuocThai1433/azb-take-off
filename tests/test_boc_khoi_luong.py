@@ -412,3 +412,13 @@ def test_suy_dam_mot_layer_khong_co_o_trong_thi_bao_thieu():
     moi, loai = suy_dam(BanVe("x.dxf", 1.0, "m", layers, []), {"BS": "khung_dam"})
     assert TEN_LAYER_SUY_RA not in moi.layers
     assert any("Ô trống" in c for c in moi.canh_bao)
+
+
+def test_doc_nhan_dam_co_so_tang_dung_truoc():
+    """Nhãn dầm kiểu '1Y4 (250x400)', '1X3-1 (200x400)', '1HR(200x300)': nhận là dầm, b x h theo nhãn."""
+    from app.takeoff import doc_nhan
+
+    for nd, ten, kt in (("1Y4 (250x400)", "1Y4", [0.25, 0.4]), ("1X3-1 (200x400)", "1X3-1", [0.2, 0.4]),
+                        ("1HR(200x300)", "1HR", [0.2, 0.3]), ("1X2 (200x400/370)", "1X2", [0.2, 0.4])):
+        n = doc_nhan(nd)
+        assert n["loai"] == "dam" and n["ten"] == ten and n["kt"] == kt, nd

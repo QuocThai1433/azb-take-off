@@ -32,6 +32,7 @@ TIEN_TO_NHAN = [
     ("cot", r"^(C|K)"),
     ("san", r"^(S|Ô|O)"),
     ("dam", r"^(D|B|GB|DC|DP|DS|DM)"),
+    ("dam", r"^\d+(X|Y|HR|B)"),   # tên dầm có số tầng đứng trước: 1X3-1, 1Y4, 1HRA, 1B1 (20/11/2026)
 ]
 
 RE_KICH_THUOC = re.compile(r"\d+(?:[.,]\d+)?(?:\s*[xX×*]\s*\d+(?:[.,]\d+)?)+")
@@ -49,7 +50,7 @@ def doc_nhan(noi_dung):
     s = re.sub(r"^\d+\s*\.\s*(?=[A-Za-zÔô])", "", noi_dung.strip())
     ten = re.split(r"[\s(\[]", s, maxsplit=1)[0].upper()
     kq = {"ten": ten, "loai": None, "kt": [], "day": None, "noi_dung": s}
-    m = RE_KICH_THUOC.search(s)
+    m = RE_KICH_THUOC.search(s[len(ten):] if re.match(r"\d", ten) else s)   # tên bắt đầu bằng số (1X3-1) thì không tìm kích thước trong chính tên
     if m:
         kq["kt"] = [_so(x) for x in re.split(r"\s*[xX×*]\s*", m.group(0))]
     m = RE_DAY.search(s)
