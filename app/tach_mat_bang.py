@@ -17,6 +17,7 @@ import unicodedata
 from collections import defaultdict, deque
 
 import numpy as np
+import shapely
 from shapely.geometry import box
 
 from .dxf_reader import KHUNG_GIAY_M2
@@ -40,29 +41,45 @@ def _bo_dau(s):
 
 def _thu_thap(ban_ve):
     """Mẫu điểm của mọi nét vẽ để gom cụm. Trả (X, Y, loai, la_chinh): loai 0 hình, 1 nét, 2 chữ."""
-    xs, ys, kind, chinh = [], [], [], []
-
-    def them(x, y, k, c):
-        xs.append(x); ys.append(y); kind.append(k); chinh.append(c)
-
+    # Làm theo lô bằng numpy/shapely (hàm vector hoá chạy bằng C), không lặp từng điểm bằng Python:
+    # bản vẽ vài chục nghìn hình, vài trăm nghìn nét thì vòng lặp Python là phần chậm nhất.
+    cac_x, cac_y, cac_k, cac_c = [], [], [], []
+    hinh, net, chu_x, chu_y = [], [], [], []
     for ten, ld in ban_ve.layers.items():
         if ld.tat or ten.lower() == "defpoints":
             continue
-        for h in ld.hinh_kin:
-            if h.geom.area >= KHUNG_GIAY_M2:
-                continue
-            x0, y0, x1, y1 = h.geom.bounds
-            them((x0 + x1) / 2, (y0 + y1) / 2, 0, True)
-            for x, y in ((x0, y0), (x1, y1), (x0, y1), (x1, y0)):
-                them(x, y, 0, False)
-        for n in ld.net_ho:
-            cs = list(n.coords)
-            buoc = max(1, len(cs) // MAX_MAU_NET)
-            for i, (x, y) in enumerate(cs[::buoc]):
-                them(x, y, 1, i == 0)
+        hinh.extend(h.geom for h in ld.hinh_kin)
+        net.extend(ld.net_ho)
         for c in ld.chu:
-            them(c.diem.x, c.diem.y, 2, True)
-    return np.array(xs), np.array(ys), np.array(kind), np.array(chinh, dtype=bool)
+            chu_x.append(c.diem.x); chu_y.append(c.diem.y)
+
+    if hinh:
+        g = np.array(hinh, dtype=object)
+        b = shapely.bounds(g)[shapely.area(g) < KHUNG_GIAY_M2]
+        n = len(b)
+        if n:
+            x0, y0, x1, y1 = b[:, 0], b[:, 1], b[:, 2], b[:, 3]
+            cac_x += [(x0 + x1) / 2, x0, x1, x0, x1]
+            cac_y += [(y0 + y1) / 2, y0, y1, y1, y0]
+            cac_k += [np.zeros(n, dtype=np.int8)] * 5
+            cac_c += [np.ones(n, dtype=bool)] + [np.zeros(n, dtype=bool)] * 4
+    if net:
+        g = np.array(net, dtype=object)
+        xy, idx = shapely.get_coordinates(g, return_index=True)
+        if len(idx):
+            dem = np.bincount(idx, minlength=len(g))
+            dau = np.cumsum(dem) - dem
+            vt = np.arange(len(idx)) - dau[idx]                  # thứ tự điểm trong đường của nó
+            buoc = np.maximum(1, dem // MAX_MAU_NET)[idx]
+            giu = vt % buoc == 0                                  # lấy mẫu mỗi `buoc` điểm, đúng như cs[::buoc]
+            cac_x.append(xy[giu, 0]); cac_y.append(xy[giu, 1])
+            cac_k.append(np.ones(int(giu.sum()), dtype=np.int8)); cac_c.append(vt[giu] == 0)
+    if chu_x:
+        cac_x.append(np.array(chu_x)); cac_y.append(np.array(chu_y))
+        cac_k.append(np.full(len(chu_x), 2, dtype=np.int8)); cac_c.append(np.ones(len(chu_x), dtype=bool))
+    if not cac_x:
+        return np.array([]), np.array([]), np.array([], dtype=np.int8), np.array([], dtype=bool)
+    return (np.concatenate(cac_x), np.concatenate(cac_y), np.concatenate(cac_k), np.concatenate(cac_c))
 
 
 def _cum(X, Y, khoang_cach):
@@ -119,8 +136,11 @@ def _khung_giay(ban_ve):
 
 
 def _chu_trong(chu_ds, k, le=0.0):
+    """Các chữ nằm trong khung k (nới `le`). chu_ds = (danh sách chữ, mảng X, mảng Y): lọc bằng numpy, không đọc toạ độ từng chữ."""
+    ds, cx, cy = chu_ds
     x0, y0, x1, y1 = k
-    return [c for c in chu_ds if x0 - le <= c.diem.x <= x1 + le and y0 - le <= c.diem.y <= y1 + le]
+    m = (cx >= x0 - le) & (cx <= x1 + le) & (cy >= y0 - le) & (cy <= y1 + le)
+    return [ds[i] for i in np.flatnonzero(m)]
 
 
 def _phan_tich_vung(chu_ds, k, le):
@@ -211,7 +231,8 @@ def _cat_chong(vung, X, Y, bien=1e-3):
 def do_mat_bang(ban_ve, khoang_cach=None):
     """Đề xuất các vùng (mặt bằng / chi tiết / bảng) trong một bản vẽ. Trả {ds, khoang_cach, cach}."""
     X, Y, K, C = _thu_thap(ban_ve)
-    chu_ds = [c for ld in ban_ve.layers.values() if not ld.tat for c in ld.chu]
+    ds_chu = [c for ld in ban_ve.layers.values() if not ld.tat for c in ld.chu]
+    chu_ds = (ds_chu, np.array([c.diem.x for c in ds_chu]), np.array([c.diem.y for c in ds_chu]))
     if not len(X):
         return {"ds": [], "khoang_cach": 0.0, "cach": "trống"}
     rong = max(X.max() - X.min(), Y.max() - Y.min())

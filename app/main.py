@@ -225,6 +225,7 @@ def tai_len(file: UploadFile = File(...), don_vi: str = Form("auto"), trang: int
     log.info("Đã tải lên %s (%d layer, đơn vị %s)", ten, len(bv.layers), bv.don_vi)
     luu_tru.ghi_meta(pid, ten, don_vi, **them)  # để nạp lại được sau khi tải lại trang hoặc khởi động lại server
     PHIEN[pid] = {"ban_ve": bv, "kq": None}
+    _tach_san_nen(PHIEN[pid], pid)
     return _thong_tin_ban_ve(pid, ten, bv)
 
 
@@ -323,10 +324,29 @@ class TachMatBang(BaseModel):
     khoang_cach: float | None = None
 
 
+def _tach_co_nho(p, khoang_cach):
+    """Kết quả tách mặt bằng theo khoảng cách, nhớ trong phiên: bấm lại / đổi tab không phải tính lại.
+    Bản vẽ không đổi trong một phiên (gán layer không ảnh hưởng việc tách) nên kết quả dùng lại an toàn."""
+    kho = p.setdefault("mat_bang", {})
+    if khoang_cach not in kho:
+        kho[khoang_cach] = do_mat_bang(p["ban_ve"], khoang_cach)
+    return kho[khoang_cach]
+
+
+def _tach_san_nen(p, pid):
+    """Tách sẵn mặt bằng (khoảng cách tự động) ngầm ngay sau khi tải lên, để lúc bấm 'Tách mặt bằng' có kết quả luôn."""
+    def chay():
+        try:
+            _tach_co_nho(p, None)
+        except Exception:
+            log.exception("Tách sẵn mặt bằng lỗi (bỏ qua, bấm tách sẽ tính lại) %s", pid)
+    threading.Thread(target=chay, daemon=True, name=f"tach-san-{pid}").start()
+
+
 @app.post("/api/tach-mat-bang")
 def tach_mat_bang(yc: TachMatBang):
     """Đề xuất các vùng (mặt bằng, chi tiết, bảng) trong một file. Chỉ đề xuất: không sửa gì, người dùng bấm tạo mới có hiệu lực."""
-    return do_mat_bang(_phien(yc.id)["ban_ve"], yc.khoang_cach)
+    return _tach_co_nho(_phien(yc.id), yc.khoang_cach)
 
 
 class KiemTraLayer(BaseModel):

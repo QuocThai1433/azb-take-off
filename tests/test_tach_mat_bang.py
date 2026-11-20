@@ -126,3 +126,21 @@ def test_api_tach_mat_bang(tmp_path):
     assert up.status_code == 200, up.text
     r = c.post("/api/tach-mat-bang", json={"id": up.json()["id"]}).json()
     assert len(r["ds"]) == 1 and r["ds"][0]["ten"].startswith("MẶT BẰNG")
+
+
+def test_tach_co_nho_va_khong_tinh_lai(tmp_path, monkeypatch):
+    """Cùng một phiên, bấm tách nhiều lần (cùng khoảng cách) chỉ tính một lần; khoảng cách khác thì tính riêng."""
+    from app import main
+    d = _doc()
+    m = d.modelspace()
+    _mat_bang(m, 0, 0, "MẶT BẰNG MÓNG  TL:1/100")
+    _mat_bang(m, 100, 0, "MẶT BẰNG TẦNG 1  TL:1/100")
+    p = {"ban_ve": _doc_ve(tmp_path, d), "kq": None}
+    so_lan = []
+    goc = main.do_mat_bang
+    monkeypatch.setattr(main, "do_mat_bang", lambda bv, kc: so_lan.append(kc) or goc(bv, kc))
+    a = main._tach_co_nho(p, None)
+    b = main._tach_co_nho(p, None)
+    assert a is b and so_lan == [None] and len(a["ds"]) == 2
+    main._tach_co_nho(p, 20)
+    assert so_lan == [None, 20]
