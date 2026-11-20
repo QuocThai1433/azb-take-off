@@ -450,3 +450,36 @@ def test_suy_dam_chi_co_cac_o_trong_khong_co_khung_ngoai():
     moi, loai = suy_dam(bv, {"BS": "khung_dam"})
     assert TEN_LAYER_SUY_RA in moi.layers and len(moi.layers[TEN_LAYER_SUY_RA].hinh_kin) >= 3
     assert any("khung bao" in c for c in moi.canh_bao)
+
+
+def test_suy_dam_bo_o_co_dau_x_khoi_san():
+    """Ô trống có hai đường chéo nối bốn góc (dấu X) là lỗ mở: vẫn tạo dầm xung quanh nhưng không tạo sàn."""
+    from shapely.geometry import LineString, box
+
+    from app.dam_suy_ra import TEN_LAYER_SAN_SUY_RA, TEN_LAYER_SUY_RA, suy_dam
+    from app.dxf_reader import BanVe, HinhKin, LayerData
+
+    hinh = [box(0, 0, 4, 4), box(0.2, 0.2, 3.8, 2.5), box(0.2, 2.7, 3.8, 3.8)]
+    x = [LineString([(0.2, 0.2), (3.8, 2.5)]), LineString([(0.2, 2.5), (3.8, 0.2)])]   # dấu X trong ô dưới
+    layers = {"BS": LayerData("BS", hinh_kin=[HinhKin(g, "", "LWPOLYLINE") for g in hinh]), "GRID": LayerData("GRID", net_ho=x)}
+    moi, loai = suy_dam(BanVe("x.dxf", 1.0, "m", layers, []), {"BS": "khung_dam"})
+    assert len(moi.layers[TEN_LAYER_SAN_SUY_RA].hinh_kin) == 1 and len(moi.layers[TEN_LAYER_SUY_RA].hinh_kin) == 5
+    assert any("dấu X" in c for c in moi.canh_bao)
+
+
+def test_suy_dam_khoet_lo_co_dau_x_nam_trong_o_san():
+    """Hộp nhỏ có dấu X nằm trong một ô sàn lớn (lỗ thang): sàn bị khoét đúng diện tích hộp."""
+    from shapely.geometry import LineString, box
+    from shapely.ops import unary_union
+
+    from app.dam_suy_ra import TEN_LAYER_SAN_SUY_RA, suy_dam
+    from app.dxf_reader import BanVe, HinhKin, LayerData
+
+    hinh = [box(0, 0, 6, 6), box(0.2, 0.2, 5.8, 5.8)]
+    lo = box(2, 2, 4, 4)
+    x = [LineString([(2, 2), (4, 4)]), LineString([(2, 4), (4, 2)])]
+    layers = {"BS": LayerData("BS", hinh_kin=[HinhKin(g, "", "LWPOLYLINE") for g in hinh]),
+              "LO": LayerData("LO", hinh_kin=[HinhKin(lo, "", "LWPOLYLINE")]), "GRID": LayerData("GRID", net_ho=x)}
+    moi, _ = suy_dam(BanVe("x.dxf", 1.0, "m", layers, []), {"BS": "khung_dam"})
+    dt = unary_union([h.geom for h in moi.layers[TEN_LAYER_SAN_SUY_RA].hinh_kin]).area
+    assert abs(dt - (5.6 * 5.6 - 4.0)) < 1e-6

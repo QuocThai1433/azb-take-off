@@ -51,6 +51,47 @@ def _cat_dai(khung, phan_dam, huong):
     return [d for d in dai if d.intersection(f).area >= PHU_KIN * d.area]
 
 
+def _duong_cheo(ban_ve):
+    """Các đoạn thẳng chéo (hai điểm, cả hai chiều > 0,3 m) ở mọi layer: ứng viên cho dấu X của ô lỗ mở."""
+    ds = []
+    for ld in ban_ve.layers.values():
+        for n in ld.net_ho:
+            cs = list(n.coords)
+            if len(cs) != 2:
+                continue
+            (a, b), (c, d) = cs[0][:2], cs[1][:2]
+            if abs(a - c) > 0.3 and abs(b - d) > 0.3:
+                ds.append(((a, b), (c, d)))
+    return ds
+
+
+def _co_dau_x(g, cheo):
+    """Hình chữ nhật có dấu X (hai đường chéo nối đúng bốn góc) là ô lỗ mở (lỗ thang, lỗ kỹ thuật) theo quy ước bản vẽ
+    kết cấu: không có sàn. Đường chéo có thể nằm ở bất kỳ layer nào (thường là layer trục lưới của mặt bằng)."""
+    x0, y0, x1, y1 = g.bounds
+    tol = max(0.05, min(0.25, 0.15 * min(x1 - x0, y1 - y0)))
+    gan = lambda p, q: abs(p[0] - q[0]) <= tol and abs(p[1] - q[1]) <= tol
+    co = [False, False]   # (trái-dưới -> phải-trên), (trái-trên -> phải-dưới)
+    for p, q in cheo:
+        for i, (u, v) in enumerate((((x0, y0), (x1, y1)), ((x0, y1), (x1, y0)))):
+            if (gan(p, u) and gan(q, v)) or (gan(p, v) and gan(q, u)):
+                co[i] = True
+    return all(co)
+
+
+def _lo_co_dau_x(ban_ve, cheo):
+    """Mọi hình kín gần chữ nhật, diện tích 0,3 đến 40 m2, có dấu X."""
+    kq = []
+    if not cheo:
+        return kq
+    for ld in ban_ve.layers.values():
+        for h in ld.hinh_kin:
+            g = h.geom
+            if 0.3 < g.area < 40 and g.area / max(g.envelope.area, 1e-9) > 0.9 and _co_dau_x(g, cheo):
+                kq.append(g)
+    return kq
+
+
 def _tach_khung_va_o(hinh):
     """Một layer chứa cả khung và ô trống: trả (khung, ô). Ô = hình nhỏ hơn có tâm nằm trong một hình lớn hơn.
     Hình trùng nhau (hatch + polyline) cùng diện tích không coi là chứa nhau."""
@@ -133,9 +174,29 @@ def suy_dam(ban_ve, loai_layer):
     loai[TEN_LAYER_SUY_RA] = "dam"
     if o_san and "san" not in loai_layer.values():
         # Chưa gán layer sàn nào: coi mỗi ô trống giữa dầm là một ô sàn (dày theo bảng tầng / mặc định, nhãn t=... nếu có)
-        layers[TEN_LAYER_SAN_SUY_RA] = LayerData(
-            ten=TEN_LAYER_SAN_SUY_RA, hinh_kin=[HinhKin(g, "", "SUY_RA") for g in o_san if g.area > 1e-3])
+        cheo = _duong_cheo(ban_ve)
+        lo = _lo_co_dau_x(ban_ve, cheo)
+        co_x = [g for g in o_san if g.area > 1e-3 and _co_dau_x(g, cheo)]
+        lo_trong = [l for l in lo if not any(l.equals(k) or l.symmetric_difference(k).area < 1e-4 for k in co_x)]
+        union_lo = unary_union(lo_trong) if lo_trong else None
+        san, so_lo = [], 0
+        for g in o_san:
+            if g.area <= 1e-3 or any(g is k for k in co_x):
+                continue
+            if union_lo is not None and g.intersects(union_lo):
+                con = g.difference(union_lo)
+                if con.area < g.area - 1e-4:
+                    so_lo += 1
+                for q in _manh(con):
+                    if q.area > 1e-3:
+                        san.append(q)
+            else:
+                san.append(g)
+        layers[TEN_LAYER_SAN_SUY_RA] = LayerData(ten=TEN_LAYER_SAN_SUY_RA, hinh_kin=[HinhKin(g, "", "SUY_RA") for g in san])
         loai[TEN_LAYER_SAN_SUY_RA] = "san"
-        canh_bao.append(f"Đã suy ra {len(layers[TEN_LAYER_SAN_SUY_RA].hinh_kin)} ô sàn = ô trống giữa dầm. "
-                        "Lỗ thang, lỗ kỹ thuật, ô không có sàn cần Sếp loại bỏ tay.")
+        canh_bao.append(f"Đã suy ra {len(san)} ô sàn = ô trống giữa dầm. Lỗ thang, lỗ kỹ thuật không có dấu X cần Sếp loại bỏ tay.")
+        if co_x:
+            canh_bao.append(f"Bỏ {len(co_x)} ô có dấu X (hai đường chéo nối bốn góc = ô lỗ mở, không có sàn).")
+        if so_lo:
+            canh_bao.append(f"Khoét lỗ có dấu X (lỗ thang, lỗ kỹ thuật) trong {so_lo} ô sàn.")
     return replace(ban_ve, layers=layers, canh_bao=canh_bao), loai

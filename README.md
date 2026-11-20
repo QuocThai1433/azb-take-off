@@ -103,6 +103,8 @@ Giới hạn: dầm nhận diện theo hình học trên mặt bằng; dầm v�
 
 **Bảng tổng hợp bỏ hình 'dầm' rộng hơn 1,2 m (20/11/2026):** hình có cạnh ngắn rộng hơn `BE_RONG_DAM_TOI_DA` = 1,2 m trong `tong_hop_cong_trinh` (`app/he_quy_chieu.py`) là khung ghi chú / đường bao khung dầm bị đọc nhầm, không đưa vào tổng hợp (3D vốn đã bỏ), nên không tính sai khối lượng dầm; số bị bỏ hiện ở mục `bo_qua`. Test: `test_tong_hop_bo_dam_rong_hon_1m2_la_khung_ghi_chu`.
 
+**Ô có dấu X là lỗ mở, không có sàn (20/11/2026):** khi suy sàn từ ô trống giữa dầm (`app/dam_suy_ra.py`), hộp chữ nhật có hai đường chéo nối đúng bốn góc (dấu X, ở bất kỳ layer nào) được coi là lỗ thang / lỗ kỹ thuật theo quy ước bản vẽ kết cấu: ô trống là chính hộp đó thì bỏ khỏi sàn (`_co_dau_x`), hộp nằm trong ô sàn lớn thì khoét lỗ (`_lo_co_dau_x`). Dầm xung quanh vẫn được suy ra như cũ. Trên LH-NOTT-CD-SH1: sàn đỉnh mái (2 ô đều có dấu X) không còn tấm sàn nào, chỉ còn khung dầm và 4 cột góc; tầng 2, 3, mái được khoét một lỗ. Lỗ không có dấu X vẫn phải loại tay. Test: `test_suy_dam_bo_o_co_dau_x_khoi_san`, `test_suy_dam_khoet_lo_co_dau_x_nam_trong_o_san`.
+
 ## 3d. Gán layer chuẩn (tab "Gán layer")
 
 Gán layer là bước quyết định độ chính xác: layer gán sai thì khối lượng sai mà không có lỗi báo ra. Phần mềm gợi ý loại cho từng layer từ ba nguồn, theo thứ tự:
