@@ -517,7 +517,7 @@
     let vanCo = null;
     function taoVanCo() {   // vân cỏ: nhiễu xanh đậm nhạt, lặp theo ô 6 m
       const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d"), im = g.createImageData(256, 256);
-      for (let i = 0; i < 256 * 256; i++) { const k = Math.random(), m = 0.55 + 0.45 * Math.random(); im.data[i * 4] = (62 + 40 * k) * m; im.data[i * 4 + 1] = (104 + 56 * k) * m; im.data[i * 4 + 2] = (40 + 22 * k) * m; im.data[i * 4 + 3] = 255; }
+      for (let i = 0; i < 256 * 256; i++) { const k = Math.random(), m = 0.55 + 0.45 * Math.random(); im.data[i * 4] = (92 + 46 * k) * m; im.data[i * 4 + 1] = (124 + 52 * k) * m; im.data[i * 4 + 2] = (48 + 20 * k) * m; im.data[i * 4 + 3] = 255; }
       g.putImageData(im, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t;
     }
     function taoVanBeTong() {   // vân bê tông: nhiễu mịn + vài vệt loang, lặp mỗi 1 m
@@ -526,7 +526,7 @@
         g.putImageData(im, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t; };
       vanBeTong = mk(228, 255); vanBeTong.encoding = THREE.sRGBEncoding; vanBump = mk(90, 170);
     }
-    const MAU_THAT = {cot: 0xb8b2a6, dam: 0xc2bcaf, san: 0xd2ccbf, mong: 0x8f8a7f, coc: 0xc9c4b8, vach: 0xbcb6aa, tuong: 0xe3d6b8, mai: 0xa5503a};   // màu bê tông / vữa / ngói khi ở chế độ chân thực
+    const MAU_THAT = {cot: 0xb8b2a6, dam: 0xc2bcaf, san: 0xd2ccbf, mong: 0x8f8a7f, coc: 0xddd8cc, vach: 0xbcb6aa, tuong: 0xe3d6b8, mai: 0xa5503a};   // màu bê tông / vữa / ngói khi ở chế độ chân thực
     const cam = new THREE.PerspectiveCamera(40, 1, 0.1, 5000);
     const dk = new THREE.OrbitControls(cam, r.domElement);
     dk.enableDamping = true; dk.dampingFactor = 0.08; dk.rotateSpeed = 0.8; dk.maxPolarAngle = Math.PI / 2 - 0.02;
@@ -1041,7 +1041,7 @@
       // mặt đất: ở cao độ chân công trình (thấp nhất của cột / dầm / sàn / tường), móng và cọc nằm dưới, nhìn xuyên qua mặt đất mờ
       let yDat = hop.min.y; { let m = 1e9; objs.forEach(o => { if (["cot", "dam", "san", "vach", "tuong"].includes(o.loai) && o.dz && !o.bo) m = Math.min(m, o.dz[0]); }); if (m < 1e8 && m > hop.min.y + 0.2) yDat = m - 0.2; }
       const ct = !!st.chanThuc, datMo = ct && st.matDat;
-      nenDat = new THREE.Mesh(new THREE.PlaneGeometry(bk * 8, bk * 8), datMo ? new THREE.MeshStandardMaterial({color: 0xffffff, map: (vanCo || (vanCo = taoVanCo())), roughness: 1, metalness: 0, transparent: true, opacity: 0.55, depthWrite: false}) : new THREE.ShadowMaterial({opacity: ct ? 0.3 : 0.38}));
+      nenDat = new THREE.Mesh(new THREE.PlaneGeometry(bk * 8, bk * 8), datMo ? new THREE.MeshStandardMaterial({color: 0xffffff, map: (vanCo || (vanCo = taoVanCo())), roughness: 1, metalness: 0, transparent: true, opacity: 0.68, depthWrite: false}) : new THREE.ShadowMaterial({opacity: ct ? 0.3 : 0.38}));
       nenDat.rotation.x = -Math.PI / 2; nenDat.position.set(tam.x, datMo ? yDat : hop.min.y - 0.012, tam.z); nenDat.receiveShadow = true; scene.add(nenDat);
       if (datMo) vanCo.repeat.set(bk * 8 / 6, bk * 8 / 6);
       const n = Math.min(Math.ceil(bk * 3), 200);
