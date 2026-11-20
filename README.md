@@ -91,6 +91,8 @@ Giới hạn: dầm nhận diện theo hình học trên mặt bằng; dầm v�
 
 **Sàn suy ra cùng với dầm (20/11/2026):** khi dầm được suy ra từ khung và ô trống mà chưa gán layer *Sàn* nào, mỗi ô trống giữa dầm thành một ô sàn (layer ảo `_SAN_SUY_RA`, `app/dam_suy_ra.py`), dày theo thông số mặc định / bảng tầng. Đã gán layer Sàn rồi thì không tự thêm. Lỗ thang, lỗ kỹ thuật cũng bị coi là ô sàn nên kỹ sư phải loại bỏ tay (có cảnh báo). Test: `test_suy_dam_tao_o_san_tu_o_trong_khi_chua_gan_layer_san`. Mặt bằng dầm sàn tầng 1 mẫu ra 5 ô sàn.
 
+**Nhân bản mục bản vẽ (20/11/2026):** mục mới tạo bằng nút ⧉ nay bắt đầu với hệ quy chiếu trống (chưa gán tầng, chưa căn, `hq:null` trong `nhanBan`, `app/static/cad.html`). Trước đây mục mới dùng chung dữ liệu `hq` với mục gốc nên gán tầng cho mục mới làm đổi luôn tầng của mục gốc.
+
 ## 3d. Gán layer chuẩn (tab "Gán layer")
 
 Gán layer là bước quyết định độ chính xác: layer gán sai thì khối lượng sai mà không có lỗi báo ra. Phần mềm gợi ý loại cho từng layer từ ba nguồn, theo thứ tự:

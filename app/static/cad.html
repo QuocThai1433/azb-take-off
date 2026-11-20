@@ -1031,7 +1031,7 @@ $("ds-file").addEventListener("change", e => {
 function nhanBan(i) {
   // Cùng một bản vẽ, thêm một mục mới có vùng và cách gán layer riêng (mỗi mặt bằng trên một tờ là một mục)
   S.nhom = new Set(); const g = S.files[i], n = S.files.filter(f => f.id === g.id).length + 1;
-  S.files.splice(i + 1, 0, {...g, ten:`${g.ten.replace(/ \(\d+\)$/, "")} (${n})`, layers:g.layers.map(l => ({...l})), vung:null, kl:null});
+  S.files.splice(i + 1, 0, {...g, ten:`${g.ten.replace(/ \(\d+\)$/, "")} (${n})`, layers:g.layers.map(l => ({...l})), vung:null, kl:null, hq:null});   // hq:null = chưa gán tầng, chưa căn (trước đây copy chung hq của mục gốc nên sửa mục mới làm đổi luôn mục gốc)
   lenh(`Đã nhân bản ${g.ten}: chọn vùng mặt bằng khác cho mục mới.`, "ok"); moFile(i + 1);
 }
 function dongFile(i) {
