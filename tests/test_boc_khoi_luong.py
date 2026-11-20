@@ -436,3 +436,17 @@ def test_suy_dam_tao_o_san_tu_o_trong_khi_chua_gan_layer_san():
     assert loai[TEN_LAYER_SAN_SUY_RA] == "san" and len(moi.layers[TEN_LAYER_SAN_SUY_RA].hinh_kin) == 2
     moi2, loai2 = suy_dam(bv, {"BS": "khung_dam", "X": "san"})   # đã có layer sàn thì không tự thêm
     assert TEN_LAYER_SAN_SUY_RA not in loai2
+
+
+def test_suy_dam_chi_co_cac_o_trong_khong_co_khung_ngoai():
+    """Mặt bằng chỉ vẽ các ô sàn (không có hình khung ngoài): lấy khung bao quanh các ô nới 200 mm làm dầm biên."""
+    from shapely.geometry import box
+
+    from app.dam_suy_ra import TEN_LAYER_SUY_RA, suy_dam
+    from app.dxf_reader import BanVe, HinhKin, LayerData
+
+    o = [box(0, 0, 3, 5), box(3.4, 0, 6, 5)]
+    bv = BanVe("x.dxf", 1.0, "m", {"BS": LayerData("BS", hinh_kin=[HinhKin(g, "", "LWPOLYLINE") for g in o])}, [])
+    moi, loai = suy_dam(bv, {"BS": "khung_dam"})
+    assert TEN_LAYER_SUY_RA in moi.layers and len(moi.layers[TEN_LAYER_SUY_RA].hinh_kin) >= 3
+    assert any("khung bao" in c for c in moi.canh_bao)

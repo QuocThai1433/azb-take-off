@@ -26,6 +26,7 @@ TEN_LAYER_SAN_SUY_RA = "_SAN_SUY_RA"   # ô trống giữa dầm = ô sàn (ch�
 EPS = 1e-6
 PHU_KIN = 0.98      # dải được coi là dầm khi F phủ từ 98% diện tích dải
 O_NHO_NHAT = 0.01   # ô trống nhỏ hơn 1% diện tích khung bị bỏ (ký hiệu, nét vẽ nhỏ)
+BE_RONG_BAO = 0.2    # m: bề rộng dầm biên giả định khi chỉ có các ô sàn, không có khung ngoài
 O_LON_NHAT = 0.9    # hình từ 90% diện tích khung trở lên là chính khung, không phải ô trống
 
 
@@ -73,6 +74,14 @@ def suy_dam(ban_ve, loai_layer):
         # Bản vẽ vẽ khung và ô trống chung một layer (như mặt bằng dầm sàn LH-NOTT-CD-SH1, 20/11/2026):
         # hình nào nằm trong hình lớn hơn là ô trống, hình ngoài cùng là khung.
         khungs, ods = _tach_khung_va_o([h.geom for t in ten_khung for h in ban_ve.layers[t].hinh_kin])
+        if not ods and len(khungs) >= 2:
+            # Chỉ có các ô sàn, không có hình khung ngoài (mặt bằng dầm sàn tầng 2 mẫu): lấy khung bao quanh các ô,
+            # nới BE_RONG_BAO m mỗi phía để có dầm biên. Là ước lượng, có cảnh báo.
+            from shapely.geometry import box as _box
+            x0, y0, x1, y1 = unary_union(khungs).bounds
+            ods, khungs = list(khungs), [_box(x0 - BE_RONG_BAO, y0 - BE_RONG_BAO, x1 + BE_RONG_BAO, y1 + BE_RONG_BAO)]
+            canh_bao.append(f"Layer chỉ có các ô trống, không có khung ngoài: lấy khung bao quanh các ô nới {BE_RONG_BAO * 1000:.0f} mm mỗi phía "
+                            "làm dầm biên (ước lượng, Sếp đối chiếu bề rộng dầm biên).")
         if not ods:
             canh_bao.append('Layer "Khung dầm" không có hình nào nằm trong hình khác để làm ô trống: '
                             'cần gán thêm layer "Ô trống giữa dầm" thì mới suy ra được dầm.')

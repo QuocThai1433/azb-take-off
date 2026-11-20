@@ -93,6 +93,8 @@ Giới hạn: dầm nhận diện theo hình học trên mặt bằng; dầm v�
 
 **Nhân bản mục bản vẽ (20/11/2026):** mục mới tạo bằng nút ⧉ nay bắt đầu với hệ quy chiếu trống (chưa gán tầng, chưa căn, `hq:null` trong `nhanBan`, `app/static/cad.html`). Trước đây mục mới dùng chung dữ liệu `hq` với mục gốc nên gán tầng cho mục mới làm đổi luôn tầng của mục gốc.
 
+**Dầm suy ra khi chỉ có các ô sàn (20/11/2026):** mặt bằng dầm sàn tầng 2 mẫu chỉ vẽ các ô, không có hình khung ngoài. Khi layer Khung dầm chỉ có ô (không hình nào chứa hình khác), `suy_dam` lấy khung bao quanh các ô nới `BE_RONG_BAO` = 200 mm mỗi phía làm dầm biên, kèm cảnh báo ước lượng. Test: `test_suy_dam_chi_co_cac_o_trong_khong_co_khung_ngoai`.
+
 ## 3d. Gán layer chuẩn (tab "Gán layer")
 
 Gán layer là bước quyết định độ chính xác: layer gán sai thì khối lượng sai mà không có lỗi báo ra. Phần mềm gợi ý loại cho từng layer từ ba nguồn, theo thứ tự:
