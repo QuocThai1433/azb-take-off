@@ -85,6 +85,8 @@ Bản vẽ mặt bằng dầm chỉ có nét (chưa có tên dầm, tên trục)
 
 Giới hạn: dầm nhận diện theo hình học trên mặt bằng; dầm vẽ lệch tim trục hoặc khung không phải hình chữ nhật có thể cho bề rộng khác thực tế, Sếp đối chiếu bảng *Loại dầm*. Nhãn là đề xuất, kỹ sư kiểm tra trước khi dùng.
 
+**Dầm suy ra khi khung và ô trống chung một layer (20/11/2026):** nhiều mặt bằng dầm sàn (như `MẶT BẰNG DẦM SÀN TẦNG 1` của LH-NOTT-CD-SH1, layer `LH_SH1_BS 1FL$0$S-Beam`) vẽ khung ngoài và các ô sàn trong cùng một layer. Gán layer đó là **Khung dầm (bao ngoài)** là đủ, không cần layer *Ô trống giữa dầm* riêng: hàm `_tach_khung_va_o` (`app/dam_suy_ra.py`) coi hình có tâm nằm trong hình lớn hơn là ô trống, hình ngoài cùng là khung, rồi suy dầm = khung trừ ô trống như bình thường. Hình trùng nhau (hatch + polyline) không coi là chứa nhau. Nếu layer không có hình nào nằm trong hình khác thì báo thiếu *Ô trống giữa dầm*. Test: `test_suy_dam_khung_va_o_trong_cung_mot_layer`, `test_suy_dam_mot_layer_khong_co_o_trong_thi_bao_thieu` trong `tests/test_boc_khoi_luong.py`. Trên mặt bằng dầm sàn tầng 1 mẫu ra 7 dải dầm rộng 200 đến 250 mm và một mảnh lẻ 0,76 m² (kèm cảnh báo, kỹ sư kiểm tra).
+
 ## 3d. Gán layer chuẩn (tab "Gán layer")
 
 Gán layer là bước quyết định độ chính xác: layer gán sai thì khối lượng sai mà không có lỗi báo ra. Phần mềm gợi ý loại cho từng layer từ ba nguồn, theo thứ tự:

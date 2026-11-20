@@ -49,6 +49,17 @@ def _cat_dai(khung, phan_dam, huong):
     return [d for d in dai if d.intersection(f).area >= PHU_KIN * d.area]
 
 
+def _tach_khung_va_o(hinh):
+    """Một layer chứa cả khung và ô trống: trả (khung, ô). Ô = hình nhỏ hơn có tâm nằm trong một hình lớn hơn.
+    Hình trùng nhau (hatch + polyline) cùng diện tích không coi là chứa nhau."""
+    ds = sorted((g for g in hinh if g.area > EPS), key=lambda g: -g.area)
+    khung, o = [], []
+    for g in ds:
+        trong = any(k.area > 1.05 * g.area and k.contains(g.centroid) for k in ds)
+        (o if trong else khung).append(g)
+    return khung, o
+
+
 def suy_dam(ban_ve, loai_layer):
     """Trả (ban_ve mới, loai_layer mới). Không đổi gì nếu không có layer khung dầm / ô trống."""
     ten_khung = [t for t, v in loai_layer.items() if v == "khung_dam"]
@@ -57,12 +68,21 @@ def suy_dam(ban_ve, loai_layer):
         return ban_ve, loai_layer
 
     canh_bao = list(ban_ve.canh_bao)
-    if not ten_khung or not ten_o:
+    if ten_khung and not ten_o:
+        # Bản vẽ vẽ khung và ô trống chung một layer (như mặt bằng dầm sàn LH-NOTT-CD-SH1, 20/11/2026):
+        # hình nào nằm trong hình lớn hơn là ô trống, hình ngoài cùng là khung.
+        khungs, ods = _tach_khung_va_o([h.geom for t in ten_khung for h in ban_ve.layers[t].hinh_kin])
+        if not ods:
+            canh_bao.append('Layer "Khung dầm" không có hình nào nằm trong hình khác để làm ô trống: '
+                            'cần gán thêm layer "Ô trống giữa dầm" thì mới suy ra được dầm.')
+            return replace(ban_ve, canh_bao=canh_bao), loai_layer
+        canh_bao.append('Layer "Khung dầm" vẽ cả khung lẫn ô trống: hình ngoài cùng là khung, hình nằm trong là ô trống. Sếp đối chiếu.')
+    elif not ten_khung:
         canh_bao.append('Cần gán cả layer "Khung dầm" và layer "Ô trống giữa dầm" thì mới suy ra được dầm.')
         return replace(ban_ve, canh_bao=canh_bao), loai_layer
-
-    khungs = [h.geom for t in ten_khung for h in ban_ve.layers[t].hinh_kin]
-    ods = [h.geom for t in ten_o for h in ban_ve.layers[t].hinh_kin]
+    else:
+        khungs = [h.geom for t in ten_khung for h in ban_ve.layers[t].hinh_kin]
+        ods = [h.geom for t in ten_o for h in ban_ve.layers[t].hinh_kin]
     # Bỏ khung trùng nhau (hatch + polyline, ghép nét)
     khung_duy_nhat = []
     for k in sorted(khungs, key=lambda g: -g.area):

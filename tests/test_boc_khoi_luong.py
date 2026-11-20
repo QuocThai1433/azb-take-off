@@ -383,3 +383,32 @@ def test_coc_tra_ve_de_dung_3d(tmp_path):
     c = kq["coc"][0]
     assert abs(c["d"] - 0.3) < 0.01 and {"id", "ten", "x", "y", "layer"} <= set(c)
     assert not kq["cau_kien"]
+
+
+def test_suy_dam_khung_va_o_trong_cung_mot_layer():
+    """Mặt bằng dầm sàn vẽ khung và ô trống chung một layer: chỉ gán layer đó là 'Khung dầm' vẫn suy ra được dầm
+    (kết quả y hệt khi tách hai layer: 5 dải dầm, 3,76 m2)."""
+    from shapely.geometry import box
+
+    from app.dam_suy_ra import TEN_LAYER_SUY_RA, suy_dam
+    from app.dxf_reader import BanVe, HinhKin, LayerData
+
+    hinh = [box(0, 0, 4, 4), box(0, 0, 4, 4),     # khung (hatch + polyline trùng nhau)
+            box(0.2, 0.2, 3.8, 2.5), box(0.2, 2.7, 3.8, 3.8)]
+    layers = {"BS": LayerData("BS", hinh_kin=[HinhKin(g, "", "LWPOLYLINE") for g in hinh])}
+    moi, loai = suy_dam(BanVe("x.dxf", 1.0, "m", layers, []), {"BS": "khung_dam"})
+    dai = moi.layers[TEN_LAYER_SUY_RA].hinh_kin
+    assert loai[TEN_LAYER_SUY_RA] == "dam" and len(dai) == 5
+    assert abs(unary_union_dien_tich([h.geom for h in dai]) - 3.76) < 1e-6
+
+
+def test_suy_dam_mot_layer_khong_co_o_trong_thi_bao_thieu():
+    from shapely.geometry import box
+
+    from app.dam_suy_ra import TEN_LAYER_SUY_RA, suy_dam
+    from app.dxf_reader import BanVe, HinhKin, LayerData
+
+    layers = {"BS": LayerData("BS", hinh_kin=[HinhKin(box(0, 0, 4, 4), "", "LWPOLYLINE"), HinhKin(box(10, 0, 14, 4), "", "LWPOLYLINE")])}
+    moi, loai = suy_dam(BanVe("x.dxf", 1.0, "m", layers, []), {"BS": "khung_dam"})
+    assert TEN_LAYER_SUY_RA not in moi.layers
+    assert any("Ô trống" in c for c in moi.canh_bao)
