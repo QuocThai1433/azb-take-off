@@ -513,6 +513,7 @@
     { const g = nenSangCv.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, "#5f8fc9"); gr.addColorStop(.5, "#b9d0e8"); gr.addColorStop(.72, "#e4ebf2"); gr.addColorStop(1, "#e4ebf2"); g.fillStyle = gr; g.fillRect(0, 0, 2, 256); }
     const nenToi = scene.background, nenSang = new THREE.CanvasTexture(nenSangCv); nenSang.encoding = THREE.sRGBEncoding;
     let moiTruong = null, vanBeTong = null, vanBump = null, daCT = null;
+    const DBG = (() => { try { return localStorage.getItem("azb-3d-dbg") || ""; } catch (e) { return ""; } })();
     function taoMoiTruong() {   // môi trường phản chiếu dựng bằng mã (không cần tải file HDR): vòm trời + mặt trời + vài tấm sáng
       const es = new THREE.Scene();
       es.add(new THREE.Mesh(new THREE.SphereGeometry(40, 32, 16), new THREE.ShaderMaterial({side: THREE.BackSide,
@@ -978,8 +979,8 @@
     }
     function apCanh() {   // đổi giữa giao diện chân thực và giao diện phân loại màu: chỉ làm khi trạng thái đổi
       const ct = !!st.chanThuc; if (daCT === ct) return; daCT = ct;
-      if (ct && !moiTruong) { moiTruong = taoMoiTruong(); taoVanBeTong(); }
-      r.toneMapping = ct ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping; r.toneMappingExposure = 1.05;
+      if (ct && !moiTruong) { try { moiTruong = DBG.includes("noenv") ? null : taoMoiTruong(); } catch (e) { console.warn("Không dựng được môi trường phản chiếu:", e); moiTruong = null; } taoVanBeTong(); }
+      r.toneMapping = ct && !DBG.includes("notone") ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping; r.toneMappingExposure = 1.05;
       r.outputEncoding = ct ? THREE.sRGBEncoding : THREE.LinearEncoding;
       scene.background = ct ? nenSang : nenToi; scene.environment = ct ? moiTruong : null;
       scene.fog.color.setHex(ct ? 0xe4ebf2 : 0x121827);
@@ -1007,7 +1008,7 @@
         const that = !!st.chanThuc && MAU_THAT[o.loai] != null && !MEPK.includes(o.loai);
         mat.color.setHex(o.bo ? 0x555b66 : loiMau ? 0xff3b3b : that ? MAU_THAT[o.loai] : mauBT);
         if (that) {   // bê tông / vữa có vân và độ nhám cao; chỉ đổi khi chế độ đổi để không biên dịch lại shader
-          if (!mat.userData.that) { mat.userData.that = true; mat.map = vanBeTong; mat.bumpMap = vanBump; mat.bumpScale = 0.9; mat.roughness = 0.93; mat.metalness = 0; mat.needsUpdate = true; }
+          if (!mat.userData.that) { mat.userData.that = true; mat.map = DBG.includes("nomap") ? null : vanBeTong; mat.bumpMap = DBG.includes("nobump") ? null : vanBump; mat.bumpScale = 0.9; mat.roughness = 0.93; mat.metalness = 0; mat.needsUpdate = true; }
         } else if (mat.userData.that) { mat.userData.that = false; mat.map = null; mat.bumpMap = null; mat.roughness = 0.62; mat.metalness = 0.05; mat.needsUpdate = true; }
         const tr0 = mat.transparent;
         if (st.xray) { mat.transparent = true; mat.opacity = 0.22; mat.depthWrite = false; }
