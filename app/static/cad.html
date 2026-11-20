@@ -3626,19 +3626,22 @@ window.themBanVe = themBanVe;  // dùng khi kiểm thử
     S.daDong = (tt.da_dong || []).filter(f => f && typeof f.id === "string");
     S.hqc = Object.assign(hqMacDinh(), tt.he_quy_chieu || {}); S.hqKq = null; if (!$("p-hq").hidden) veHQ();
     try {
-      const tin = {};
+      const tin = {}, tam = new Set();
       for (const f of tt.files || []) {
         if (!(f.id in tin)) {
           lenh(`Đang nạp lại ${f.ten} ...`);
-          try {
-            const [t, h] = await Promise.all([goi("/api/ban-ve/" + f.id).then(r => r.json()), goi("/api/hinh?id=" + f.id).then(r => r.json())]);
-            tin[f.id] = {t, h};
-          } catch (e) {
-            tin[f.id] = null; lenh(`Không nạp lại được ${f.ten}: ${e.message}`, "loi");
-            if (!/Không còn file|không hợp lệ/.test(e.message)) giu.push(f);   // lỗi tạm thời: giữ thiết lập, không làm mất
+          for (let lan = 1; lan <= 3 && tin[f.id] === undefined; lan++) {   // vừa khởi động lại máy chủ thường đọc bản vẽ lớn chậm: thử lại 3 lần
+            try {
+              const [t, h] = await Promise.all([goi("/api/ban-ve/" + f.id).then(r => r.json()), goi("/api/hinh?id=" + f.id).then(r => r.json())]);
+              tin[f.id] = {t, h};
+            } catch (e) {
+              if (/Không còn file|không hợp lệ/.test(e.message)) { tin[f.id] = null; lenh(`Không nạp lại được ${f.ten}: ${e.message}`, "loi"); }
+              else if (lan < 3) { lenh(`Máy chủ chưa sẵn sàng, thử lại lần ${lan + 1}: ${e.message}`); await new Promise(r => setTimeout(r, 4000)); }
+              else { tin[f.id] = null; tam.add(f.id); lenh(`Không nạp lại được ${f.ten}: ${e.message}. Giữ nguyên thiết lập, KHÔNG xoá; tải lại trang (F5) để thử lại.`, "loi"); }
+            }
           }
         }
-        const x = tin[f.id]; if (!x) continue;
+        const x = tin[f.id]; if (!x) { if (tam.has(f.id)) giu.push(f); continue; }   // lỗi tạm thời: giữ MỌI mục dùng chung bản vẽ này (trước đây chỉ giữ mục đầu nên mất cả chục mặt bằng đã làm)
         S.mac_dinh = x.t.mac_dinh; S.loaiHopLe = x.t.loai_hop_le;
         S.files.push({id:f.id, ten:f.ten, vai_tro:f.vai_tro, layers:f.layers || [], hinh:x.h, vung:f.vung ?? null, ve3d:f.ve3d ?? null, tang_tm:f.tang_tm || "", hq:f.hq || null, kl:null});
       }

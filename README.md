@@ -99,6 +99,8 @@ Giới hạn: dầm nhận diện theo hình học trên mặt bằng; dầm v�
 
 **Căn vùng tự động chính xác hơn (20/11/2026):** "Dò trục + căn tự động" (`goi_y_diem_vung`, `app/he_quy_chieu.py`) không còn lấy trục đầu tiên trùng tên. Hàm `_chon_truc_khop` bỏ phiếu: mỗi trục của vùng trùng tên với lưới chuẩn cho một độ dời, độ dời nào được nhiều trục (1, 2, 3, 4, A, B) đồng ý nhất thắng (dung sai `DUNG_SAI_TRUC_BO_PHIEU` 50 mm). Nhờ đó đường trục cùng tên ở mặt cắt / chi tiết không làm lệch cả vùng (trước đây dầm sàn tầng 2 lệch 7213 mm, dầm sàn tầng 3 lệch 8475 mm). Kiểm tra chéo trong `tinh_can_vung` cũng chỉ xét đường khớp nhất khi có nhiều đường cùng tên. Trên 5 mặt bằng của LH-NOTT-CD-SH1 (cột tầng 1, 2, dầm sàn tầng 1, 2, 3) cả 6 trục đều lệch 0 mm. Test: `test_diem_can_bo_phieu_khong_bi_duong_cung_ten_lam_lech`, `test_kiem_tra_cheo_chi_xet_duong_khop_nhat_trong_cac_duong_cung_ten`.
 
+**Sửa lỗi mất mặt bằng khi khởi động lại (20/11/2026):** khi nạp lại dự án mà máy chủ chưa sẵn sàng (vừa khởi động, đọc bản vẽ lớn chậm) và nạp bản vẽ lỗi tạm thời, hàm `nap` (`app/static/cad.html`) chỉ giữ **mục đầu tiên** dùng bản vẽ đó, bỏ cả chục mục mặt bằng còn lại rồi tự lưu đè, nên dự án chỉ còn 1 mục. Nay `nap` thử lại 3 lần (cách 4 giây) và nếu vẫn lỗi tạm thời thì giữ **mọi** mục cùng bản vẽ, báo cách tải lại trang. Lấy lại dự án đã mất: nút *Sao lưu* chọn bản gần nhất, hoặc API `/api/du-an/khoi-phuc`.
+
 ## 3d. Gán layer chuẩn (tab "Gán layer")
 
 Gán layer là bước quyết định độ chính xác: layer gán sai thì khối lượng sai mà không có lỗi báo ra. Phần mềm gợi ý loại cho từng layer từ ba nguồn, theo thứ tự:
