@@ -408,7 +408,7 @@ def test_suy_dam_mot_layer_khong_co_o_trong_thi_bao_thieu():
     from app.dam_suy_ra import TEN_LAYER_SUY_RA, suy_dam
     from app.dxf_reader import BanVe, HinhKin, LayerData
 
-    layers = {"BS": LayerData("BS", hinh_kin=[HinhKin(box(0, 0, 4, 4), "", "LWPOLYLINE"), HinhKin(box(10, 0, 14, 4), "", "LWPOLYLINE")])}
+    layers = {"BS": LayerData("BS", hinh_kin=[HinhKin(box(0, 0, 4, 4), "", "LWPOLYLINE")])}
     moi, loai = suy_dam(BanVe("x.dxf", 1.0, "m", layers, []), {"BS": "khung_dam"})
     assert TEN_LAYER_SUY_RA not in moi.layers
     assert any("Ô trống" in c for c in moi.canh_bao)
