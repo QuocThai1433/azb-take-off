@@ -40,6 +40,8 @@ Mở trình duyệt vào **http://127.0.0.1:8765**. Công cụ chỉ nhận kế
 
 ## 3. Quy trình sử dụng
 
+> Bản trình bày cho các phòng ban (8 bước từ DWG đến 3D, ai kiểm gì): xem [docs/QUY_TRINH_SU_DUNG.md](docs/QUY_TRINH_SU_DUNG.md) (thêm 21/11/2026).
+
 1. **Tải bản vẽ** lên (DXF, DWG hoặc **PDF**): mỗi file là 1 mặt bằng của 1 tầng. Bản vẽ có nhiều mặt bằng thì tách ra trước.
    - **PDF** phải xuất từ CAD còn nét vector (PDF scan/ảnh không đọc được, app báo rõ). App đổi từng trang thành DXF (lưu cạnh file PDF gốc trong `data/uploads`) rồi bóc như DXF. Tỷ lệ lấy từ chữ `TL 1/xx` trong trang; không có thì nhập vào ô *Tỷ lệ PDF 1/* trước khi tải. PDF nhiều trang: app mở trang 1 rồi hỏi các trang cần mở thêm. Layer đặt theo lớp (layer) của PDF nếu có, không thì theo màu nét. Kiểm tra lại bằng một kích thước đã biết trước khi bóc.
 2. **Gán layer:** công cụ tự đoán loại cấu kiện theo tên layer (`config/layer_map.yaml`), Sếp chỉnh lại nếu sai. Nhập chiều cao tầng.
