@@ -3060,14 +3060,13 @@ function hqDongDT(o) {
     <td class="so">${so(o.dien_tich, 3)}</td><td class="so">${o.the_tich == null ? "–" : so(o.the_tich, 3)}</td><td class="nho">${esc(o.vung)}</td></tr>`;
 }
 function veHQTH() {
-  const p = $("hq-th"); if (!p) return; const t = S.hqTH, dd = S.hqc.da_dua_ve;
+  const p = $("hq-th"); if (!p) return; const t = S.hqTH;
   const dsChon = hqDsChon();
-  let h = `<div><b>5. Tổng hợp theo tầng và đưa về tim trục</b> <span class="nho">tầng → cấu kiện → đối tượng, toạ độ theo gốc ${esc(hqNhan(S.hqc.goc)) || "(chưa chọn gốc)"}</span></div>
+  let h = `<div><b>5. Tổng hợp theo tầng</b> <span class="nho">tầng → cấu kiện → đối tượng, toạ độ theo gốc ${esc(hqNhan(S.hqc.goc)) || "(chưa chọn gốc)"}</span></div>
     <div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button id="hq-th-tinh">Tính và tổng hợp</button> <button id="hq-th-3d" class="cam" title="Dựng 3D từ lưới trục, bảng tầng và các mặt bằng đã căn">Dựng 3D theo hệ quy chiếu</button>
-      ${t ? `<button id="hq-th-dua" ${dsChon.length ? "" : "disabled"}>Đưa về tim trục (${dsChon.length} đối tượng đã tick)</button>
+      ${t ? `
       <label class="nho"><input type="checkbox" id="hq-th-xem" ${t.xem ? "checked" : ""}> Xem trước trên bản vẽ chuẩn</label>
-      <button id="hq-th-csv" ${dsChon.length ? "" : "disabled"}>Xuất CSV</button>` : ""}</div>
-    ${dd ? `<div style="color:#4cc38a">✓ Đã đưa về tim trục lúc ${esc(dd.luc)}: ${dd.so_doi_tuong} đối tượng (${dd.nhom.map(n => `${esc(n.tang)} ${esc(n.ten)} ${n.so}`).join("; ")}).</div>` : ""}`;
+      <button id="hq-th-csv" ${dsChon.length ? "" : "disabled"}>Xuất CSV (${dsChon.length} đối tượng đã tick)</button>` : ""}</div>`;
   if (!t) h += '<div class="nho">Bấm "Tính và tổng hợp" sau khi đã gán tầng, cấu kiện và căn xong các mặt bằng ở mục 4.</div>';
   else {
     h += t.data.canh_bao.map(c => `<div class="cb">⚠ ${esc(c)}</div>`).join("") + t.data.bo_qua.map(b => `<div class="nho">${esc(b.vung)}: bỏ ${b.so} đối tượng ${esc(b.ly_do)}.</div>`).join("");
@@ -3105,12 +3104,6 @@ $("p-hq").addEventListener("click", async e => {
   const d = e.target.closest("button"); if (!d) return;
   if (d.id === "hq-th-tinh") return hqTinhTongHop();
   if (!t) return;
-  if (d.id === "hq-th-dua") {
-    const ds = hqDsChon(), dem = {};
-    t.data.tang.forEach(g => g.nhom.forEach(n => { if (t.chon.has(g.ma + "|" + n.cau_kien)) dem[g.ma + "|" + n.cau_kien] = {tang:g.ma, ten:n.ten, so:n.so}; }));
-    S.hqc.da_dua_ve = {luc:new Date().toLocaleString("vi-VN"), so_doi_tuong:ds.length, nhom:Object.values(dem)};
-    lenh(`Đã đưa ${ds.length} đối tượng về tim trục (gốc ${hqNhan(S.hqc.goc)}).`, "ok"); veHQTH(); return;
-  }
   if (d.id === "hq-th-csv") {
     const dong = [["Tầng", "Cấu kiện", "Đối tượng", "Loại", "Vùng", "Dài (mm)", "Rộng (mm)", "Tâm X (m)", "Tâm Y (m)", "Cao độ đáy (m)", "Cao độ đỉnh (m)", "Diện tích (m2)", "Thể tích (m3)"]];
     t.data.tang.forEach(g => g.nhom.forEach(n => { if (t.chon.has(g.ma + "|" + n.cau_kien)) n.doi_tuong.forEach(o => dong.push([g.ma, n.ten, o.ten, o.loai, o.vung, hqMm(o.kich_thuoc[0]), hqMm(o.kich_thuoc[1]), o.tam_ct[0], o.tam_ct[1], o.z_day ?? "", o.z_dinh ?? "", o.dien_tich, o.the_tich ?? ""])); }));

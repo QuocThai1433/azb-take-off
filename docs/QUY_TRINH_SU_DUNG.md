@@ -65,7 +65,7 @@ Với mỗi mặt bằng: chọn **tầng**, **loại cấu kiện**, rồi bấ
 ### Bước 6. Tính và tổng hợp
 Bấm **Tính và tổng hợp**. Ra cây **Tầng → Cấu kiện → Đối tượng** với toạ độ, cao độ đáy/đỉnh, diện tích, thể tích. Bấm một dòng để thấy cấu kiện sáng lên trên bản vẽ.
 - Mục "bỏ qua" ghi lý do (khác loại khai báo, hình dầm rộng hơn 1,2 m là khung ghi chú...).
-- Xuất CSV/Excel.
+- Xuất CSV: tick tầng / cấu kiện cần lấy, chỉ các dòng đã tick được xuất. (Nút "Đưa về tim trục" cũ đã bỏ vì chỉ ghi ghi chú, không có tác dụng.)
 
 **Lưu ý:** danh sách tổng hợp không lưu, mở app lại thì bấm tính lại.
 
